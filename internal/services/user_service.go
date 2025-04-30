@@ -15,6 +15,8 @@ type IUserService interface {
 	GetUserByToken(token string) (*models.User, error)
 	GetProfile(id uint) (*models.User, error)
 	UpdateProfile(user *models.User) error
+	ImportUsers(users []models.User) (int, []string, error)
+	GetAll() (*[]models.User, error)
 }
 
 type UserService struct {
@@ -198,4 +200,42 @@ func (service *UserService) UpdateProfile(user *models.User) error {
 		return errors.New(errors.ErrDatabaseUpdate, err.Error())
 	}
 	return nil
+}
+
+// ImportUsers imports multiple users from a data source (like CSV)
+// It returns the number of successfully imported users, a list of failed emails, and any error that occurred
+func (service *UserService) ImportUsers(users []models.User) (int, []string, error) {
+	successCount := 0
+	failedEmails := []string{}
+
+	for _, user := range users {
+		// Check if user with this email already exists
+		existingUser, _ := service.GetUserByEmail(user.Email)
+		if existingUser != nil {
+			failedEmails = append(failedEmails, user.Email)
+			continue
+		}
+
+		// Create the user
+		if err := service.CreateUser(&user); err != nil {
+			failedEmails = append(failedEmails, user.Email)
+			continue
+		}
+
+		successCount++
+	}
+
+	return successCount, failedEmails, nil
+}
+
+// GetAll retrieves all users from the database.
+// Returns:
+//   - *[]models.User: A pointer to the slice of user records
+//   - error: nil if successful, otherwise returns the error that occurred
+func (service *UserService) GetAll() (*[]models.User, error) {
+	users, err := service.repo.GetAll()
+	if err != nil {
+		return nil, errors.New(errors.ErrDatabaseQuery, err.Error())
+	}
+	return users, nil
 }

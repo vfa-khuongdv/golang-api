@@ -65,6 +65,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		api.POST("/forgot-password", userHandler.ForgotPassword)
 		api.POST("/reset-password", userHandler.ResetPassword)
 
+		// User import/export
+		api.POST("/users/import-csv", userHandler.ImportUsersFromCSV)
+		api.GET("/users/export-xls", userHandler.ExportUsersToXLS)
+
 		// Protected routes (require authentication)
 		api.Use(middlewares.AuthMiddleware())
 		{

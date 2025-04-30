@@ -15,6 +15,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/errors"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
+	"github.com/xuri/excelize/v2"
 )
 
 type IUserhandler interface {
@@ -28,6 +29,8 @@ type IUserhandler interface {
 	DeleteUser(c *gin.Context)
 	GetProfile(c *gin.Context)
 	UpdateProfile(c *gin.Context)
+	ImportUsersFromCSV(c *gin.Context)
+	ExportUsersToXLS(c *gin.Context)
 }
 
 type UserHandler struct {
@@ -599,4 +602,243 @@ func (handler *UserHandler) UpdateProfile(ctx *gin.Context) {
 	}
 
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Update profile successfully"})
+}
+
+// ImportUsersFromCSV handles the uploading of a CSV file and importing users from it
+// The CSV file should have the following columns: email, password, name, birthday, address, gender
+func (handler *UserHandler) ImportUsersFromCSV(ctx *gin.Context) {
+	// Get the multipart file from the request
+	file, fileHeader, err := ctx.Request.FormFile("file")
+	if err != nil {
+		utils.RespondWithError(
+			ctx,
+			http.StatusBadRequest,
+			errors.New(errors.ErrInvalidData, "Invalid file upload: "+err.Error()),
+		)
+		return
+	}
+	defer file.Close()
+
+	// Validate file size (limit to 20MB)
+	const maxSize = 20 << 20 // 20MB
+	if fileHeader.Size > maxSize {
+		utils.RespondWithError(
+			ctx,
+			http.StatusBadRequest,
+			errors.New(errors.ErrInvalidData, "File size exceeds the 5MB limit"),
+		)
+		return
+	}
+
+	// Validate file type
+	if fileHeader.Header.Get("Content-Type") != "text/csv" {
+		utils.RespondWithError(
+			ctx,
+			http.StatusBadRequest,
+			errors.New(errors.ErrInvalidData, "Only CSV files are allowed"),
+		)
+		return
+	}
+
+	// Parse CSV to users
+	users, err := utils.ParseUserCSV(file)
+	if err != nil {
+		utils.RespondWithError(
+			ctx,
+			http.StatusBadRequest,
+			err,
+		)
+		return
+	}
+
+	// Validate that we have at least one user to import
+	if len(users) == 0 {
+		utils.RespondWithError(
+			ctx,
+			http.StatusBadRequest,
+			errors.New(errors.ErrInvalidData, "No valid users found in the CSV file"),
+		)
+		return
+	}
+
+	// Import users
+	successCount, failedEmails, err := handler.userService.ImportUsers(users)
+	if err != nil {
+		utils.RespondWithError(
+			ctx,
+			http.StatusInternalServerError,
+			err,
+		)
+		return
+	}
+
+	// Prepare response
+	response := gin.H{
+		"message":       "Users import completed",
+		"total":         len(users),
+		"success_count": successCount,
+		"failed_count":  len(failedEmails),
+	}
+
+	// Include failed emails if there are any
+	if len(failedEmails) > 0 {
+		response["failed_emails"] = failedEmails
+	}
+
+	utils.RespondWithOK(ctx, http.StatusOK, response)
+}
+
+// ExportUsersToXLS exports all users to an Excel file
+func (handler *UserHandler) ExportUsersToXLS(ctx *gin.Context) {
+	// Get all users from database
+	users, err := handler.userService.GetAll()
+	if err != nil {
+		utils.RespondWithError(
+			ctx,
+			http.StatusInternalServerError,
+			err,
+		)
+		return
+	}
+
+	// Create a new Excel file
+	f := excelize.NewFile()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Warnf("Failed to close Excel file: %v", err)
+		}
+	}()
+
+	// Create a new sheet
+	sheetName := "Users"
+	f.NewSheet(sheetName)
+	f.DeleteSheet("Sheet1") // Delete default sheet
+
+	// Add headers with styling
+	headers := []string{"ID", "Name", "Email", "Birthday", "Address", "Gender"}
+
+	// Create header style - blue background with white text and borders
+	headerStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold:  true,
+			Color: "FFFFFF", // White text
+		},
+		Fill: excelize.Fill{
+			Type:    "pattern",
+			Color:   []string{"4472C4"}, // Blue background
+			Pattern: 1,
+		},
+		Border: []excelize.Border{
+			{Type: "left", Color: "000000", Style: 1},
+			{Type: "top", Color: "000000", Style: 1},
+			{Type: "right", Color: "000000", Style: 1},
+			{Type: "bottom", Color: "000000", Style: 1},
+		},
+		Alignment: &excelize.Alignment{
+			Horizontal: "center",
+			Vertical:   "center",
+		},
+	})
+	if err != nil {
+		logger.Warnf("Failed to create header style: %v", err)
+	}
+
+	// Create data cell style with borders
+	dataCellStyle, err := f.NewStyle(&excelize.Style{
+		Border: []excelize.Border{
+			{Type: "left", Color: "000000", Style: 1},
+			{Type: "top", Color: "000000", Style: 1},
+			{Type: "right", Color: "000000", Style: 1},
+			{Type: "bottom", Color: "000000", Style: 1},
+		},
+	})
+	if err != nil {
+		logger.Warnf("Failed to create data cell style: %v", err)
+	}
+
+	// Apply header values and style
+	for i, header := range headers {
+		cell := fmt.Sprintf("%c%d", 'A'+i, 1) // A1, B1, C1, etc.
+		f.SetCellValue(sheetName, cell, header)
+		if headerStyle > 0 {
+			f.SetCellStyle(sheetName, cell, cell, headerStyle)
+		}
+	}
+
+	// Add data
+	for i, user := range *users {
+		rowNum := i + 2 // Start from row 2 (after headers)
+
+		// Format gender as text
+		var genderText string
+		switch user.Gender {
+		case 0:
+			genderText = "Unknown"
+		case 1:
+			genderText = "Male"
+		case 2:
+			genderText = "Female"
+		default:
+			genderText = "Unknown"
+		}
+
+		// Format birthday
+		birthdayStr := ""
+		if user.Birthday != nil {
+			birthdayStr = *user.Birthday
+		}
+
+		// Format address
+		addressStr := ""
+		if user.Address != nil {
+			addressStr = *user.Address
+		}
+
+		// Set values
+		columns := []string{"A", "B", "C", "D", "E", "F"}
+		values := []interface{}{user.ID, user.Name, user.Email, birthdayStr, addressStr, genderText}
+
+		for j, col := range columns {
+			cell := fmt.Sprintf("%s%d", col, rowNum)
+			f.SetCellValue(sheetName, cell, values[j])
+			// Apply border style to each data cell
+			if dataCellStyle > 0 {
+				f.SetCellStyle(sheetName, cell, cell, dataCellStyle)
+			}
+		}
+	}
+
+	// Adjust column width for better readability
+	for i := range headers {
+		colName := string('A' + i)
+		f.SetColWidth(sheetName, colName, colName, 20)
+	}
+
+	// This is the code to save file to disk
+	filename := fmt.Sprintf("users_export_%s.xlsx", time.Now().Format("2006-01-02"))
+
+	if err := f.SaveAs(filename); err != nil {
+		print(err)
+		utils.RespondWithError(
+			ctx,
+			http.StatusInternalServerError,
+			errors.New(errors.ErrServerInternal, "Failed to save Excel file: "+err.Error()),
+		)
+		return
+	}
+
+	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Export users successfully", "filename": filename})
+
+	// This is code to response file to client
+	// 	ctx.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	// 	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+
+	//	if err := f.Write(ctx.Writer); err != nil {
+	//		utils.RespondWithError(
+	//			ctx,
+	//			http.StatusInternalServerError,
+	//			errors.New(errors.ErrServerInternal, "Failed to write Excel file: "+err.Error()),
+	//		)
+	//		return
+	//	}
 }
