@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: ✅ Run Unit Tests
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
@@ -30,7 +30,7 @@ jobs:
           go tool cover -func=coverage.out
 
   analyze:
-    name: 🧪 Static Code Analysis (Placeholder)
+    name: Static Code Analysis
     needs: test
     runs-on: ubuntu-latest
     steps:
