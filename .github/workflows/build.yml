@@ -1,17 +1,15 @@
-name: Test → Analyze → Build & Deploy
+name: Test → Analyze
 
 on:
-  push:
+  pull_request:
     branches:
       - main
       - master
-  pull_request:
 
 jobs:
   test:
     name: ✅ Run Unit Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v3
@@ -35,33 +33,6 @@ jobs:
     name: 🧪 Static Code Analysis (Placeholder)
     needs: test
     runs-on: ubuntu-latest
-
     steps:
       - name: 🔍 Analyze Code (Placeholder)
         run: echo "🧪 Static analysis will be added later."
-
-  build:
-    name: 🏗 Build Go Application
-    needs: analyze
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 📥 Checkout Source Code
-        uses: actions/checkout@v3
-
-      - name: 🛠 Set Up Go 1.24
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24'
-
-      - name: 🏗 Compile Go Application
-        run: go build ./...
-
-  deploy:
-    name: 🚀 Deploy to Production
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: 🚀 Deploy to Production Environment
-        run: echo "✅ Deploy successful (replace with real deployment logic)"
