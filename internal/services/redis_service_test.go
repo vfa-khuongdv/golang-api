@@ -24,7 +24,7 @@ func setupTestRedis(t *testing.T) (*services.RedisService, func()) {
 
 	// teardown function
 	return service, func() {
-		client.Close()
+		_ = client.Close()
 		s.Close()
 	}
 }
