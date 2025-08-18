@@ -1,4 +1,4 @@
-name: Test → Analyze
+name: lint → test → measure → db → sast → integration
 
 on:
   pull_request:
@@ -7,8 +7,30 @@ on:
       - master
 
 jobs:
+  lint:
+    name: 🔎 Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Source Code
+        uses: actions/checkout@v3
+
+      - name: 🛠 Set Up Go 1.24
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: 📦 Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+            | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: ✅ Run Linter
+        run: golangci-lint run ./...
+
   test:
-    name: Run Unit Tests
+    name: ✅ Unit Tests
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
@@ -24,15 +46,51 @@ jobs:
           go install gotest.tools/gotestsum@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-      - name: ✅ Run Unit Tests with Coverage
+      - name: 🧪 Run Unit Tests with Coverage
         run: |
           gotestsum --format=standard-verbose -- -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out
 
-  analyze:
-    name: Static Code Analysis
+  measure:
+    name: 📊 Coverage / Measuring Unit
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - name: 🔍 Analyze Code (Placeholder)
-        run: echo "🧪 Static analysis will be added later."
+      - name: 📥 Checkout Source Code
+        uses: actions/checkout@v3
+
+      - name: 📊 Upload Coverage Report
+        run: |
+          echo "This step will check thresholds or upload coverage report"
+          # Example: enforce 70% coverage
+          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
+
+  db:
+    name: 🗄 Database Script (Placeholder)
+    needs: measure
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout Source Code
+        uses: actions/checkout@v3
+
+      - name: 🗄 Run Database Migration Script
+        run: |
+          echo "Placeholder: run migration script here (e.g. goose, flyway, liquibase, etc.)"
+
+  sast:
+    name: 🛡 SAST (Placeholder)
+    needs: db
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Static Application Security Testing
+        run: |
+          echo "Placeholder: SAST tool integration (e.g. SonarCloud, CodeQL, Trivy, etc.)"
+
+  integration:
+    name: 🔗 Integration Tests (Placeholder)
+    needs: sast
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧪 Run Integration Tests
+        run: |
+          echo "Placeholder: run integration tests here"
