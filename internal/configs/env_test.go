@@ -13,12 +13,16 @@ func TestLoadEnv(t *testing.T) {
 		// Save current working directory
 		originalDir, err := os.Getwd()
 		assert.NoError(t, err)
-		defer os.Chdir(originalDir)
+		defer func() {
+			_ = os.Chdir(originalDir)
+		}()
 
 		// Create a temporary directory
 		tempDir, err := os.MkdirTemp("", "env_test")
 		assert.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() {
+			_ = os.RemoveAll(tempDir)
+		}()
 
 		// Change to the temporary directory
 		err = os.Chdir(tempDir)
@@ -32,8 +36,8 @@ ANOTHER_VAR=another_value`
 		assert.NoError(t, err)
 
 		// Clean up any existing environment variables
-		os.Unsetenv("TEST_VAR")
-		os.Unsetenv("ANOTHER_VAR")
+		_ = os.Unsetenv("TEST_VAR")
+		_ = os.Unsetenv("ANOTHER_VAR")
 
 		// Call LoadEnv
 		configs.LoadEnv()
@@ -46,26 +50,32 @@ ANOTHER_VAR=another_value`
 		assert.Equal(t, "another_value", anotherVar)
 
 		// Clean up environment variables
-		os.Unsetenv("TEST_VAR")
-		os.Unsetenv("ANOTHER_VAR")
+		_ = os.Unsetenv("TEST_VAR")
+		_ = os.Unsetenv("ANOTHER_VAR")
 	})
 
 	t.Run("LoadEnv - Without .env file", func(t *testing.T) {
 		// Create a temporary directory without .env file
 		tempDir, err := os.MkdirTemp("", "no_env_test")
 		assert.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() {
+			_ = os.RemoveAll(tempDir)
+		}()
 
 		originalDir, err := os.Getwd()
 		assert.NoError(t, err)
-		defer os.Chdir(originalDir)
+		defer func() {
+			_ = os.Chdir(originalDir)
+		}()
 
 		err = os.Chdir(tempDir)
 		assert.NoError(t, err)
 
 		// Set a system environment variable
-		os.Setenv("SYSTEM_TEST_VAR", "system_value")
-		defer os.Unsetenv("SYSTEM_TEST_VAR")
+		_ = os.Setenv("SYSTEM_TEST_VAR", "system_value")
+		defer func() {
+			_ = os.Unsetenv("SYSTEM_TEST_VAR")
+		}()
 
 		// Call LoadEnv - should not panic and should use system env vars
 		configs.LoadEnv()

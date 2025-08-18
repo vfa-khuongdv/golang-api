@@ -13,19 +13,19 @@ import (
 func TestSendMailForgotPassword(t *testing.T) {
 	t.Run("SendMailForgotPassword - Success", func(t *testing.T) {
 		// Set required environment variables for the test
-		os.Setenv("MAIL_HOST", "smtp.gmail.com")
-		os.Setenv("MAIL_PORT", "587")
-		os.Setenv("MAIL_USERNAME", "test@example.com")
-		os.Setenv("MAIL_PASSWORD", "testpassword")
-		os.Setenv("MAIL_FROM", "noreply@example.com")
-		os.Setenv("FRONTEND_URL", "https://example.com")
+		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
+		_ = os.Setenv("MAIL_PORT", "587")
+		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
+		_ = os.Setenv("MAIL_PASSWORD", "testpassword")
+		_ = os.Setenv("MAIL_FROM", "noreply@example.com")
+		_ = os.Setenv("FRONTEND_URL", "https://example.com")
 		defer func() {
-			os.Unsetenv("MAIL_HOST")
-			os.Unsetenv("MAIL_PORT")
-			os.Unsetenv("MAIL_USERNAME")
-			os.Unsetenv("MAIL_PASSWORD")
-			os.Unsetenv("MAIL_FROM")
-			os.Unsetenv("FRONTEND_URL")
+			_ = os.Unsetenv("MAIL_HOST")
+			_ = os.Unsetenv("MAIL_PORT")
+			_ = os.Unsetenv("MAIL_USERNAME")
+			_ = os.Unsetenv("MAIL_PASSWORD")
+			_ = os.Unsetenv("MAIL_FROM")
+			_ = os.Unsetenv("FRONTEND_URL")
 		}()
 
 		// Create a test user with token
@@ -56,11 +56,13 @@ func TestSendMailForgotPassword(t *testing.T) {
 		// Create the template file
 		templateFile, err := os.Create("pkg/mailer/templates/forgot_template.html")
 		require.NoError(t, err)
-		defer os.Remove("pkg/mailer/templates/forgot_template.html")
+		defer func() {
+			_ = os.Remove("pkg/mailer/templates/forgot_template.html")
+		}()
 
 		_, err = templateFile.WriteString(templateContent)
 		require.NoError(t, err)
-		templateFile.Close()
+		_ = templateFile.Close()
 
 		// Note: This test will fail on actual email sending since we don't have real SMTP credentials
 		// But it will test the template parsing and execution logic
@@ -77,23 +79,23 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 	t.Run("SendMailForgotPassword - Template Not Found", func(t *testing.T) {
 		// Set required environment variables for the test
-		os.Setenv("MAIL_HOST", "smtp.gmail.com")
-		os.Setenv("MAIL_PORT", "587")
-		os.Setenv("MAIL_USERNAME", "test@example.com")
-		os.Setenv("MAIL_PASSWORD", "testpassword")
-		os.Setenv("MAIL_FROM", "noreply@example.com")
-		os.Setenv("FRONTEND_URL", "https://example.com")
+		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
+		_ = os.Setenv("MAIL_PORT", "587")
+		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
+		_ = os.Setenv("MAIL_PASSWORD", "testpassword")
+		_ = os.Setenv("MAIL_FROM", "noreply@example.com")
+		_ = os.Setenv("FRONTEND_URL", "https://example.com")
 		defer func() {
-			os.Unsetenv("MAIL_HOST")
-			os.Unsetenv("MAIL_PORT")
-			os.Unsetenv("MAIL_USERNAME")
-			os.Unsetenv("MAIL_PASSWORD")
-			os.Unsetenv("MAIL_FROM")
-			os.Unsetenv("FRONTEND_URL")
+			_ = os.Unsetenv("MAIL_HOST")
+			_ = os.Unsetenv("MAIL_PORT")
+			_ = os.Unsetenv("MAIL_USERNAME")
+			_ = os.Unsetenv("MAIL_PASSWORD")
+			_ = os.Unsetenv("MAIL_FROM")
+			_ = os.Unsetenv("FRONTEND_URL")
 		}()
 
 		// Remove template file if it exists
-		os.Remove("pkg/mailer/templates/forgot_template.html")
+		_ = os.Remove("pkg/mailer/templates/forgot_template.html")
 
 		// Create a test user with token
 		token := "test-reset-token"
@@ -114,19 +116,19 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 	t.Run("SendMailForgotPassword - Invalid Template", func(t *testing.T) {
 		// Set required environment variables for the test
-		os.Setenv("MAIL_HOST", "smtp.gmail.com")
-		os.Setenv("MAIL_PORT", "587")
-		os.Setenv("MAIL_USERNAME", "test@example.com")
-		os.Setenv("MAIL_PASSWORD", "testpassword")
-		os.Setenv("MAIL_FROM", "noreply@example.com")
-		os.Setenv("FRONTEND_URL", "https://example.com")
+		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
+		_ = os.Setenv("MAIL_PORT", "587")
+		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
+		_ = os.Setenv("MAIL_PASSWORD", "testpassword")
+		_ = os.Setenv("MAIL_FROM", "noreply@example.com")
+		_ = os.Setenv("FRONTEND_URL", "https://example.com")
 		defer func() {
-			os.Unsetenv("MAIL_HOST")
-			os.Unsetenv("MAIL_PORT")
-			os.Unsetenv("MAIL_USERNAME")
-			os.Unsetenv("MAIL_PASSWORD")
-			os.Unsetenv("MAIL_FROM")
-			os.Unsetenv("FRONTEND_URL")
+			_ = os.Unsetenv("MAIL_HOST")
+			_ = os.Unsetenv("MAIL_PORT")
+			_ = os.Unsetenv("MAIL_USERNAME")
+			_ = os.Unsetenv("MAIL_PASSWORD")
+			_ = os.Unsetenv("MAIL_FROM")
+			_ = os.Unsetenv("FRONTEND_URL")
 		}()
 
 		// Create invalid template content
@@ -148,11 +150,13 @@ func TestSendMailForgotPassword(t *testing.T) {
 		// Create the invalid template file
 		templateFile, err := os.Create("pkg/mailer/templates/forgot_template.html")
 		require.NoError(t, err)
-		defer os.Remove("pkg/mailer/templates/forgot_template.html")
+		defer func() {
+			_ = templateFile.Close()
+			_ = os.Remove("pkg/mailer/templates/forgot_template.html")
+		}()
 
 		_, err = templateFile.WriteString(invalidTemplateContent)
 		require.NoError(t, err)
-		templateFile.Close()
 
 		// Create a test user with token
 		token := "test-reset-token"
@@ -173,19 +177,19 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 	t.Run("SendMailForgotPassword - Nil Token", func(t *testing.T) {
 		// Set required environment variables for the test
-		os.Setenv("MAIL_HOST", "smtp.gmail.com")
-		os.Setenv("MAIL_PORT", "587")
-		os.Setenv("MAIL_USERNAME", "test@example.com")
-		os.Setenv("MAIL_PASSWORD", "testpassword")
-		os.Setenv("MAIL_FROM", "noreply@example.com")
-		os.Setenv("FRONTEND_URL", "https://example.com")
+		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
+		_ = os.Setenv("MAIL_PORT", "587")
+		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
+		_ = os.Setenv("MAIL_PASSWORD", "testpassword")
+		_ = os.Setenv("MAIL_FROM", "noreply@example.com")
+		_ = os.Setenv("FRONTEND_URL", "https://example.com")
 		defer func() {
-			os.Unsetenv("MAIL_HOST")
-			os.Unsetenv("MAIL_PORT")
-			os.Unsetenv("MAIL_USERNAME")
-			os.Unsetenv("MAIL_PASSWORD")
-			os.Unsetenv("MAIL_FROM")
-			os.Unsetenv("FRONTEND_URL")
+			_ = os.Unsetenv("MAIL_HOST")
+			_ = os.Unsetenv("MAIL_PORT")
+			_ = os.Unsetenv("MAIL_USERNAME")
+			_ = os.Unsetenv("MAIL_PASSWORD")
+			_ = os.Unsetenv("MAIL_FROM")
+			_ = os.Unsetenv("FRONTEND_URL")
 		}()
 
 		// Create valid template content
@@ -207,11 +211,13 @@ func TestSendMailForgotPassword(t *testing.T) {
 		// Create the template file
 		templateFile, err := os.Create("pkg/mailer/templates/forgot_template.html")
 		require.NoError(t, err)
-		defer os.Remove("pkg/mailer/templates/forgot_template.html")
+		defer func() {
+			_ = templateFile.Close()
+			_ = os.Remove("pkg/mailer/templates/forgot_template.html")
+		}()
 
 		_, err = templateFile.WriteString(templateContent)
 		require.NoError(t, err)
-		templateFile.Close()
 
 		// Create a test user with nil token
 		user := &models.User{
@@ -223,19 +229,19 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 		// Call the function should panic due to nil pointer dereference
 		assert.Panics(t, func() {
-			services.SendMailForgotPassword(user)
+			_ = services.SendMailForgotPassword(user)
 		})
 	})
 
 	t.Run("SendMailForgotPassword - Environment Variables Test", func(t *testing.T) {
 		// Test with default environment values
 		defer func() {
-			os.Unsetenv("MAIL_HOST")
-			os.Unsetenv("MAIL_PORT")
-			os.Unsetenv("MAIL_USERNAME")
-			os.Unsetenv("MAIL_PASSWORD")
-			os.Unsetenv("MAIL_FROM")
-			os.Unsetenv("FRONTEND_URL")
+			_ = os.Unsetenv("MAIL_HOST")
+			_ = os.Unsetenv("MAIL_PORT")
+			_ = os.Unsetenv("MAIL_USERNAME")
+			_ = os.Unsetenv("MAIL_PASSWORD")
+			_ = os.Unsetenv("MAIL_FROM")
+			_ = os.Unsetenv("FRONTEND_URL")
 		}()
 
 		// Create valid template content
@@ -257,11 +263,13 @@ func TestSendMailForgotPassword(t *testing.T) {
 		// Create the template file
 		templateFile, err := os.Create("pkg/mailer/templates/forgot_template.html")
 		require.NoError(t, err)
-		defer os.Remove("pkg/mailer/templates/forgot_template.html")
+		defer func() {
+			_ = templateFile.Close()
+			_ = os.Remove("pkg/mailer/templates/forgot_template.html")
+		}()
 
 		_, err = templateFile.WriteString(templateContent)
 		require.NoError(t, err)
-		templateFile.Close()
 
 		// Create a test user with token
 		token := "test-reset-token"
