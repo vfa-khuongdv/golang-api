@@ -16,8 +16,10 @@ func TestInitDB(t *testing.T) {
 		// Create a temporary SQLite database for testing
 		tempFile, err := os.CreateTemp("", "test_db_*.sqlite")
 		require.NoError(t, err)
-		defer os.Remove(tempFile.Name())
-		tempFile.Close()
+		defer func() {
+			_ = os.Remove(tempFile.Name())
+		}()
+		_ = tempFile.Close()
 
 		// Mock the GORM Open function by using SQLite instead of MySQL for testing
 		// This tests the core functionality without requiring a MySQL server
@@ -58,9 +60,11 @@ func TestInitDB(t *testing.T) {
 		// Create a temporary SQLite database for testing
 		tempFile, err := os.CreateTemp("", "test_db_global_*.sqlite")
 		require.NoError(t, err)
-		defer os.Remove(tempFile.Name())
-		tempFile.Close()
+		defer func() {
+			_ = os.Remove(tempFile.Name())
+		}()
 
+		_ = tempFile.Close()
 		// Test with SQLite (simulating successful database connection)
 		db, err := gorm.Open(sqlite.Open(tempFile.Name()), &gorm.Config{})
 		require.NoError(t, err)

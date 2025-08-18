@@ -2684,19 +2684,19 @@ func TestForgotPassword(t *testing.T) {
 
 	t.Run("ForgotPassword - Success", func(t *testing.T) {
 		// Set up environment variables to avoid mail service crash
-		os.Setenv("MAIL_HOST", "smtp.gmail.com")
-		os.Setenv("MAIL_PORT", "587")
-		os.Setenv("MAIL_USERNAME", "test@example.com")
-		os.Setenv("MAIL_PASSWORD", "testpassword")
-		os.Setenv("MAIL_FROM", "noreply@example.com")
-		os.Setenv("FRONTEND_URL", "https://example.com")
+		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
+		_ = os.Setenv("MAIL_PORT", "587")
+		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
+		_ = os.Setenv("MAIL_PASSWORD", "testpassword")
+		_ = os.Setenv("MAIL_FROM", "noreply@example.com")
+		_ = os.Setenv("FRONTEND_URL", "https://example.com")
 		defer func() {
-			os.Unsetenv("MAIL_HOST")
-			os.Unsetenv("MAIL_PORT")
-			os.Unsetenv("MAIL_USERNAME")
-			os.Unsetenv("MAIL_PASSWORD")
-			os.Unsetenv("MAIL_FROM")
-			os.Unsetenv("FRONTEND_URL")
+			_ = os.Unsetenv("MAIL_HOST")
+			_ = os.Unsetenv("MAIL_PORT")
+			_ = os.Unsetenv("MAIL_USERNAME")
+			_ = os.Unsetenv("MAIL_PASSWORD")
+			_ = os.Unsetenv("MAIL_FROM")
+			_ = os.Unsetenv("FRONTEND_URL")
 		}()
 
 		userService := new(mocks.MockUserService)
