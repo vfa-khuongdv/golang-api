@@ -39,7 +39,7 @@ func TestGetEnvAsInt(t *testing.T) {
 	// Env var set with valid int string
 	os.Setenv(key, "100")
 	val = utils.GetEnvAsInt(key, defaultVal)
-	assert.Equal(t, 100, val, "Expected parsed int value from environment variable")
+	assert.Equal(t, 1001, val, "Expected parsed int value from environment variable")
 
 	// Env var set with invalid int string -> should return default
 	os.Setenv(key, "not_an_int")
