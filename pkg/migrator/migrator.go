@@ -10,8 +10,17 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
+// MigrateIface makes Migrator testable without a real DB.
+type MigrateIface interface {
+	Up() error
+	Down() error
+	Steps(int) error
+	Version() (uint, bool, error)
+	Close() (error, error)
+}
+
 type Migrator struct {
-	m *migrate.Migrate
+	m MigrateIface
 }
 
 type MySQLConfig struct {
