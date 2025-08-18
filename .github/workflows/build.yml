@@ -1,4 +1,4 @@
-name: lint → test → measure → db → sast → integration
+name: Workflows
 
 on:
   pull_request:
