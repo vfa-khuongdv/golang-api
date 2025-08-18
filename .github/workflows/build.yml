@@ -12,21 +12,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: 🛠 Set Up Go 1.24
-        uses: actions/setup-go@v4
+      - name: 🛠 Setup Go (from go.mod) with cache
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: go.mod
+          cache: true
 
-      - name: 📦 Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-            | sh -s -- -b $(go env GOPATH)/bin v1.62.2
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      - name: 📦 Download Go modules
+        run: go mod download
 
-      - name: ✅ Run Linter
-        run: golangci-lint run ./...
+      - name: ✅ Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.2
+          args: --timeout=7m ./...
+          only-new-issues: false
 
   test:
     name: ✅ Unit Tests
@@ -34,22 +36,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: 🛠 Set Up Go 1.24
-        uses: actions/setup-go@v4
+      - name: 🛠 Setup Go (from go.mod) with cache
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version-file: go.mod
+          cache: true
 
       - name: 📦 Install gotestsum for Test Reporting
         run: |
           go install gotest.tools/gotestsum@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
+      - name: 📦 Download Go modules
+        run: go mod download
+
       - name: 🧪 Run Unit Tests with Coverage
         run: |
           gotestsum --format=standard-verbose -- -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out
+
+      - name: ⬆️ Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
 
   measure:
     name: 📊 Coverage / Measuring Unit
@@ -57,13 +69,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: 📊 Upload Coverage Report
+      - name: 🛠 Setup Go (from go.mod) with cache
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: ⬇️ Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: .
+
+      - name: 📊 Enforce Coverage Threshold
         run: |
-          echo "This step will check thresholds or upload coverage report"
-          # Example: enforce 70% coverage
-          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
+          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' \
+          | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
 
   db:
     name: 🗄 Database Script (Placeholder)
@@ -71,11 +94,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
-        uses: actions/checkout@v3
-
+        uses: actions/checkout@v4
       - name: 🗄 Run Database Migration Script
         run: |
-          echo "Placeholder: run migration script here (e.g. goose, flyway, liquibase, etc.)"
+          echo "Placeholder: run migration script here"
 
   sast:
     name: 🛡 SAST (Placeholder)
@@ -84,7 +106,7 @@ jobs:
     steps:
       - name: 🔍 Static Application Security Testing
         run: |
-          echo "Placeholder: SAST tool integration (e.g. SonarCloud, CodeQL, Trivy, etc.)"
+          echo "Placeholder: SAST tool integration"
 
   integration:
     name: 🔗 Integration Tests (Placeholder)
