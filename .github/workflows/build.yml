@@ -89,8 +89,8 @@ jobs:
           | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
 
   db:
-    name: 🗄 Database Script (Placeholder)
-    needs: measure
+    name: 🗄 Database Script
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Source Code
@@ -100,8 +100,8 @@ jobs:
           echo "Placeholder: run migration script here"
 
   sast:
-    name: 🛡 SAST (Placeholder)
-    needs: db
+    name: 🛡 SAST
+    needs: [measure, db]   # <- wait for both coverage + db
     runs-on: ubuntu-latest
     steps:
       - name: 🔍 Static Application Security Testing
@@ -109,7 +109,7 @@ jobs:
           echo "Placeholder: SAST tool integration"
 
   integration:
-    name: 🔗 Integration Tests (Placeholder)
+    name: 🔗 Integration Tests
     needs: sast
     runs-on: ubuntu-latest
     steps:
