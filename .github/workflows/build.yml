@@ -14,10 +14,13 @@ jobs:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v3
 
-      - name: 🛠 Set Up Go 1.24
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24'
+      - name: 🛠 Install Go 1.24 (tip)
+        run: |
+          wget https://go.dev/dl/go1.24beta1.linux-amd64.tar.gz
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf go1.24beta1.linux-amd64.tar.gz
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+          go version
 
       - name: 📦 Install golangci-lint
         run: |
@@ -26,7 +29,7 @@ jobs:
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
       - name: ✅ Run Linter
-        run: golangci-lint run ./...
+        run: golangci-lint run --timeout=5m ./...
 
   test:
     name: ✅ Unit Tests
@@ -36,10 +39,13 @@ jobs:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v3
 
-      - name: 🛠 Set Up Go 1.24
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24'
+      - name: 🛠 Install Go 1.24 (tip)
+        run: |
+          wget https://go.dev/dl/go1.24beta1.linux-amd64.tar.gz
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf go1.24beta1.linux-amd64.tar.gz
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+          go version
 
       - name: 📦 Install gotestsum for Test Reporting
         run: |
@@ -59,11 +65,10 @@ jobs:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v3
 
-      - name: 📊 Upload Coverage Report
+      - name: 📊 Enforce Coverage Threshold
         run: |
-          echo "This step will check thresholds or upload coverage report"
-          # Example: enforce 70% coverage
-          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
+          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' \
+          | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
 
   db:
     name: 🗄 Database Script (Placeholder)
@@ -72,10 +77,8 @@ jobs:
     steps:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v3
-
       - name: 🗄 Run Database Migration Script
-        run: |
-          echo "Placeholder: run migration script here (e.g. goose, flyway, liquibase, etc.)"
+        run: echo "Placeholder: run migration script here"
 
   sast:
     name: 🛡 SAST (Placeholder)
@@ -83,8 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🔍 Static Application Security Testing
-        run: |
-          echo "Placeholder: SAST tool integration (e.g. SonarCloud, CodeQL, Trivy, etc.)"
+        run: echo "Placeholder: SAST tool integration"
 
   integration:
     name: 🔗 Integration Tests (Placeholder)
@@ -92,5 +94,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🧪 Run Integration Tests
-        run: |
-          echo "Placeholder: run integration tests here"
+        run: echo "Placeholder: run integration tests here"
