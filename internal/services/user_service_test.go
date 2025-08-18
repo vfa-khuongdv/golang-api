@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
@@ -181,6 +182,46 @@ func (s *UserServiceTestSuite) TestUpdateUser() {
 		err := s.service.UpdateUser(user)
 		s.Error(err)
 	})
+}
+
+func (s *UserServiceTestSuite) TestCreateUser() {
+	user := &models.User{
+		Email:    "newuser@example.com",
+		Password: "password123",
+		Name:     "New User",
+		Gender:   1,
+	}
+	roleIds := []uint{1, 2}
+
+	// Test 1: Transaction Begin Error
+	// Create a new closed database to simulate the error
+	closedDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	s.Require().NoError(err)
+	sqlDB, err := closedDB.DB()
+	s.Require().NoError(err)
+	err = sqlDB.Close()
+	s.Require().NoError(err)
+
+	s.repo.On("GetDB").Return(closedDB).Once()
+
+	// Call service
+	err = s.service.CreateUser(user, roleIds)
+	s.Error(err)
+	s.Contains(err.Error(), "sql: database is closed")
+
+	// Reset mocks for next test
+	s.repo.Mock = mock.Mock{}
+
+	// Test 2: Create Error with Working Transaction
+	// Mock the database to return the working database but simulate CreateWithTx error
+	s.repo.On("GetDB").Return(s.db).Once()
+	// Mock create error - need to return (*models.User)(nil) instead of nil to avoid panic
+	s.repo.On("CreateWithTx", mock.AnythingOfType("*gorm.DB"), user).Return((*models.User)(nil), errors.New("create failed")).Once()
+
+	// Call service
+	err = s.service.CreateUser(user, roleIds)
+	s.Error(err)
+	s.Contains(err.Error(), "create failed")
 }
 
 func TestUserServiceTestSuite(t *testing.T) {

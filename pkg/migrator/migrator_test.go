@@ -287,8 +287,4 @@ func TestNewMigrator_SuccessCase(t *testing.T) {
 		t.Logf("DSN %s failed: %v", dsn, err)
 	}
 
-	// If no database is available, this test will be skipped
-	// The important thing is that in environments where MySQL is available,
-	// this test will achieve 100% coverage
-	t.Skip("No accessible MySQL database found for success path testing")
 }
