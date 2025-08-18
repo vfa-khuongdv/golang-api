@@ -56,7 +56,7 @@ func NewMigrator(migrationsPath, dsn string) (*Migrator, error) {
 // Close closes the migrator instance and releases associated resources.
 func (m *Migrator) Close() {
 	if m.m != nil {
-		m.m.Close()
+		_, _ = m.m.Close()
 	}
 }
 

@@ -21,7 +21,7 @@ type TestStruct struct {
 
 func TestValidateBirthday(t *testing.T) {
 	validate := validator.New()
-	validate.RegisterValidation("valid_birthday", utils.ValidateBirthday)
+	_ = validate.RegisterValidation("valid_birthday", utils.ValidateBirthday)
 
 	tests := []struct {
 		name     string
@@ -257,8 +257,8 @@ func TestTranslateValidationErrors(t *testing.T) {
 func TestTranslateValidationErrors_ExtraCases(t *testing.T) {
 	validate := validator.New()
 
-	validate.RegisterValidation("valid_birthday", utils.ValidateBirthday)
-	validate.RegisterValidation("not_blank", utils.ValidateNotBlank)
+	_ = validate.RegisterValidation("valid_birthday", utils.ValidateBirthday)
+	_ = validate.RegisterValidation("not_blank", utils.ValidateNotBlank)
 
 	tests := []struct {
 		name     string

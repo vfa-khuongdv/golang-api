@@ -392,7 +392,7 @@ func TestCreateUser(t *testing.T) {
 					"fields":  tc.expectedFields,
 				}
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -443,7 +443,7 @@ func TestCreateUser(t *testing.T) {
 			"message": "Database insert error",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -489,7 +489,7 @@ func TestCreateUser(t *testing.T) {
 			"message": "Failed to hash password",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -687,7 +687,7 @@ func TestUpdateProfile(t *testing.T) {
 				}
 
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
@@ -723,7 +723,7 @@ func TestUpdateProfile(t *testing.T) {
 			"message": "Invalid UserID",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -766,7 +766,7 @@ func TestUpdateProfile(t *testing.T) {
 			"message": "User not found",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusNotFound, w.Code)
@@ -817,7 +817,7 @@ func TestUpdateProfile(t *testing.T) {
 			"message": "Update error",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
@@ -867,7 +867,7 @@ func TestUpdateProfile(t *testing.T) {
 			"message": "Update profile successfully",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusOK, w.Code)
 
@@ -926,7 +926,7 @@ func TestGetProfile(t *testing.T) {
 			"deletedAt": nil,
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, expectedBody, actualBody)
 
@@ -977,7 +977,7 @@ func TestGetProfile(t *testing.T) {
 		}
 
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, expectedBody, actualBody)
 
@@ -1006,7 +1006,7 @@ func TestGetProfile(t *testing.T) {
 			"message": "Invalid UserID",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -1046,7 +1046,7 @@ func TestGetProfile(t *testing.T) {
 			"message": "User not found",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, http.StatusNotFound, w.Code)
@@ -1132,7 +1132,7 @@ func TestGetProfile(t *testing.T) {
 			"message": "Invalid user data in cache",
 		}
 		var responseBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
 		assert.Equal(t, actualBody["code"], responseBody["code"])
 		assert.Equal(t, actualBody["message"], responseBody["message"])
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -1176,7 +1176,7 @@ func TestGetUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"id":        float64(1),
 			"email":     "email@example.com",
@@ -1219,7 +1219,7 @@ func TestGetUser(t *testing.T) {
 			"message": "User not found",
 		}
 		var responseBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.Equal(t, actualBody["code"], responseBody["code"])
 		assert.Equal(t, actualBody["message"], responseBody["message"])
@@ -1251,7 +1251,7 @@ func TestGetUser(t *testing.T) {
 			"message": "Invalid UserID",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1439,7 +1439,7 @@ func TestChangePassword(t *testing.T) {
 					"fields":  tt.expectedFields,
 				}
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1484,7 +1484,7 @@ func TestChangePassword(t *testing.T) {
 			"message": "User not found",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1534,7 +1534,7 @@ func TestChangePassword(t *testing.T) {
 		}
 
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1583,7 +1583,7 @@ func TestChangePassword(t *testing.T) {
 			"message": "New password and confirm password do not match",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1634,7 +1634,7 @@ func TestChangePassword(t *testing.T) {
 			"message": "Update error",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1708,7 +1708,7 @@ func TestChangePassword(t *testing.T) {
 			"message": "New password must be different from old password",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1758,7 +1758,7 @@ func TestChangePassword(t *testing.T) {
 			"message": "Hash password failed",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -1940,7 +1940,7 @@ func TestUpdateUser(t *testing.T) {
 
 				// Assert the response
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, tt.expectedCode, actualBody["code"])
@@ -1979,7 +1979,7 @@ func TestUpdateUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrParseError),
 			"message": "Invalid UserID",
@@ -2019,7 +2019,7 @@ func TestUpdateUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrNotFound),
 			"message": "User not found",
@@ -2064,7 +2064,7 @@ func TestUpdateUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrDBUpdate),
 			"message": "Update error",
@@ -2134,7 +2134,7 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrParseError),
 			"message": "Invalid UserID",
@@ -2168,7 +2168,7 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrNotFound),
 			"message": "User not found",
@@ -2208,7 +2208,7 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert the response
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrDBDelete),
 			"message": "Delete error",
@@ -2305,7 +2305,7 @@ func TestResetPassword(t *testing.T) {
 			"message": "User not found",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
@@ -2356,7 +2356,7 @@ func TestResetPassword(t *testing.T) {
 			"message": "Token is expired",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -2407,7 +2407,7 @@ func TestResetPassword(t *testing.T) {
 			"message": "Old password is incorrect",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -2460,7 +2460,7 @@ func TestResetPassword(t *testing.T) {
 			"message": "Failed to hash password",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -2516,7 +2516,7 @@ func TestResetPassword(t *testing.T) {
 			"message": "Failed to update user",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
@@ -2659,7 +2659,7 @@ func TestResetPassword(t *testing.T) {
 
 				// Assert the response
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, tt.expectedCode, actualBody["code"])
 				assert.Equal(t, tt.expectedMsg, actualBody["message"])
