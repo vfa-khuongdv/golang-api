@@ -95,7 +95,7 @@ func TestLogin(t *testing.T) {
 			"message": "Invalid email or password",
 		}
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 
@@ -209,7 +209,7 @@ func TestLogin(t *testing.T) {
 				}
 
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
@@ -299,7 +299,7 @@ func TestRefreshToken(t *testing.T) {
 		}
 
 		var actualBody map[string]any
-		json.Unmarshal(w.Body.Bytes(), &actualBody)
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
@@ -358,7 +358,7 @@ func TestRefreshToken(t *testing.T) {
 				}
 
 				var actualBody map[string]any
-				json.Unmarshal(w.Body.Bytes(), &actualBody)
+				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])

@@ -32,7 +32,7 @@ func (s *RefreshTokenRepositoryTestSuite) SetupTest() {
 func (s *RefreshTokenRepositoryTestSuite) TearDownTest() {
 	db, err := s.db.DB()
 	if err == nil {
-		db.Close()
+		_ = db.Close()
 	}
 }
 

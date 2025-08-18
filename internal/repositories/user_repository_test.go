@@ -34,7 +34,7 @@ func (s *UserRepositoryTestSuite) SetupTest() {
 func (s *UserRepositoryTestSuite) TearDownTest() {
 	db, err := s.db.DB()
 	if err == nil {
-		db.Close()
+		_ = db.Close()
 	}
 }
 

@@ -16,8 +16,8 @@ import (
 // This function is called during the application startup to ensure that
 func InitValidator() {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("valid_birthday", ValidateBirthday)
-		v.RegisterValidation("not_blank", ValidateNotBlank)
+		_ = v.RegisterValidation("valid_birthday", ValidateBirthday)
+		_ = v.RegisterValidation("not_blank", ValidateNotBlank)
 	}
 }
 
