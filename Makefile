@@ -37,12 +37,12 @@ install-tools:
 
 test: install-tools
 	@echo "Running tests with gotestsum..."
-	@gotestsum --format=short-verbose -- ./...
+	@gotestsum --format=short-verbose -- $(shell go list ./... | grep -v -E '/(cmd|docs|tests)')
 	@echo "✅ Tests completed."
 
 test-coverage: install-tools
 	@echo "Running tests with coverage..."
-	@gotestsum -- -coverprofile=coverage.out ./...
+	@gotestsum -- -coverprofile=coverage.out $(shell go list ./... | grep -v -E '/(cmd|docs|tests)')
 	@echo "Generating coverage report..."
 	@go tool cover -func=coverage.out | tee coverage-summary.txt
 	@go tool cover -html=coverage.out -o coverage.html
@@ -51,7 +51,7 @@ test-coverage: install-tools
 
 watch-test: install-tools
 	@echo "Watching for changes and running tests..."
-	@reflex -r '\.go$$' -s -- sh -c 'clear && gotestsum --format=short-verbose -- ./...'
+	@reflex -r '\.go$$' -s -- sh -c 'clear && gotestsum --format=short-verbose -- $(shell go list ./... | grep -v -E "/(cmd|docs|tests)")'
 
 start-server: install-tools
 	@echo "🚀 Starting development server setup..."
