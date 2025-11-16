@@ -36,6 +36,7 @@ func TestTotpService_VerifyCode(t *testing.T) {
 
 	// Test with invalid code
 	valid, err := service.VerifyCode(secret, "000000")
+	assert.NoError(t, err)
 	assert.False(t, valid)
 }
 
