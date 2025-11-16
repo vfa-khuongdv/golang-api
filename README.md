@@ -198,11 +198,6 @@ Mail Configuration (if using email features):
 - `SMTP_PASSWORD` - SMTP password
 - `SMTP_FROM_ADDRESS` - Email address used as sender
 
-Redis Configuration (for caching and session management):
-- `REDIS_HOST` - Redis server host
-- `REDIS_PORT` - Redis server port
-- `REDIS_PASSWORD` - Redis password (if any)
-
 These can be set in the `.env` file or passed directly as environment variables. A sample `.env.example` file is provided in the repository.
 
 Check the `docs/api_spec.md` for a detailed API specification.

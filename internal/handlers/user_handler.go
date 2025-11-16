@@ -1,15 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
-	"github.com/vfa-khuongdv/golang-cms/internal/constants"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
@@ -31,14 +27,12 @@ type IUserhandler interface {
 
 type UserHandler struct {
 	userService   services.IUserService
-	redisService  services.IRedisService
 	bcryptService services.IBcryptService
 }
 
-func NewUserHandler(userService services.IUserService, redisService services.IRedisService, bcryptService services.IBcryptService) *UserHandler {
+func NewUserHandler(userService services.IUserService, bcryptService services.IBcryptService) *UserHandler {
 	return &UserHandler{
 		userService:   userService,
-		redisService:  redisService,
 		bcryptService: bcryptService,
 	}
 }
@@ -376,7 +370,7 @@ func (handler *UserHandler) GetUser(ctx *gin.Context) {
 }
 
 func (handler *UserHandler) GetProfile(ctx *gin.Context) {
-	// Get user ID from the context
+	// Get user ID from context and validate
 	userId := ctx.GetUint("UserID")
 	if userId == 0 {
 		utils.RespondWithError(
@@ -386,59 +380,15 @@ func (handler *UserHandler) GetProfile(ctx *gin.Context) {
 		return
 	}
 
-	var user models.User
-
-	// Try to get user from Redis cache
-	cacheKey := constants.PROFILE + strconv.Itoa(int(userId))
-	userString, err := handler.redisService.Get(cacheKey)
+	// Get user from database
+	logger.Info("User retrieved from DB")
+	dbUser, err := handler.userService.GetProfile(userId)
 	if err != nil {
-		logger.Warnf("Failed to get user from Redis: %+v", err)
-	}
-	// If not in cache, get from DB
-	if userString == "" {
-		logger.Info("User retrieved from DB")
-		dbUser, err := handler.userService.GetProfile(userId)
-		if err != nil {
-			utils.RespondWithError(ctx, err)
-			return
-		}
-		user = *dbUser
-
-		// Cache the user data
-		if err := handler.cacheUserProfile(&user); err != nil {
-			logger.Warnf("Failed to cache user profile: %v", err)
-		}
-	} else {
-		logger.Info("User retrieved from Redis")
-		if err := json.Unmarshal([]byte(userString), &user); err != nil {
-			logger.Warnf("Failed to unmarshal user from Redis: %v", err)
-			utils.RespondWithError(
-				ctx,
-				apperror.NewParseError("Invalid user data in cache"),
-			)
-			return
-		}
-
+		utils.RespondWithError(ctx, err)
+		return
 	}
 
-	utils.RespondWithOK(ctx, http.StatusOK, user)
-}
-
-func (handler *UserHandler) cacheUserProfile(user *models.User) error {
-	// Convert user object to JSON bytes
-	userJSON, err := json.Marshal(user)
-	if err != nil {
-		return fmt.Errorf("failed to marshal user: %v", err)
-	}
-
-	// Create Redis key by concatenating profile prefix with user ID
-	profileKey := constants.PROFILE + strconv.Itoa(int(user.ID))
-
-	// Store serialized user data in Redis
-	if err := handler.redisService.Set(profileKey, userJSON, 60*time.Minute); err != nil {
-		return fmt.Errorf("failed to cache in Redis: %v", err)
-	}
-	return nil
+	utils.RespondWithOK(ctx, http.StatusOK, dbUser)
 }
 
 func (handler *UserHandler) UpdateProfile(ctx *gin.Context) {
@@ -494,11 +444,6 @@ func (handler *UserHandler) UpdateProfile(ctx *gin.Context) {
 	if err := handler.userService.UpdateUser(user); err != nil {
 		utils.RespondWithError(ctx, err)
 		return
-	}
-	// Clear cache
-	profileKey := constants.PROFILE + string(rune(user.ID))
-	if err := handler.redisService.Delete(profileKey); err != nil {
-		logrus.Errorf("Failed to clear cache: %v", err)
 	}
 
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Update profile successfully"})
