@@ -16,7 +16,9 @@ The project follows a clean architecture and is organized into the following dir
 │       └── main.go
 ├── docker-compose.yml                # Docker Compose configuration for the app and MySQL
 ├── docs                              # API documentation
-│   └── api_spec.md
+│   ├── swagger.json                  # OpenAPI 3.0 specification
+│   ├── swagger.html                  # Swagger UI documentation
+│   └── LOGIN_FLOW.md                 # Login flow documentation
 ├── go.mod                            # Go module dependencies
 ├── go.sum                            # Go module checksums
 ├── internal                          # Core application logic
@@ -200,7 +202,42 @@ Mail Configuration (if using email features):
 
 These can be set in the `.env` file or passed directly as environment variables. A sample `.env.example` file is provided in the repository.
 
-Check the `docs/api_spec.md` for a detailed API specification.
+## API Documentation
+
+The API is documented using OpenAPI 3.0 specification. You can access the documentation through:
+
+- **Swagger UI**: `http://localhost:8080/swagger` or `http://localhost:8080/api-docs`
+- **OpenAPI JSON**: `http://localhost:8080/docs/swagger.json`
+- **Login Flow**: See `docs/LOGIN_FLOW.md` for detailed authentication flow
+
+### Main API Endpoints
+
+#### Authentication (Public)
+- `POST /api/v1/login` - User login
+- `POST /api/v1/refresh-token` - Refresh access token
+- `POST /api/v1/forgot-password` - Request password reset
+- `POST /api/v1/reset-password` - Reset password with token
+
+#### User Profile (Authenticated)
+- `GET /api/v1/profile` - Get user profile
+- `PATCH /api/v1/profile` - Update user profile
+- `POST /api/v1/change-password` - Change user password
+
+#### User Management (Authenticated)
+- `POST /api/v1/users` - Create user (admin only)
+- `GET /api/v1/users/{id}` - Get user by ID
+- `PATCH /api/v1/users/{id}` - Update user (admin only)
+- `DELETE /api/v1/users/{id}` - Delete user (admin only)
+
+#### Multi-Factor Authentication (Authenticated)
+- `POST /api/v1/mfa/setup` - Initialize MFA setup
+- `POST /api/v1/mfa/verify-setup` - Verify MFA setup
+- `POST /api/v1/mfa/verify-code` - Verify MFA code during login
+- `POST /api/v1/mfa/disable` - Disable MFA
+- `GET /api/v1/mfa/status` - Get MFA status
+
+#### Health Check
+- `GET /healthz` - Health status
 
 ## Testing
 

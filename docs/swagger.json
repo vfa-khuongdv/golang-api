@@ -802,13 +802,18 @@
         "summary": "Verify MFA code during login",
         "description": "Verify the TOTP code when logging in with MFA enabled",
         "operationId": "verifyMfaCode",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["code", "user_id"],
+                "required": ["code"],
                 "properties": {
                   "code": {
                     "type": "string",
@@ -816,11 +821,6 @@
                     "maxLength": 6,
                     "description": "6-digit TOTP code",
                     "example": "123456"
-                  },
-                  "user_id": {
-                    "type": "integer",
-                    "description": "User ID",
-                    "example": 1
                   }
                 }
               }

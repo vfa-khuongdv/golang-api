@@ -1,37 +1,79 @@
 # Login Flow Documentation
 
-## Simple Login Flow
+## Simple Login Flow (Without MFA)
 
 ```
-Client                       Server
-  │                           │
-  ├─ POST /api/auth/login ───>│
-  │  { email, password }      │
-  │                           │
-  │                           ├─ Find user by email
-  │                           │
-  │                           ├─ Verify password
-  │                           │
-  │                           ├─ Generate tokens
-  │                           │
-  │<─ 200 OK ─────────────────┤
-  │  { accessToken,           │
-  │    refreshToken }         │
-  │                           │
-  ├─ Store tokens             │
-  │                           │
+Client                           Server
+  │                               │
+  ├─ POST /api/v1/login ────────> │
+  │  { email, password }          │
+  │                               │
+  │                               ├─ Find user by email
+  │                               │
+  │                               ├─ Verify password
+  │                               │
+  │                               ├─ Check if MFA enabled
+  │                               │
+  │                               ├─ Generate JWT tokens
+  │                               │
+  │ <─ 200 OK ──────────────────  │
+  │  { access_token, refresh_token}
+  │                               │
+  ├─ Store tokens in storage      │
+  │                               │
+```
+
+## Login Flow With MFA Enabled
+
+```
+Client                           Server
+  │                               │
+  ├─ POST /api/v1/login ────────> │
+  │  { email, password }          │
+  │                               │
+  │                               ├─ Find user by email
+  │                               │
+  │                               ├─ Verify password
+  │                               │
+  │                               ├─ Check if MFA enabled
+  │                               │
+  │ <─ 200 OK ──────────────────  │
+  │  { mfa_required: true,        │
+  │    user_id: 1 }               │
+  │                               │
+  ├─ User enters TOTP code        │
+  │                               │
+  ├─ POST /api/v1/mfa/verify-code ├──> │
+  │  { code: "123456",            │
+  │    user_id: 1 }               │
+  │                               │
+  │                               ├─ Verify TOTP code
+  │                               │
+  │                               ├─ Generate JWT tokens
+  │                               │
+  │ <─ 200 OK ──────────────────  │
+  │  { access_token, refresh_token}
+  │                               │
+  ├─ Store tokens in storage      │
+  │                               │
 ```
 
 ## API Endpoints
 
-- `POST /api/auth/login` - Login with email and password
-- `POST /api/auth/refresh` - Refresh access token
-- `POST /api/auth/mfa/verify` - Verify MFA code (if MFA enabled)
+- `POST /api/v1/login` - Login with email and password
+- `POST /api/v1/refresh-token` - Refresh access token
+- `POST /api/v1/mfa/verify-code` - Verify MFA code (if MFA enabled)
+- `POST /api/v1/mfa/setup` - Initialize MFA setup
+- `POST /api/v1/mfa/verify-setup` - Verify MFA setup with TOTP code
+- `POST /api/v1/mfa/disable` - Disable MFA
+- `GET /api/v1/mfa/status` - Check MFA status
 
 ## Login Request
 
 ```json
-POST /api/auth/login
+POST /api/v1/login
+Content-Type: application/json
+
 {
   "email": "user@example.com",
   "password": "password123"
@@ -42,14 +84,11 @@ POST /api/auth/login
 
 ```json
 {
-  "accessToken": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "expiresAt": "2025-11-16T12:30:00Z"
-  },
-  "refreshToken": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "expiresAt": "2025-11-23T11:15:00Z"
-  }
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "mfa_required": false
 }
 ```
 
@@ -58,7 +97,7 @@ POST /api/auth/login
 ```json
 {
   "mfa_required": true,
-  "temporary_token": "eyJhbGciOiJIUzI1NiIs...",
+  "user_id": 1,
   "message": "MFA code required"
 }
 ```
@@ -66,10 +105,12 @@ POST /api/auth/login
 ## MFA Verification Request
 
 ```json
-POST /api/auth/mfa/verify
+POST /api/v1/mfa/verify-code
+Content-Type: application/json
+
 {
   "code": "123456",
-  "temporary_token": "eyJhbGciOiJIUzI1NiIs..."
+  "user_id": 1
 }
 ```
 
@@ -77,23 +118,21 @@ POST /api/auth/mfa/verify
 
 ```json
 {
-  "accessToken": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "expiresAt": "2025-11-16T12:30:00Z"
-  },
-  "refreshToken": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "expiresAt": "2025-11-23T11:15:00Z"
-  }
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600
 }
 ```
 
 ## Refresh Token Request
 
 ```json
-POST /api/auth/refresh
+POST /api/v1/refresh-token
+Content-Type: application/json
+
 {
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
@@ -101,14 +140,45 @@ POST /api/auth/refresh
 
 ```json
 {
-  "accessToken": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "expiresAt": "2025-11-16T12:30:00Z"
-  },
-  "refreshToken": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "expiresAt": "2025-11-23T11:15:00Z"
-  }
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+## MFA Setup Flow
+
+### 1. Initialize MFA Setup
+
+```json
+POST /api/v1/mfa/setup
+Authorization: Bearer <access_token>
+```
+
+**Response:**
+```json
+{
+  "qr_code": "data:image/png;base64,iVBORw0KGgo...",
+  "secret": "JBSWY3DPEBLW64TMMQ======"
+}
+```
+
+### 2. Verify MFA Setup
+
+```json
+POST /api/v1/mfa/verify-setup
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "code": "123456"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "MFA setup verified successfully"
 }
 ```
 
@@ -117,16 +187,17 @@ POST /api/auth/refresh
 Add the access token to the Authorization header:
 
 ```bash
-curl -X GET http://localhost:8080/api/users/profile \
-  -H "Authorization: Bearer <accessToken>"
+curl -X GET http://localhost:8080/api/v1/profile \
+  -H "Authorization: Bearer <access_token>"
 ```
 
 ## Error Codes
 
 | Status | Error | Description |
 |--------|-------|-------------|
-| 400 | VALIDATION_ERROR | Invalid input |
-| 401 | INVALID_PASSWORD | Wrong password |
-| 401 | INVALID_TOKEN | Invalid/expired token |
-| 404 | USER_NOT_FOUND | User doesn't exist |
-| 500 | INTERNAL_ERROR | Server error |
+| 400 | validation_error | Invalid input or validation failed |
+| 401 | invalid_credentials | Invalid email or password |
+| 401 | invalid_token | Invalid or expired token |
+| 401 | invalid_mfa_code | Invalid MFA code |
+| 404 | user_not_found | User doesn't exist |
+| 500 | internal_error | Server error |
