@@ -23,6 +23,9 @@ func (m *MockUserRepository) GetAll() ([]models.User, error) {
 
 func (m *MockUserRepository) GetByID(id uint) (*models.User, error) {
 	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
