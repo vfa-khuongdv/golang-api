@@ -33,9 +33,11 @@ type MfaRequiredResponse struct {
 
 // NewAuthService creates and returns a new instance of AuthService
 // Parameters:
-//   - repo: User repository for database operations
-//   - tokenService: Service for handling refresh token operations
-//   - mfaRepository: Repository for MFA settings
+//   - repo: IUserRepository for user data access
+//   - refreshTokenService: IRefreshTokenService for managing refresh tokens
+//   - bcryptService: IBcryptService for password hashing and verification
+//   - jwtService: IJWTService for JWT token generation and validation
+//   - mfaRepository: IMfaRepository for accessing MFA settings
 //
 // Returns:
 //   - *AuthService: New AuthService instance initialized with the provided dependencies
