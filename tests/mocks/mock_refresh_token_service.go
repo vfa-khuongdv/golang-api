@@ -12,12 +12,18 @@ type MockRefreshTokenService struct {
 
 func (m *MockRefreshTokenService) Create(user *models.User, ipAddress string) (*services.JwtResult, error) {
 	args := m.Called(user, ipAddress)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	result, _ := args.Get(0).(*services.JwtResult)
 	return result, args.Error(1)
 }
 
 func (m *MockRefreshTokenService) Update(token string, ipAddress string) (*services.RefreshTokenResult, error) {
 	args := m.Called(token, ipAddress)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	result, _ := args.Get(0).(*services.RefreshTokenResult)
 	return result, args.Error(1)
 }
