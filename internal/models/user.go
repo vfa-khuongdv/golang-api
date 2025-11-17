@@ -20,3 +20,8 @@ type User struct {
 	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updatedAt"`
 	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deletedAt,omitempty"`
 }
+
+// TableName specifies the table name for User model
+func (User) TableName() string {
+	return "users"
+}
