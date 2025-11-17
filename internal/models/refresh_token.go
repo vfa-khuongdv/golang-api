@@ -20,3 +20,8 @@ type RefreshToken struct {
 	// Relations
 	User User `gorm:"constraint:OnDelete:CASCADE;foreignKey:UserID" json:"user"`
 }
+
+// TableName specifies the table name for RefreshToken model
+func (RefreshToken) TableName() string {
+	return "refresh_tokens"
+}
