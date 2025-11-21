@@ -51,6 +51,7 @@ func (handler *AuthHandler) Login(ctx *gin.Context) {
 func (handler *AuthHandler) RefreshToken(ctx *gin.Context) {
 	var input struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
+		AccessToken  string `json:"access_token" binding:"required"`
 	}
 
 	// Bind JSON request body to token struct
@@ -64,7 +65,7 @@ func (handler *AuthHandler) RefreshToken(ctx *gin.Context) {
 	}
 
 	// Call auth service to refresh the token
-	res, err := handler.authService.RefreshToken(input.RefreshToken, ctx)
+	res, err := handler.authService.RefreshToken(input.RefreshToken, input.AccessToken, ctx)
 	if err != nil {
 		utils.RespondWithError(ctx, err)
 		return

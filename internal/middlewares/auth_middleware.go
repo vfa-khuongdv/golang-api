@@ -14,6 +14,7 @@ import (
 // The middleware checks if:
 // - Authorization header exists and has "Bearer " prefix
 // - Token is valid and can be parsed
+// - Token has "access" scope
 // If validation succeeds, it sets the user ID from token claims in context
 // If validation fails, it returns 401 Unauthorized
 func AuthMiddleware() gin.HandlerFunc {
@@ -28,7 +29,33 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		claims, err := jwtService.ValidateToken(tokenString)
+		claims, err := jwtService.ValidateTokenWithScope(tokenString, services.TokenScopeAccess)
+		if err != nil {
+			utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Unauthorized"))
+			return
+		}
+
+		ctx.Set("UserID", claims.ID)
+		ctx.Next()
+	}
+}
+
+// MfaMiddleware is a Gin middleware for MFA verification endpoints
+// It validates that the token has "mfa_verification" scope
+// This middleware should be applied only to /mfa/verify-code endpoint
+func MfaMiddleware() gin.HandlerFunc {
+	jwtService := services.NewJWTService()
+	return func(ctx *gin.Context) {
+
+		authHeader := ctx.GetHeader("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Authorization header required"))
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+		claims, err := jwtService.ValidateTokenWithScope(tokenString, services.TokenScopeMfaVerification)
 		if err != nil {
 			utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Unauthorized"))
 			return

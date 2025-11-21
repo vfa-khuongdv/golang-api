@@ -327,7 +327,7 @@ func TestVerifyMfaCode(t *testing.T) {
 			Name:  "Test User",
 		}, nil)
 
-		mockJwtService.On("GenerateToken", uint(1)).Return(&services.JwtResult{
+		mockJwtService.On("GenerateAccessToken", uint(1)).Return(&services.JwtResult{
 			Token:     "access_token",
 			ExpiresAt: 1000000,
 		}, nil)
@@ -462,7 +462,7 @@ func TestVerifyMfaCode(t *testing.T) {
 			Email: "test@example.com",
 			Name:  "Test User",
 		}, nil)
-		mockJwtService.On("GenerateToken", uint(1)).Return(nil, apperror.NewInternalError("JWT error"))
+		mockJwtService.On("GenerateAccessToken", uint(1)).Return(nil, apperror.NewInternalError("JWT error"))
 
 		requestBody := map[string]string{
 			"code": "123456",
@@ -497,7 +497,7 @@ func TestVerifyMfaCode(t *testing.T) {
 			Email: "test@example.com",
 			Name:  "Test User",
 		}, nil)
-		mockJwtService.On("GenerateToken", uint(1)).Return(&services.JwtResult{
+		mockJwtService.On("GenerateAccessToken", uint(1)).Return(&services.JwtResult{
 			Token:     "access_token",
 			ExpiresAt: 1000000,
 		}, nil)

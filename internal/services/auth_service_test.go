@@ -61,7 +61,7 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(nil, nil) // MFA not enabled
-	s.jwtService.On("GenerateToken", user.ID).Return(&services.JwtResult{
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&services.JwtResult{
 		Token:     "mocked-access-token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 	}, nil)
@@ -155,7 +155,7 @@ func (s *AuthServiceTestSuite) TestLogin_CreateTokenError() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
 	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(nil, nil) // MFA not enabled
-	s.jwtService.On("GenerateToken", user.ID).
+	s.jwtService.On("GenerateAccessToken", user.ID).
 		Return(&services.JwtResult{
 			Token:     "mocked-access-token",
 			ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -202,7 +202,7 @@ func (s *AuthServiceTestSuite) TestLogin_JwtError() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
 	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(nil, nil) // MFA not enabled
-	s.jwtService.On("GenerateToken", user.ID).
+	s.jwtService.On("GenerateAccessToken", user.ID).
 		Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
 
 	w := httptest.NewRecorder()
@@ -251,10 +251,10 @@ func (s *AuthServiceTestSuite) TestLogin_MfaEnabled() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
 	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(mfaSettings, nil).Once()
-	s.jwtService.On("GenerateToken", user.ID).
+	s.jwtService.On("GenerateMfaToken", user.ID).
 		Return(&services.JwtResult{
 			Token:     "temporary-token",
-			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
+			ExpiresAt: time.Now().Add(10 * time.Minute).Unix(),
 		}, nil)
 
 	w := httptest.NewRecorder()
@@ -305,7 +305,7 @@ func (s *AuthServiceTestSuite) TestLogin_MfaEnabledJwtError() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
 	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(mfaSettings, nil).Once()
-	s.jwtService.On("GenerateToken", user.ID).
+	s.jwtService.On("GenerateMfaToken", user.ID).
 		Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
 
 	w := httptest.NewRecorder()
@@ -340,6 +340,7 @@ func stringPtr(s string) *string {
 func (s *AuthServiceTestSuite) TestRefreshToken_Success() {
 	// Test input values
 	oldRefreshToken := "valid-refresh-token"
+	oldAccessToken := "valid-access-token"
 	ipAddress := "127.0.0.1"
 	userID := uint(1)
 
@@ -359,10 +360,20 @@ func (s *AuthServiceTestSuite) TestRefreshToken_Success() {
 		Email: "user@example.com",
 	}
 
+	// Mock claims from access token
+	mockClaims := &services.CustomClaims{
+		ID:    userID,
+		Scope: services.TokenScopeAccess,
+	}
+
 	// Should update refresh token with correct old token and IP
 	s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil).Once()
+
+	// Should validate access token (even if expired)
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(mockClaims, nil).Once()
+
 	s.repo.On("GetByID", mockRes.UserId).Return(mockUser, nil).Once()
-	s.jwtService.On("GenerateToken", mockUser.ID).Return(&services.JwtResult{
+	s.jwtService.On("GenerateAccessToken", mockUser.ID).Return(&services.JwtResult{
 		Token:     "new-access-token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 	}, nil).Once()
@@ -373,7 +384,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_Success() {
 	ginCtx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
 
 	// Execute the refresh token flow
-	result, err := s.service.RefreshToken(oldRefreshToken, ginCtx)
+	result, err := s.service.RefreshToken(oldRefreshToken, oldAccessToken, ginCtx)
 
 	// Assert no errors occurred
 	s.NoError(err, "Expected no error from RefreshToken")
@@ -397,6 +408,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_Success() {
 func (s *AuthServiceTestSuite) TestRefreshToken_UpdateError() {
 	// Test input values
 	invalidToken := "invalid-refresh-token"
+	accessToken := "valid-access-token"
 	ipAddress := "127.0.0.1"
 
 	// Mock refresh token service to return error for invalid token
@@ -409,35 +421,48 @@ func (s *AuthServiceTestSuite) TestRefreshToken_UpdateError() {
 	ginCtx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
 
 	// Execute the refresh token flow
-	result, err := s.service.RefreshToken(invalidToken, ginCtx) // Assert error was returned
+	result, err := s.service.RefreshToken(invalidToken, accessToken, ginCtx) // Assert error was returned
 	s.Error(err, "Expected error for invalid refresh token")
 	s.Nil(result, "Expected nil result for error case")
-	s.Contains(err.Error(), mockError.Error(), "Expected database query error message")
+
+	if appError, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrUnauthorized, appError.Code)
+		assert.Equal(s.T(), "Invalid refresh token", appError.Message)
+	}
 
 	// Assert mocks
 	s.refreshTokenService.AssertExpectations(s.T())
-	s.repo.AssertExpectations(s.T())
-	s.jwtService.AssertExpectations(s.T())
-	s.bcryptService.AssertExpectations(s.T())
 }
 
 func (s *AuthServiceTestSuite) TestRefreshToken_GetByIDError() {
 	oldRefreshToken := "old-refresh-token"
-
+	oldAccessToken := "old-access-token"
 	ipAddress := "127.0.0.1"
+	userID := uint(1)
+
 	// Mock new refresh token that would be returned by refresh token service
 	mockRefreshToken := &services.JwtResult{
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(), // 30 days
 	}
 	mockRes := &services.RefreshTokenResult{
-		UserId: 1,
+		UserId: userID,
 		Token:  mockRefreshToken,
+	}
+
+	// Mock claims from access token
+	mockClaims := &services.CustomClaims{
+		ID:    userID,
+		Scope: services.TokenScopeAccess,
 	}
 
 	// Should update refresh token with correct old token and IP
 	s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil).Once()
-	// Should fetch user with ID from refresh token
+
+	// Should validate access token
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(mockClaims, nil).Once()
+
+	// Should fetch user with ID from refresh token but fail
 	s.repo.On("GetByID", mockRes.UserId).Return((*models.User)(nil), gorm.ErrRecordNotFound).Once()
 
 	// Setup gin test context with IP
@@ -446,14 +471,14 @@ func (s *AuthServiceTestSuite) TestRefreshToken_GetByIDError() {
 	ginCtx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
 
 	// Execute the refresh token flow
-	result, err := s.service.RefreshToken(oldRefreshToken, ginCtx)
+	result, err := s.service.RefreshToken(oldRefreshToken, oldAccessToken, ginCtx)
 	s.Error(err, "Expected error for valid refresh token")
 	s.Nil(result, "Expected nil result for error case")
 
 	// Assert that the error is of type AppError with ErrNotFound code
 	if appError, ok := err.(*apperror.AppError); ok {
 		assert.Equal(s.T(), apperror.ErrNotFound, appError.Code)
-		assert.Equal(s.T(), "record not found", appError.Message)
+		assert.Equal(s.T(), "User not found", appError.Message)
 	} else {
 		s.Fail("Expected AppError with ErrNotFound code")
 	}
@@ -467,9 +492,11 @@ func (s *AuthServiceTestSuite) TestRefreshToken_GetByIDError() {
 
 func (s *AuthServiceTestSuite) TestRefreshToken_JwtError() {
 	oldRefreshToken := "old-refresh-token"
+	oldAccessToken := "old-access-token"
+	userID := uint(1)
 
 	user := &models.User{
-		ID:    1,
+		ID:    userID,
 		Email: "email@example.com",
 	}
 
@@ -480,16 +507,26 @@ func (s *AuthServiceTestSuite) TestRefreshToken_JwtError() {
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(), // 30 days
 	}
 	mockRes := &services.RefreshTokenResult{
-		UserId: 1,
+		UserId: userID,
 		Token:  mockRefreshToken,
+	}
+
+	// Mock claims from access token
+	mockClaims := &services.CustomClaims{
+		ID:    userID,
+		Scope: services.TokenScopeAccess,
 	}
 
 	// Should update refresh token with correct old token and IP
 	s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil).Once()
+
+	// Should validate access token
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(mockClaims, nil).Once()
+
 	// Should fetch user with ID from refresh token
 	s.repo.On("GetByID", mockRes.UserId).Return(user, nil).Once()
 	// Should generate new access token for user
-	s.jwtService.On("GenerateToken", user.ID).Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
 
 	// Setup gin test context with IP
 	w := httptest.NewRecorder()
@@ -497,7 +534,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_JwtError() {
 	ginCtx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
 
 	// Execute the refresh token flow
-	result, err := s.service.RefreshToken(oldRefreshToken, ginCtx)
+	result, err := s.service.RefreshToken(oldRefreshToken, oldAccessToken, ginCtx)
 	s.Error(err, "Expected error for valid refresh token")
 	s.Nil(result, "Expected nil result for error case")
 
@@ -509,8 +546,99 @@ func (s *AuthServiceTestSuite) TestRefreshToken_JwtError() {
 	}
 
 	// Assert mocks
+	s.refreshTokenService.AssertExpectations(s.T())
 	s.repo.AssertExpectations(s.T())
-	s.bcryptService.AssertExpectations(s.T())
+	s.jwtService.AssertExpectations(s.T())
+}
+
+func (s *AuthServiceTestSuite) TestRefreshToken_InvalidAccessToken() {
+	// Test input values
+	oldRefreshToken := "valid-refresh-token"
+	oldAccessToken := "invalid-access-token"
+	ipAddress := "127.0.0.1"
+	userID := uint(1)
+
+	// Mock new refresh token that would be returned by refresh token service
+	mockRefreshToken := &services.JwtResult{
+		Token:     "new-refresh-token",
+		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(),
+	}
+	mockRes := &services.RefreshTokenResult{
+		UserId: userID,
+		Token:  mockRefreshToken,
+	}
+
+	// Should update refresh token
+	s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil).Once()
+
+	// Should fail to validate access token
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(nil, errors.New("Invalid token signature")).Once()
+
+	// Setup gin test context with IP
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
+
+	// Execute the refresh token flow
+	result, err := s.service.RefreshToken(oldRefreshToken, oldAccessToken, ginCtx)
+	s.Error(err, "Expected error for invalid access token")
+	s.Nil(result, "Expected nil result for error case")
+
+	if appError, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrUnauthorized, appError.Code)
+	}
+
+	// Assert mocks
+	s.refreshTokenService.AssertExpectations(s.T())
+	s.jwtService.AssertExpectations(s.T())
+}
+
+func (s *AuthServiceTestSuite) TestRefreshToken_TokenMismatch() {
+	// Test input values
+	oldRefreshToken := "valid-refresh-token"
+	oldAccessToken := "valid-access-token"
+	ipAddress := "127.0.0.1"
+	refreshUserID := uint(1)
+	accessUserID := uint(2)
+
+	// Mock new refresh token that would be returned by refresh token service
+	mockRefreshToken := &services.JwtResult{
+		Token:     "new-refresh-token",
+		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(),
+	}
+	mockRes := &services.RefreshTokenResult{
+		UserId: refreshUserID,
+		Token:  mockRefreshToken,
+	}
+
+	// Mock claims from access token with different user ID
+	mockClaims := &services.CustomClaims{
+		ID:    accessUserID, // Different from refresh token user ID
+		Scope: services.TokenScopeAccess,
+	}
+
+	// Should update refresh token
+	s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil).Once()
+
+	// Should validate access token but find user mismatch
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(mockClaims, nil).Once()
+
+	// Setup gin test context with IP
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
+
+	// Execute the refresh token flow
+	result, err := s.service.RefreshToken(oldRefreshToken, oldAccessToken, ginCtx)
+	s.Error(err, "Expected error for token mismatch")
+	s.Nil(result, "Expected nil result for error case")
+
+	if appError, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrUnauthorized, appError.Code)
+		assert.Contains(s.T(), appError.Message, "Token mismatch")
+	}
+
+	// Assert mocks
 	s.refreshTokenService.AssertExpectations(s.T())
 	s.jwtService.AssertExpectations(s.T())
 }

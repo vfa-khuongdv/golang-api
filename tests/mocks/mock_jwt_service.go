@@ -18,7 +18,39 @@ func (m *MockJWTService) GenerateToken(id uint) (*services.JwtResult, error) {
 	return args.Get(0).(*services.JwtResult), args.Error(1)
 }
 
+func (m *MockJWTService) GenerateAccessToken(id uint) (*services.JwtResult, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*services.JwtResult), args.Error(1)
+}
+
+func (m *MockJWTService) GenerateMfaToken(id uint) (*services.JwtResult, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*services.JwtResult), args.Error(1)
+}
+
 func (m *MockJWTService) ValidateToken(tokenString string) (*services.CustomClaims, error) {
+	args := m.Called(tokenString)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*services.CustomClaims), args.Error(1)
+}
+
+func (m *MockJWTService) ValidateTokenWithScope(tokenString string, requiredScope string) (*services.CustomClaims, error) {
+	args := m.Called(tokenString, requiredScope)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*services.CustomClaims), args.Error(1)
+}
+
+func (m *MockJWTService) ValidateTokenIgnoreExpiration(tokenString string) (*services.CustomClaims, error) {
 	args := m.Called(tokenString)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

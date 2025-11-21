@@ -209,16 +209,20 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	// Create a real JWT service to generate a valid token
+	// Create a real JWT service to generate tokens
 	jwtService := services.NewJWTService()
 
-	// Generate a valid token
-	result, err := jwtService.GenerateToken(123)
+	// Generate valid tokens with different scopes
+	accessTokenResult, err := jwtService.GenerateAccessToken(123)
 	assert.NoError(t, err)
-	assert.NotNil(t, result)
+	assert.NotNil(t, accessTokenResult)
 
-	// Test with valid token
-	t.Run("Valid JWT token", func(t *testing.T) {
+	mfaTokenResult, err := jwtService.GenerateMfaToken(456)
+	assert.NoError(t, err)
+	assert.NotNil(t, mfaTokenResult)
+
+	// Test with valid access token
+	t.Run("Valid JWT access token", func(t *testing.T) {
 		router := gin.New()
 		router.Use(AuthMiddleware())
 
@@ -229,13 +233,30 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 		})
 
 		req, _ := http.NewRequest("GET", "/test", nil)
-		req.Header.Set("Authorization", "Bearer "+result.Token)
+		req.Header.Set("Authorization", "Bearer "+accessTokenResult.Token)
 
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, uint(123), capturedUserID)
+	})
+
+	// Test with MFA token (should fail because scope is wrong)
+	t.Run("Invalid JWT token - wrong scope (MFA token on access endpoint)", func(t *testing.T) {
+		router := gin.New()
+		router.Use(AuthMiddleware())
+		router.GET("/test", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "success"})
+		})
+
+		req, _ := http.NewRequest("GET", "/test", nil)
+		req.Header.Set("Authorization", "Bearer "+mfaTokenResult.Token)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 
 	// Test with invalid token
@@ -248,6 +269,75 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 
 		req, _ := http.NewRequest("GET", "/test", nil)
 		req.Header.Set("Authorization", "Bearer invalid.token.here")
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+// TestMfaMiddleware tests the MFA verification middleware
+func TestMfaMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// Create a real JWT service to generate tokens
+	jwtService := services.NewJWTService()
+
+	// Generate tokens with different scopes
+	accessTokenResult, err := jwtService.GenerateAccessToken(123)
+	assert.NoError(t, err)
+
+	mfaTokenResult, err := jwtService.GenerateMfaToken(789)
+	assert.NoError(t, err)
+
+	// Test with valid MFA token
+	t.Run("Valid MFA token", func(t *testing.T) {
+		router := gin.New()
+		router.Use(MfaMiddleware())
+
+		var capturedUserID interface{}
+		router.POST("/verify", func(c *gin.Context) {
+			capturedUserID, _ = c.Get("UserID")
+			c.JSON(http.StatusOK, gin.H{"message": "success"})
+		})
+
+		req, _ := http.NewRequest("POST", "/verify", nil)
+		req.Header.Set("Authorization", "Bearer "+mfaTokenResult.Token)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, uint(789), capturedUserID)
+	})
+
+	// Test with access token (should fail because scope is wrong)
+	t.Run("Invalid token - wrong scope (access token on MFA endpoint)", func(t *testing.T) {
+		router := gin.New()
+		router.Use(MfaMiddleware())
+		router.POST("/verify", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "success"})
+		})
+
+		req, _ := http.NewRequest("POST", "/verify", nil)
+		req.Header.Set("Authorization", "Bearer "+accessTokenResult.Token)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	// Test missing authorization header
+	t.Run("Missing authorization header", func(t *testing.T) {
+		router := gin.New()
+		router.Use(MfaMiddleware())
+		router.POST("/verify", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "success"})
+		})
+
+		req, _ := http.NewRequest("POST", "/verify", nil)
 
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)

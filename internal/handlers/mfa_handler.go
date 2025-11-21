@@ -159,7 +159,7 @@ func (h *MfaHandler) VerifyMfaCode(c *gin.Context) {
 	}
 
 	// Generate access token
-	accessToken, err := h.jwtService.GenerateToken(user.ID)
+	accessToken, err := h.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
 		logrus.Errorf("Failed to generate access token: %v", err)
 		utils.RespondWithError(c, apperror.NewInternalError("Failed to generate tokens after MFA verification"))
@@ -175,17 +175,19 @@ func (h *MfaHandler) VerifyMfaCode(c *gin.Context) {
 		return
 	}
 
+	result := &services.LoginResponse{
+		AccessToken: services.JwtResult{
+			Token:     accessToken.Token,
+			ExpiresAt: accessToken.ExpiresAt,
+		},
+		RefreshToken: services.JwtResult{
+			Token:     refreshToken.Token,
+			ExpiresAt: refreshToken.ExpiresAt,
+		},
+	}
+
 	// Return tokens to client
-	utils.RespondWithOK(c, http.StatusOK, gin.H{
-		"access_token": gin.H{
-			"token":      accessToken.Token,
-			"expires_at": accessToken.ExpiresAt,
-		},
-		"refresh_token": gin.H{
-			"token":      refreshToken.Token,
-			"expires_at": refreshToken.ExpiresAt,
-		},
-	})
+	utils.RespondWithOK(c, http.StatusOK, result)
 }
 
 // DisableMfa disables MFA for the authenticated user
