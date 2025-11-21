@@ -26,6 +26,7 @@ type AuthServiceTestSuite struct {
 	service             services.IAuthService
 	bcryptService       *mocks.MockBcryptService
 	jwtService          *mocks.MockJWTService
+	mfaRepository       *mocks.MockMfaRepository
 }
 
 func (s *AuthServiceTestSuite) SetupTest() {
@@ -33,12 +34,14 @@ func (s *AuthServiceTestSuite) SetupTest() {
 	s.refreshTokenService = new(mocks.MockRefreshTokenService)
 	s.bcryptService = new(mocks.MockBcryptService)
 	s.jwtService = new(mocks.MockJWTService)
+	s.mfaRepository = new(mocks.MockMfaRepository)
 
 	s.service = services.NewAuthService(
 		s.repo,
 		s.refreshTokenService,
 		s.bcryptService,
 		s.jwtService,
+		s.mfaRepository,
 	)
 }
 
@@ -57,6 +60,7 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 	// Mock the methods of the dependencies
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
+	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(nil, nil) // MFA not enabled
 	s.jwtService.On("GenerateToken", user.ID).Return(&services.JwtResult{
 		Token:     "mocked-access-token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -73,7 +77,11 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 
 	// Call the Login method
 	resp, _ := s.service.Login(email, password, ginCtx)
-	assert.Equal(s.T(), "mocked-refresh-token", resp.RefreshToken.Token)
+
+	// Cast response to LoginResponse (MFA not enabled)
+	loginResp, ok := resp.(*services.LoginResponse)
+	assert.True(s.T(), ok, "Expected LoginResponse type")
+	assert.Equal(s.T(), "mocked-refresh-token", loginResp.RefreshToken.Token)
 
 }
 
@@ -146,6 +154,7 @@ func (s *AuthServiceTestSuite) TestLogin_CreateTokenError() {
 	// Mock user repository and bcrypt service
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
+	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(nil, nil) // MFA not enabled
 	s.jwtService.On("GenerateToken", user.ID).
 		Return(&services.JwtResult{
 			Token:     "mocked-access-token",
@@ -192,6 +201,7 @@ func (s *AuthServiceTestSuite) TestLogin_JwtError() {
 	// Mock user repository and bcrypt service
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
+	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(nil, nil) // MFA not enabled
 	s.jwtService.On("GenerateToken", user.ID).
 		Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
 
@@ -217,6 +227,114 @@ func (s *AuthServiceTestSuite) TestLogin_JwtError() {
 	// Assert mocks
 	s.repo.AssertExpectations(s.T())
 	s.refreshTokenService.AssertExpectations(s.T())
+}
+
+// TestLogin_MfaEnabled tests login when MFA is enabled
+func (s *AuthServiceTestSuite) TestLogin_MfaEnabled() {
+	email := "test@example.com"
+	password := "password123"
+	user := &models.User{
+		ID:       1,
+		Email:    email,
+		Password: "hashed_password",
+	}
+	ipAddress := "127.0.0.1"
+
+	mfaSettings := &models.MfaSettings{
+		ID:         1,
+		UserID:     user.ID,
+		MfaEnabled: true,
+		TotpSecret: stringPtr("test-secret"),
+	}
+
+	// Mock user repository and bcrypt service
+	s.repo.On("FindByField", "email", email).Return(user, nil)
+	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
+	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(mfaSettings, nil).Once()
+	s.jwtService.On("GenerateToken", user.ID).
+		Return(&services.JwtResult{
+			Token:     "temporary-token",
+			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
+		}, nil)
+
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx.Request = &http.Request{
+		RemoteAddr: ipAddress + ":12345",
+	}
+
+	// Call Login method
+	resp, err := s.service.Login(email, password, ginCtx)
+
+	// Assert no error
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
+
+	// Cast response to MfaRequiredResponse
+	mfaResp, ok := resp.(*services.MfaRequiredResponse)
+	assert.True(s.T(), ok, "Expected MfaRequiredResponse type")
+	assert.True(s.T(), mfaResp.MfaRequired)
+	assert.Equal(s.T(), "temporary-token", mfaResp.TemporaryToken)
+	assert.Equal(s.T(), "MFA code required", mfaResp.Message)
+
+	// Assert mocks
+	s.repo.AssertExpectations(s.T())
+	s.mfaRepository.AssertExpectations(s.T())
+	s.jwtService.AssertExpectations(s.T())
+}
+
+// TestLogin_MfaEnabledJwtError tests MFA login when JWT generation fails
+func (s *AuthServiceTestSuite) TestLogin_MfaEnabledJwtError() {
+	email := "test@example.com"
+	password := "password123"
+	user := &models.User{
+		ID:       1,
+		Email:    email,
+		Password: "hashed_password",
+	}
+	ipAddress := "127.0.0.1"
+
+	mfaSettings := &models.MfaSettings{
+		ID:         1,
+		UserID:     user.ID,
+		MfaEnabled: true,
+		TotpSecret: stringPtr("test-secret"),
+	}
+
+	// Mock user repository and bcrypt service
+	s.repo.On("FindByField", "email", email).Return(user, nil)
+	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
+	s.mfaRepository.On("GetMfaSettingsByUserID", user.ID).Return(mfaSettings, nil).Once()
+	s.jwtService.On("GenerateToken", user.ID).
+		Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
+
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx.Request = &http.Request{
+		RemoteAddr: ipAddress + ":12345",
+	}
+
+	// Call Login method
+	resp, err := s.service.Login(email, password, ginCtx)
+
+	// Assert error
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), resp)
+
+	if appError, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrInternal, appError.Code)
+	} else {
+		s.Fail("Expected AppError with ErrInternal code")
+	}
+
+	// Assert mocks
+	s.repo.AssertExpectations(s.T())
+	s.mfaRepository.AssertExpectations(s.T())
+	s.jwtService.AssertExpectations(s.T())
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
 
 func (s *AuthServiceTestSuite) TestRefreshToken_Success() {

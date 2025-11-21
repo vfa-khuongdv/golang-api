@@ -10,8 +10,11 @@ type MockUserService struct {
 	mock.Mock
 }
 
-func (m *MockUserService) PaginateUser(page, limit int) (*utils.Pagination, error) {
+func (m *MockUserService) GetUsers(page int, limit int) (*utils.Pagination, error) {
 	args := m.Called(page, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
 	return args.Get(0).(*utils.Pagination), args.Error(1)
 }
 

@@ -44,7 +44,7 @@ func LogMiddleware() gin.HandlerFunc {
 			"password", "api-key", "token", "access_token", "refresh_token",
 			"ccv", "credit_card", "debit_card", "social_security_number",
 			"ssn", "bank_account", "bank_account_number",
-			"email", "phone", "address",
+			"email", "phone", "address", "cvv",
 		}
 
 		logEntry := LogResponse{

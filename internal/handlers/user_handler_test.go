@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/vfa-khuongdv/golang-cms/internal/constants"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
@@ -33,9 +31,8 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("CreateUser - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the CreateUser method
 		userService.On("CreateUser", mock.AnythingOfType("*models.User"), mock.AnythingOfType("[]uint")).Return(nil)
@@ -66,13 +63,11 @@ func TestCreateUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("CreateUser - Validation Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
 
 		tests := []struct {
@@ -376,7 +371,7 @@ func TestCreateUser(t *testing.T) {
 
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
-				handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -401,7 +396,6 @@ func TestCreateUser(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				redisService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
 			})
 		}
@@ -409,9 +403,8 @@ func TestCreateUser(t *testing.T) {
 
 	t.Run("Create user Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the service methods
 		bcryptService.On("HashPassword", "password").Return("$2a$10$examplehash", nil)
@@ -451,16 +444,14 @@ func TestCreateUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 
 	})
 
 	t.Run("Error Bcrypt Hash Password", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the service methods
 		bcryptService.On("HashPassword", "password").Return("", errors.New("bcrypt error"))
@@ -497,7 +488,6 @@ func TestCreateUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 
 	})
@@ -511,9 +501,8 @@ func TestUpdateProfile(t *testing.T) {
 
 	t.Run("UpdateProfile - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -522,12 +511,10 @@ func TestUpdateProfile(t *testing.T) {
 		}
 
 		// Assuming the cache key is constructed as "profile:<user_id>"
-		profileKey := constants.PROFILE + string(rune(user.ID))
 
 		// Mock the service methods
 		userService.On("GetUser", uint(1)).Return(user, nil)
 		userService.On("UpdateUser", user).Return(nil)
-		redisService.On("Delete", profileKey).Return(nil)
 
 		requestBody := map[string]any{
 			"name":     "Updated User",
@@ -553,7 +540,6 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
@@ -667,9 +653,8 @@ func TestUpdateProfile(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				redisService := new(mocks.MockRedisService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -697,7 +682,6 @@ func TestUpdateProfile(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				redisService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
 			})
 		}
@@ -705,9 +689,8 @@ func TestUpdateProfile(t *testing.T) {
 
 	t.Run("UpdateProfile - Invalid UserID ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -731,15 +714,13 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		requestBody := map[string]any{
 			"name":     "Updated User",
@@ -774,15 +755,13 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("Error Update User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -825,15 +804,13 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("Error Delete Cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -851,8 +828,6 @@ func TestUpdateProfile(t *testing.T) {
 		// Mock the service method
 		userService.On("GetUser", uint(1)).Return(user, nil)
 		userService.On("UpdateUser", user).Return(nil)
-		profileKey := constants.PROFILE + string(rune(user.ID))
-		redisService.On("Delete", profileKey).Return(errors.New("Redis delete error"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -874,7 +849,6 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 }
@@ -884,9 +858,8 @@ func TestGetProfile(t *testing.T) {
 
 	t.Run("Success get profile from database", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:        1,
@@ -896,16 +869,8 @@ func TestGetProfile(t *testing.T) {
 			CreatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 		}
-		profileKey := constants.PROFILE + strconv.Itoa(int(user.ID))
 		// Mock the service method
 		userService.On("GetProfile", uint(1)).Return(user, nil)
-		redisService.On("Get", profileKey).Return("", nil)
-		// Parse the user into a JSON string
-		profileData, _ := json.Marshal(user)
-		// Set the TTL for the cache
-		ttl := 60 * time.Minute
-		// Mock the Redis Set method to cache the profile
-		redisService.On("Set", profileKey, profileData, ttl).Return(nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -933,13 +898,11 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("Success get profile from redis cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
 
 		user := &models.User{
@@ -950,14 +913,10 @@ func TestGetProfile(t *testing.T) {
 			CreatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 		}
-		profileKey := constants.PROFILE + strconv.Itoa(int(user.ID))
-		// Mock the Redis Get method to return a cached profile
-		cachedProfile := fmt.Sprintf(`{"id":%d,"email":"%s","name":"%s","gender":%d,"createdAt":"%s","updatedAt":"%s","deletedAt":null}`,
-			user.ID, user.Email, user.Name, user.Gender, user.CreatedAt.Format(time.RFC3339), user.UpdatedAt.Format(time.RFC3339))
+		// Mock the service to return the cached profile
+		userService.On("GetProfile", uint(1)).Return(user, nil)
 
-		redisService.On("Get", profileKey).Return(cachedProfile, nil)
-
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -984,16 +943,14 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("Error Invalid User ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -1014,25 +971,21 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("Error User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
 
 		userId := uint(1)
 		// Assuming the cache key is constructed as "profile:<user_id>"
 
-		profileKey := constants.PROFILE + strconv.Itoa(int(userId))
 		// Mock the GetUser method to return an error
 		userService.On("GetProfile", userId).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 		// Mock the Redis Get method to return an empty string
-		redisService.On("Get", profileKey).Return("", nil)
 
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -1054,17 +1007,14 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 
 	})
 
 	t.Run("Success Get Profile but Error Cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
 
-		profileKey := constants.PROFILE + strconv.Itoa(int(1))
 		// Mock the GetUser method to return a user
 		user := &models.User{
 			ID:        1,
@@ -1075,13 +1025,8 @@ func TestGetProfile(t *testing.T) {
 			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 		}
 		userService.On("GetProfile", uint(1)).Return(user, nil)
-		// Mock the Redis Get method to return an error
-		redisService.On("Get", profileKey).Return("", errors.New("Cache get error"))
-		// Mock the Redis Set method to cache the profile
-		profileData, _ := json.Marshal(user)
-		ttl := 60 * time.Minute
-		redisService.On("Set", profileKey, profileData, ttl).Return(errors.New("Cache set error"))
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+
+		handler := handlers.NewUserHandler(userService, bcryptService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -1108,41 +1053,6 @@ func TestGetProfile(t *testing.T) {
 		assert.Equal(t, expectedBody, actualBody)
 
 	})
-
-	t.Run("GetProfile - Could not parse user data from cache", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
-		bcryptService := new(mocks.MockBcryptService)
-
-		profileKey := constants.PROFILE + strconv.Itoa(int(1))
-		// Mock the Redis Get method to return an invalid JSON
-		redisService.On("Get", profileKey).Return("invalid-json", nil)
-
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
-		c.Set("UserID", uint(1))
-
-		// Call the GetProfile handler
-		handler.GetProfile(c)
-
-		// Assert the response
-		actualBody := map[string]any{
-			"code":    float64(apperror.ErrParseError),
-			"message": "Invalid user data in cache",
-		}
-		var responseBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
-		assert.Equal(t, actualBody["code"], responseBody["code"])
-		assert.Equal(t, actualBody["message"], responseBody["message"])
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
 }
 
 func TestGetUser(t *testing.T) {
@@ -1150,9 +1060,8 @@ func TestGetUser(t *testing.T) {
 
 	t.Run("GetUser - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:        1,
@@ -1192,15 +1101,13 @@ func TestGetUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("GetUser - Not found the user", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the service method
 		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
@@ -1227,15 +1134,13 @@ func TestGetUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("GetUser - Invalid UserID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Create http request with invalid UserID
 		w := httptest.NewRecorder()
@@ -1259,7 +1164,6 @@ func TestGetUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 }
@@ -1272,9 +1176,8 @@ func TestChangePassword(t *testing.T) {
 
 	t.Run("ChangePassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:        1,
@@ -1313,7 +1216,6 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
@@ -1420,9 +1322,8 @@ func TestChangePassword(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				redisService := new(mocks.MockRedisService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService)
 
 				// Create http request and context
 				w := httptest.NewRecorder()
@@ -1449,16 +1350,14 @@ func TestChangePassword(t *testing.T) {
 				// Assert mock expectations
 				userService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
-				redisService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("ChangePassword - NotFound User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -1493,14 +1392,12 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:       1,
@@ -1543,14 +1440,12 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - New Password and Confirm Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:       1,
@@ -1592,14 +1487,12 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Failed To Update", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:       1,
@@ -1643,14 +1536,12 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - User Not found from ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1668,14 +1559,12 @@ func TestChangePassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password equal to New Password", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:       1,
@@ -1717,14 +1606,12 @@ func TestChangePassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Hash Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:       1,
@@ -1767,7 +1654,6 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 	})
 
 }
@@ -1780,9 +1666,8 @@ func TestUpdateUser(t *testing.T) {
 	t.Run("UpdateUser - Success", func(t *testing.T) {
 		// Mock the dependencies
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -1926,9 +1811,8 @@ func TestUpdateUser(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				// Mock services
 				userService := new(mocks.MockUserService)
-				redisService := new(mocks.MockRedisService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -1949,7 +1833,6 @@ func TestUpdateUser(t *testing.T) {
 
 				// Assert mock expectations
 				userService.AssertExpectations(t)
-				redisService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
 
 			})
@@ -1958,9 +1841,8 @@ func TestUpdateUser(t *testing.T) {
 
 	t.Run("UpdateUser - Error Parse ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		requestBody := map[string]any{
 			"name":     "Updated User",
@@ -1990,15 +1872,13 @@ func TestUpdateUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateUser - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		var requestBody = map[string]any{
 			"name":     "Updated User",
@@ -2030,15 +1910,13 @@ func TestUpdateUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateUser - Update User Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -2075,7 +1953,6 @@ func TestUpdateUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
@@ -2086,9 +1963,8 @@ func TestDeleteUser(t *testing.T) {
 
 	t.Run("DelelteUser - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -2114,15 +1990,13 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("DeleteUser - Failed To Parse UserID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2145,15 +2019,13 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("DeleteUser - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the service method
 		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
@@ -2179,15 +2051,13 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("DeleteUser - Failed To Delete", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -2219,7 +2089,6 @@ func TestDeleteUser(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 }
@@ -2231,9 +2100,8 @@ func TestResetPassword(t *testing.T) {
 
 	t.Run("ResetPassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2271,15 +2139,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Not found user by token", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
@@ -2314,15 +2180,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Token Expired", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		expiredAt := time.Now().Add(-24 * time.Hour).Unix() // Token expired
 		user := &models.User{
@@ -2364,16 +2228,14 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 
 	})
 
 	t.Run("ResetPassword - Passwords Incorrect", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2415,15 +2277,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Error Hashing Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2468,15 +2328,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("Error failed to UpdateUser", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2524,7 +2382,6 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
@@ -2645,9 +2502,8 @@ func TestResetPassword(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				redisService := new(mocks.MockRedisService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -2668,7 +2524,6 @@ func TestResetPassword(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				redisService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
 			})
 		}
@@ -2700,9 +2555,8 @@ func TestForgotPassword(t *testing.T) {
 		}()
 
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -2742,7 +2596,6 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
@@ -2786,9 +2639,8 @@ func TestForgotPassword(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				redisService := new(mocks.MockRedisService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -2813,7 +2665,6 @@ func TestForgotPassword(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				redisService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
 			})
 		}
@@ -2821,9 +2672,8 @@ func TestForgotPassword(t *testing.T) {
 
 	t.Run("ForgotPassword - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		requestBody := map[string]any{
 			"email": "notfound@example.com",
@@ -2854,15 +2704,13 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Update User Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		user := &models.User{
 			ID:    1,
@@ -2900,15 +2748,13 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - JSON Parse Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		redisService := new(mocks.MockRedisService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, redisService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Create a test context with invalid JSON
 		w := httptest.NewRecorder()
@@ -2923,7 +2769,140 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		redisService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+	})
+}
+
+func TestGetUsers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	utils.InitValidator()
+
+	t.Run("GetUsers - Success with pagination", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Create mock user data
+		users := []models.User{
+			{
+				ID:    1,
+				Name:  "User 1",
+				Email: "user1@example.com",
+			},
+			{
+				ID:    2,
+				Name:  "User 2",
+				Email: "user2@example.com",
+			},
+		}
+
+		// Mock the GetUsers method
+		expectedPagination := &utils.Pagination{
+			Page:       1,
+			Limit:      10,
+			TotalItems: 2,
+			TotalPages: 1,
+			Data:       users,
+		}
+		userService.On("GetUsers", 1, 10).Return(expectedPagination, nil)
+
+		// Create a test context with query parameters
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users?page=1&limit=10", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response
+		assert.Equal(t, http.StatusOK, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+
+		// Verify response body contains pagination data
+		var response map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+		assert.NotNil(t, response["data"])
+	})
+
+	t.Run("GetUsers - Default pagination values", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Mock the GetUsers method with default values (page=1, limit=50)
+		expectedPagination := &utils.Pagination{
+			Page:       1,
+			Limit:      50,
+			TotalItems: 0,
+			TotalPages: 0,
+			Data:       []models.User{},
+		}
+		userService.On("GetUsers", 1, 50).Return(expectedPagination, nil)
+
+		// Create a test context without query parameters (should use defaults)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response
+		assert.Equal(t, http.StatusOK, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+	})
+
+	t.Run("GetUsers - Invalid page parameter", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Mock the GetUsers method with default page=1
+		expectedPagination := &utils.Pagination{
+			Page:       1,
+			Limit:      5,
+			TotalItems: 0,
+			TotalPages: 0,
+			Data:       []models.User{},
+		}
+		userService.On("GetUsers", 1, 5).Return(expectedPagination, nil)
+
+		// Create a test context with invalid page parameter (should default to 1)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users?page=invalid&limit=5", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response - should still be 200 with default pagination
+		assert.Equal(t, http.StatusOK, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+	})
+
+	t.Run("GetUsers - Service error", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Mock the GetUsers method to return an error
+		userService.On("GetUsers", 1, 50).Return(nil, apperror.NewDBQueryError("database error"))
+
+		// Create a test context
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response - should return 500 for service error
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
 	})
 }

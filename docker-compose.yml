@@ -19,19 +19,6 @@ services:
       test: [ "CMD", "mysqladmin", "ping", "-p${DB_PASSWORD}" ]
       retries: 3
       timeout: 5s
-  redis:
-    image: 'redis:alpine'
-    container_name: golang-redis
-    ports:
-      - '${FORWARD_REDIS_PORT:-6379}:6379'
-    volumes:
-      - 'redis:/data'
-    networks:
-      - go-network
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      retries: 3
-      timeout: 5s
   phpmyadmin:
     depends_on:
       - mysql
@@ -49,6 +36,4 @@ networks:
     driver: bridge
 volumes:
   mysql:
-    driver: local
-  redis:
     driver: local

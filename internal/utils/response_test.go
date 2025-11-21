@@ -12,62 +12,62 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
-func TestRespondWithError_AppError(t *testing.T) {
+func TestRespondWith(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
 
-	appErr := &apperror.AppError{
-		HttpStatusCode: http.StatusBadRequest,
-		Code:           1001,
-		Message:        "App error occurred",
-	}
+	t.Run("RespondWithError_AppError", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
 
-	utils.RespondWithError(ctx, appErr)
+		appErr := &apperror.AppError{
+			HttpStatusCode: http.StatusBadRequest,
+			Code:           1001,
+			Message:        "App error occurred",
+		}
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	expectedJSON := `{"code":1001,"message":"App error occurred"}`
-	assert.JSONEq(t, expectedJSON, w.Body.String())
-}
+		utils.RespondWithError(ctx, appErr)
 
-func TestRespondWithError_InternalServerError(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		expectedJSON := `{"code":1001,"message":"App error occurred"}`
+		assert.JSONEq(t, expectedJSON, w.Body.String())
+	})
 
-	internalErr := stdErrors.New("Internal server error occurred")
+	t.Run("RespondWithError_InternalServerError", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
 
-	utils.RespondWithError(ctx, internalErr)
+		internalErr := stdErrors.New("Internal server error occurred")
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	expectedJSON := `{"code":1000,"message":"Internal server error occurred"}`
-	assert.JSONEq(t, expectedJSON, w.Body.String())
-}
+		utils.RespondWithError(ctx, internalErr)
 
-func TestRespondWithError_GenericError(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		expectedJSON := `{"code":1000,"message":"Internal server error occurred"}`
+		assert.JSONEq(t, expectedJSON, w.Body.String())
+	})
 
-	genericErr := apperror.NewInternalError("generic error message")
+	t.Run("RespondWithError_GenericError", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
 
-	utils.RespondWithError(ctx, genericErr)
+		genericErr := apperror.NewInternalError("generic error message")
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-	expectedJSON := `{"code":1000,"message":"generic error message"}`
-	assert.JSONEq(t, expectedJSON, w.Body.String())
-}
+		utils.RespondWithError(ctx, genericErr)
 
-func TestRespondWithOK(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(w)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		expectedJSON := `{"code":1000,"message":"generic error message"}`
+		assert.JSONEq(t, expectedJSON, w.Body.String())
+	})
 
-	body := gin.H{"success": true, "data": "some data"}
+	t.Run("RespondWithOK", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
 
-	utils.RespondWithOK(ctx, http.StatusOK, body)
+		body := gin.H{"success": true, "data": "some data"}
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	expectedJSON := `{"success":true,"data":"some data"}`
-	assert.JSONEq(t, expectedJSON, w.Body.String())
+		utils.RespondWithOK(ctx, http.StatusOK, body)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		expectedJSON := `{"success":true,"data":"some data"}`
+		assert.JSONEq(t, expectedJSON, w.Body.String())
+	})
 }
