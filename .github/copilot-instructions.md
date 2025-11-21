@@ -105,10 +105,10 @@ docker-compose up -d mysql
 # Run migrations and seeding
 go run cmd/seeder/seeder.go
 
-# Start server (default port 8080)
+# Start server (default port 3000)
 go run cmd/server/main.go
 
-# Server runs on http://localhost:8080
+# Server runs on http://localhost:3000
 ```
 
 ## Key Architectural Patterns
