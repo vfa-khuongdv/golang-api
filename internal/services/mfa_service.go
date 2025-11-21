@@ -162,7 +162,9 @@ func (s *MfaService) ValidateBackupCode(userID uint, code string) (bool, error) 
 			backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
 			updatedCodes, _ := json.Marshal(backupCodes)
 			settings.BackupCodes = updatedCodes
-			s.mfaRepository.UpdateMfaSettings(settings)
+			if err := s.mfaRepository.UpdateMfaSettings(settings); err != nil {
+				return false, err
+			}
 			return true, nil
 		}
 	}
