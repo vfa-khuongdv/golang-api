@@ -20,8 +20,8 @@ type AuthService struct {
 }
 
 type LoginResponse struct {
-	AccessToken  JwtResult `json:"accessToken"`
-	RefreshToken JwtResult `json:"refreshToken"`
+	AccessToken  JwtResult `json:"access_token"`
+	RefreshToken JwtResult `json:"refresh_token"`
 }
 
 // MfaRequiredResponse is returned when user has MFA enabled but hasn't verified it yet

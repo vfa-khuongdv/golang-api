@@ -77,7 +77,6 @@ func (h *MfaHandler) InitMfaSetup(c *gin.Context) {
 		"secret":       secret,
 		"qr_code":      fmt.Sprintf("data:image/png;base64,%s", qrCodeBase64),
 		"backup_codes": backupCodes,
-		"message":      "Scan the QR code with your authenticator app and save the backup codes",
 	})
 }
 
@@ -178,14 +177,13 @@ func (h *MfaHandler) VerifyMfaCode(c *gin.Context) {
 
 	// Return tokens to client
 	utils.RespondWithOK(c, http.StatusOK, gin.H{
-		"message": "MFA verification successful",
-		"accessToken": gin.H{
-			"token":     accessToken.Token,
-			"expiresAt": accessToken.ExpiresAt,
+		"access_token": gin.H{
+			"token":      accessToken.Token,
+			"expires_at": accessToken.ExpiresAt,
 		},
-		"refreshToken": gin.H{
-			"token":     refreshToken.Token,
-			"expiresAt": refreshToken.ExpiresAt,
+		"refresh_token": gin.H{
+			"token":      refreshToken.Token,
+			"expires_at": refreshToken.ExpiresAt,
 		},
 	})
 }

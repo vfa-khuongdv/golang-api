@@ -883,13 +883,13 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert the response
 		expectedBody := map[string]any{
-			"id":        float64(1),
-			"email":     "email@example.com",
-			"name":      "User",
-			"gender":    float64(1),
-			"createdAt": "2023-10-01T00:00:00Z",
-			"updatedAt": "2023-10-01T00:00:00Z",
-			"deletedAt": nil,
+			"id":         float64(1),
+			"email":      "email@example.com",
+			"name":       "User",
+			"gender":     float64(1),
+			"created_at": "2023-10-01T00:00:00Z",
+			"updated_at": "2023-10-01T00:00:00Z",
+			"deleted_at": nil,
 		}
 		var actualBody map[string]any
 		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
@@ -927,13 +927,13 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert the response
 		expectedBody := map[string]any{
-			"id":        float64(1),
-			"email":     "email@example.com",
-			"name":      "User",
-			"gender":    float64(1),
-			"createdAt": "2023-10-01T00:00:00Z",
-			"updatedAt": "2023-10-01T00:00:00Z",
-			"deletedAt": nil,
+			"id":         float64(1),
+			"email":      "email@example.com",
+			"name":       "User",
+			"gender":     float64(1),
+			"created_at": "2023-10-01T00:00:00Z",
+			"updated_at": "2023-10-01T00:00:00Z",
+			"deleted_at": nil,
 		}
 
 		var actualBody map[string]any
@@ -1036,13 +1036,13 @@ func TestGetProfile(t *testing.T) {
 		// Assert the response
 		assert.Equal(t, http.StatusOK, w.Code)
 		expectedBody := map[string]any{
-			"id":        float64(1),
-			"email":     "email@example.com",
-			"name":      "User",
-			"gender":    float64(1),
-			"createdAt": "2023-10-01T00:00:00Z",
-			"updatedAt": "2023-10-01T00:00:00Z",
-			"deletedAt": nil,
+			"id":         float64(1),
+			"email":      "email@example.com",
+			"name":       "User",
+			"gender":     float64(1),
+			"created_at": "2023-10-01T00:00:00Z",
+			"updated_at": "2023-10-01T00:00:00Z",
+			"deleted_at": nil,
 		}
 
 		var actualBody map[string]any
@@ -1088,13 +1088,13 @@ func TestGetUser(t *testing.T) {
 		var actualBody map[string]any
 		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		expectedBody := map[string]any{
-			"id":        float64(1),
-			"email":     "email@example.com",
-			"name":      "User",
-			"gender":    float64(1),
-			"createdAt": "2023-10-01T00:00:00Z",
-			"updatedAt": "2023-10-01T00:00:00Z",
-			"deletedAt": nil,
+			"id":         float64(1),
+			"email":      "email@example.com",
+			"name":       "User",
+			"gender":     float64(1),
+			"created_at": "2023-10-01T00:00:00Z",
+			"updated_at": "2023-10-01T00:00:00Z",
+			"deleted_at": nil,
 		}
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, expectedBody, actualBody)

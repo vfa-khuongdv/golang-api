@@ -16,7 +16,7 @@ type CustomClaims struct {
 // JwtResult represents the result of a token generation
 type JwtResult struct {
 	Token     string `json:"token"`
-	ExpiresAt int64  `json:"expiresAt"`
+	ExpiresAt int64  `json:"expires_at"`
 }
 
 // IJWTService defines JWT-related operations

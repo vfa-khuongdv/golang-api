@@ -47,7 +47,7 @@ func ParsePageAndLimit(c *gin.Context) (int, int) {
 type Pagination struct {
 	Page       int `json:"page"`
 	Limit      int `json:"limit"`
-	TotalItems int `json:"totalItems"`
-	TotalPages int `json:"totalPages"`
+	TotalItems int `json:"total_items"`
+	TotalPages int `json:"total_pages"`
 	Data       any `json:"data"`
 }

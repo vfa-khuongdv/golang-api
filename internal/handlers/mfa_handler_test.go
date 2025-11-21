@@ -358,9 +358,8 @@ func TestVerifyMfaCode(t *testing.T) {
 		var responseBody map[string]interface{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
-		assert.Equal(t, "MFA verification successful", responseBody["message"])
-		assert.NotEmpty(t, responseBody["accessToken"])
-		assert.NotEmpty(t, responseBody["refreshToken"])
+		assert.NotEmpty(t, responseBody["access_token"])
+		assert.NotEmpty(t, responseBody["refresh_token"])
 
 		mockMfaService.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
