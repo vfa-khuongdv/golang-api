@@ -169,3 +169,68 @@ func NewValidationDataError(message string) *AppError {
 		Message:        message,
 	}
 }
+
+// === MFA errors ===
+func NewMfaAlreadyEnabledError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusBadRequest,
+		Code:           ErrMfaAlreadyEnabled,
+		Message:        message,
+	}
+}
+
+func NewMfaNotEnabledError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusBadRequest,
+		Code:           ErrMfaNotEnabled,
+		Message:        message,
+	}
+}
+
+func NewMfaSetupNotInitiatedError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusBadRequest,
+		Code:           ErrMfaSetupNotInitiated,
+		Message:        message,
+	}
+}
+
+func NewMfaInvalidCodeError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusBadRequest,
+		Code:           ErrMfaInvalidCode,
+		Message:        message,
+	}
+}
+
+func NewMfaExpiredError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusBadRequest,
+		Code:           ErrMfaExpired,
+		Message:        message,
+	}
+}
+
+func NewMfaSecretGenerationError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusInternalServerError,
+		Code:           ErrMfaSecretGeneration,
+		Message:        message,
+	}
+}
+
+func NewMfaQRCodeGenerationError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusInternalServerError,
+		Code:           ErrMfaQRCodeGeneration,
+		Message:        message,
+	}
+}
+
+func NewMfaBackupCodeError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusInternalServerError,
+		Code:           ErrMfaBackupCodeError,
+		Message:        message,
+	}
+}
