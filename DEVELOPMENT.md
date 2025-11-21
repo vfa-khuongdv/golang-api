@@ -167,15 +167,19 @@ project/
 #### **Models**
 - Use singular names for structs
 - Use descriptive field names
-- Use JSON tags for serialization
+- Use JSON tags for serialization in **snake_case** format for API responses
 
 ```go
 type User struct {
-    ID    uint   `json:"id"`
-    Email string `json:"email"`
-    Name  string `json:"name"`
+    ID        uint      `json:\"id\"`
+    Email     string    `json:\"email\"`
+    Name      string    `json:\"name\"`
+    CreatedAt time.Time `json:\"created_at\"`
+    UpdatedAt time.Time `json:\"updated_at\"`
 }
 ```
+
+**Note:** All JSON field names in API responses must use snake_case (e.g., `created_at`, `user_id`, `is_active`) for consistency with REST API conventions.
 
 #### **Interfaces**
 - Describe the contract clearly

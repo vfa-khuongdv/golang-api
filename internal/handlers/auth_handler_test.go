@@ -59,8 +59,8 @@ func TestLogin(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.JSONEq(t, `
 		{
-			"accessToken": {"token":"testtoken","expiresAt":0},
-			"refreshToken": {"token":"testrefreshtoken","expiresAt":0}
+			"access_token": {"token":"testtoken","expires_at":0},
+			"refresh_token": {"token":"testrefreshtoken","expires_at":0}
 		}
 		`, w.Body.String())
 		// Assert that the mock service method was called
@@ -258,12 +258,12 @@ func TestRefreshToken(t *testing.T) {
 		// Call the handler
 		handler.RefreshToken(c)
 
-		// Assert the response
+		// Assert response
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.JSONEq(t, `
 		{
-			"accessToken": {"token":"newtesttoken","expiresAt":0},
-			"refreshToken": {"token":"newtestrefreshtoken","expiresAt":0}
+			"access_token": {"token":"newtesttoken","expires_at":0},
+			"refresh_token": {"token":"newtestrefreshtoken","expires_at":0}
 		}
 		`, w.Body.String())
 
