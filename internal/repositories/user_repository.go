@@ -16,6 +16,7 @@ type IUserRepository interface {
 	FindByField(field string, value string) (*models.User, error)
 	GetProfile(id uint) (*models.User, error)
 	UpdateProfile(user *models.User) error
+	GetUsers(page int, limit int) (*utils.Pagination, error)
 	GetDB() *gorm.DB
 }
 
@@ -27,7 +28,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// PaginateUser retrieves a paginated list of users from the database
+// GetUsers retrieves a paginated list of users from the database
 // Parameters:
 //   - page: The page number to retrieve (default is 1)
 //   - limit: The number of users per page (default is 10)
@@ -37,8 +38,8 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 //   - error: nil if successful, otherwise returns the error that occurred
 //
 // Example:
-//   - users, err := repo.PaginateUser(1, 50) // Gets the first page of users
-func (repo *UserRepository) PaginateUser(page, limit int) (*utils.Pagination, error) {
+//   - users, err := repo.GetUsers(1, 50) // Gets the first page of users
+func (repo *UserRepository) GetUsers(page, limit int) (*utils.Pagination, error) {
 	var totalRows int64
 	offset := (page - 1) * limit
 

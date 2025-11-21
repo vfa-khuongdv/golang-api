@@ -224,6 +224,7 @@ The API is documented using OpenAPI 3.0 specification. You can access the docume
 - `POST /api/v1/change-password` - Change user password
 
 #### User Management (Authenticated)
+- `GET /api/v1/users` - List users (admin only)
 - `POST /api/v1/users` - Create user (admin only)
 - `GET /api/v1/users/{id}` - Get user by ID
 - `PATCH /api/v1/users/{id}` - Update user (admin only)

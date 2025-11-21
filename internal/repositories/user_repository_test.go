@@ -327,7 +327,7 @@ func (s *UserRepositoryTestSuite) TestPaginateUser() {
 	}
 
 	// Test first page with limit 2
-	pagination, err := s.repo.PaginateUser(1, 2)
+	pagination, err := s.repo.GetUsers(1, 2)
 	s.NoError(err, "Expected no error when paginating users")
 	s.NotNil(pagination, "Expected pagination to be not nil")
 	s.Equal(1, pagination.Page, "Expected page to be 1")
@@ -337,7 +337,7 @@ func (s *UserRepositoryTestSuite) TestPaginateUser() {
 	s.Len(pagination.Data, 2, "Expected 2 users in first page")
 
 	// Test second page with limit 2
-	pagination, err = s.repo.PaginateUser(2, 2)
+	pagination, err = s.repo.GetUsers(2, 2)
 	s.NoError(err, "Expected no error when paginating users")
 	s.NotNil(pagination, "Expected pagination to be not nil")
 	s.Equal(2, pagination.Page, "Expected page to be 2")
@@ -347,7 +347,7 @@ func (s *UserRepositoryTestSuite) TestPaginateUser() {
 	s.Len(pagination.Data, 2, "Expected 2 users in second page")
 
 	// Test third page with limit 2
-	pagination, err = s.repo.PaginateUser(3, 2)
+	pagination, err = s.repo.GetUsers(3, 2)
 	s.NoError(err, "Expected no error when paginating users")
 	s.NotNil(pagination, "Expected pagination to be not nil")
 	s.Equal(3, pagination.Page, "Expected page to be 3")
@@ -357,7 +357,7 @@ func (s *UserRepositoryTestSuite) TestPaginateUser() {
 	s.Len(pagination.Data, 1, "Expected 1 user in third page")
 
 	// Test page out of range
-	pagination, err = s.repo.PaginateUser(5, 2)
+	pagination, err = s.repo.GetUsers(5, 2)
 	s.NoError(err, "Expected no error when paginating users with page out of range")
 	s.NotNil(pagination, "Expected pagination to be not nil")
 	s.Equal(5, pagination.Page, "Expected page to be 5")
@@ -367,7 +367,7 @@ func (s *UserRepositoryTestSuite) TestPaginateUser() {
 	s.Len(pagination.Data, 0, "Expected 0 users when page is out of range")
 
 	// Test with different limit
-	pagination, err = s.repo.PaginateUser(1, 10)
+	pagination, err = s.repo.GetUsers(1, 10)
 	s.NoError(err, "Expected no error when paginating users with limit 10")
 	s.NotNil(pagination, "Expected pagination to be not nil")
 	s.Equal(1, pagination.Page, "Expected page to be 1")
@@ -384,8 +384,8 @@ func (s *UserRepositoryTestSuite) TestPaginateUserError() {
 	err = sqlDB.Close()
 	s.Require().NoError(err)
 
-	// Test PaginateUser method after closing the DB
-	pagination, err := s.repo.PaginateUser(1, 10)
+	// Test GetUsers method after closing the DB
+	pagination, err := s.repo.GetUsers(1, 10)
 	s.Error(err, "Expected error when paginating users after closing DB")
 	s.Nil(pagination, "Expected pagination to be nil after error")
 }

@@ -17,6 +17,7 @@ type IUserhandler interface {
 	CreateUser(c *gin.Context)
 	ForgotPassword(c *gin.Context)
 	ResetPassword(c *gin.Context)
+	ChangePassword(c *gin.Context)
 	GetUser(c *gin.Context)
 	GetUsers(c *gin.Context)
 	UpdateUser(c *gin.Context)
@@ -35,6 +36,21 @@ func NewUserHandler(userService services.IUserService, bcryptService services.IB
 		userService:   userService,
 		bcryptService: bcryptService,
 	}
+}
+
+func (handler *UserHandler) GetUsers(ctx *gin.Context) {
+	// Parse pagination query parameters with default values
+	page, limit := utils.ParsePageAndLimit(ctx)
+
+	// Retrieve paginated list of users from the service using PaginateUser
+	pagination, err := handler.userService.GetUsers(page, limit)
+	if err != nil {
+		utils.RespondWithError(ctx, err)
+		return
+	}
+
+	// Respond with pagination data
+	utils.RespondWithOK(ctx, http.StatusOK, pagination)
 }
 
 func (handler *UserHandler) CreateUser(ctx *gin.Context) {

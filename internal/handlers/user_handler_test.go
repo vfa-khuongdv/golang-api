@@ -2772,3 +2772,137 @@ func TestForgotPassword(t *testing.T) {
 		bcryptService.AssertExpectations(t)
 	})
 }
+
+func TestGetUsers(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	utils.InitValidator()
+
+	t.Run("GetUsers - Success with pagination", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Create mock user data
+		users := []models.User{
+			{
+				ID:    1,
+				Name:  "User 1",
+				Email: "user1@example.com",
+			},
+			{
+				ID:    2,
+				Name:  "User 2",
+				Email: "user2@example.com",
+			},
+		}
+
+		// Mock the GetUsers method
+		expectedPagination := &utils.Pagination{
+			Page:       1,
+			Limit:      10,
+			TotalItems: 2,
+			TotalPages: 1,
+			Data:       users,
+		}
+		userService.On("GetUsers", 1, 10).Return(expectedPagination, nil)
+
+		// Create a test context with query parameters
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users?page=1&limit=10", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response
+		assert.Equal(t, http.StatusOK, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+
+		// Verify response body contains pagination data
+		var response map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+		assert.NotNil(t, response["data"])
+	})
+
+	t.Run("GetUsers - Default pagination values", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Mock the GetUsers method with default values (page=1, limit=50)
+		expectedPagination := &utils.Pagination{
+			Page:       1,
+			Limit:      50,
+			TotalItems: 0,
+			TotalPages: 0,
+			Data:       []models.User{},
+		}
+		userService.On("GetUsers", 1, 50).Return(expectedPagination, nil)
+
+		// Create a test context without query parameters (should use defaults)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response
+		assert.Equal(t, http.StatusOK, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+	})
+
+	t.Run("GetUsers - Invalid page parameter", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Mock the GetUsers method with default page=1
+		expectedPagination := &utils.Pagination{
+			Page:       1,
+			Limit:      5,
+			TotalItems: 0,
+			TotalPages: 0,
+			Data:       []models.User{},
+		}
+		userService.On("GetUsers", 1, 5).Return(expectedPagination, nil)
+
+		// Create a test context with invalid page parameter (should default to 1)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users?page=invalid&limit=5", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response - should still be 200 with default pagination
+		assert.Equal(t, http.StatusOK, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+	})
+
+	t.Run("GetUsers - Service error", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		bcryptService := new(mocks.MockBcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService)
+
+		// Mock the GetUsers method to return an error
+		userService.On("GetUsers", 1, 50).Return(nil, apperror.NewDBQueryError("database error"))
+
+		// Create a test context
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("GET", "/api/v1/users", nil)
+
+		// Call the handler
+		handler.GetUsers(c)
+
+		// Assert the response - should return 500 for service error
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		userService.AssertExpectations(t)
+		bcryptService.AssertExpectations(t)
+	})
+}
