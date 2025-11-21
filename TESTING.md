@@ -273,7 +273,7 @@ func TestAuthService(t *testing.T) {
         mockUserRepo.On("FindByEmail", "test@example.com").Return(user, nil)
         mockBcryptService.On("CheckPasswordHash", "password", "hashed_password").
             Return(true)
-        mockJWTService.On("GenerateToken", uint(1)).
+        mockJWTService.On("GenerateAccessToken", uint(1)).
             Return(&JwtResult{Token: "jwt_token", ExpiresAt: 1000}, nil)
 
         service := services.NewAuthService(

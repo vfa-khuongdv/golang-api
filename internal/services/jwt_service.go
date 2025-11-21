@@ -29,7 +29,6 @@ type JwtResult struct {
 
 // IJWTService defines JWT-related operations
 type IJWTService interface {
-	GenerateToken(id uint) (*JwtResult, error)
 	GenerateAccessToken(id uint) (*JwtResult, error)
 	GenerateMfaToken(id uint) (*JwtResult, error)
 	ValidateToken(tokenString string) (*CustomClaims, error)
@@ -48,12 +47,6 @@ func NewJWTService() IJWTService {
 	return &jwtService{
 		secret: secret,
 	}
-}
-
-// GenerateToken creates a new JWT token for the given user ID with "access" scope
-// Deprecated: Use GenerateAccessToken or GenerateMfaToken instead for explicit scope
-func (s *jwtService) GenerateToken(id uint) (*JwtResult, error) {
-	return s.GenerateAccessToken(id)
 }
 
 // GenerateAccessToken creates a new access JWT token for the given user ID

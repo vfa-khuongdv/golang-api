@@ -12,24 +12,6 @@ import (
 )
 
 func TestJWTService(t *testing.T) {
-	t.Run("GenerateAndValidateToken", func(t *testing.T) {
-		svc := services.NewJWTService()
-
-		// Generate a token for user ID 123
-		result, err := svc.GenerateToken(123)
-		require.NoError(t, err)
-		assert.NotEmpty(t, result.Token)
-		assert.True(t, result.ExpiresAt > time.Now().Unix())
-
-		// Validate the generated token
-		claims, err := svc.ValidateToken(result.Token)
-		require.NoError(t, err)
-		assert.Equal(t, uint(123), claims.ID)
-		assert.Equal(t, services.TokenScopeAccess, claims.Scope)
-		assert.WithinDuration(t, time.Now(), claims.IssuedAt.Time, time.Minute)
-		assert.WithinDuration(t, time.Unix(result.ExpiresAt, 0), claims.ExpiresAt.Time, time.Minute)
-	})
-
 	t.Run("GenerateAccessToken", func(t *testing.T) {
 		svc := services.NewJWTService()
 
