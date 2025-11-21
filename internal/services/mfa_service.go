@@ -47,6 +47,16 @@ func NewMfaService(mfaRepository IMfaRepository, totpService ITotpService) IMfaS
 
 // SetupMfa initiates MFA setup for a user, generating a TOTP secret and backup codes
 func (s *MfaService) SetupMfa(userID uint, email string) (string, []byte, []string, error) {
+	// Check if MFA is already enabled
+	settings, err := s.mfaRepository.GetMfaSettingsByUserID(userID)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to retrieve MFA settings: %w", err)
+	}
+
+	if settings != nil && settings.MfaEnabled {
+		return "", nil, nil, apperror.NewMfaAlreadyEnabledError("MFA is already enabled for this user")
+	}
+
 	// Generate TOTP secret
 	secret, err := s.totpService.GenerateSecret(email)
 	if err != nil {
@@ -65,6 +75,33 @@ func (s *MfaService) SetupMfa(userID uint, email string) (string, []byte, []stri
 		return "", nil, nil, fmt.Errorf("failed to generate QR code: %w", err)
 	}
 
+	// Convert backup codes to JSON
+	backupCodesJSON, err := json.Marshal(backupCodes)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to marshal backup codes: %w", err)
+	}
+
+	if settings == nil {
+		// Create new MFA settings with temporary secret (MFA not yet enabled)
+		settings = &models.MfaSettings{
+			UserID:      userID,
+			TotpSecret:  &secret,
+			BackupCodes: backupCodesJSON,
+			MfaEnabled:  false,
+		}
+		if err := s.mfaRepository.CreateMfaSettings(settings); err != nil {
+			return "", nil, nil, fmt.Errorf("failed to create MFA settings: %w", err)
+		}
+	} else {
+		// Update existing MFA settings with new temporary secret
+		settings.TotpSecret = &secret
+		settings.BackupCodes = backupCodesJSON
+		settings.MfaEnabled = false
+		if err := s.mfaRepository.UpdateMfaSettings(settings); err != nil {
+			return "", nil, nil, fmt.Errorf("failed to update MFA settings: %w", err)
+		}
+	}
+
 	return secret, qrCode, backupCodes, nil
 }
 
@@ -77,13 +114,13 @@ func (s *MfaService) VerifyMfaSetup(userID uint, totpCode string) ([]string, err
 	}
 
 	if settings == nil || settings.TotpSecret == nil {
-		return nil, apperror.NewUnauthorizedError("MFA setup session expired or not initiated")
+		return nil, apperror.NewMfaSetupNotInitiatedError("MFA setup session expired or not initiated")
 	}
 
 	// Verify TOTP code with the stored secret
 	valid, err := s.totpService.VerifyCode(*settings.TotpSecret, totpCode)
 	if err != nil || !valid {
-		return nil, apperror.NewInvalidPasswordError("Invalid TOTP code")
+		return nil, apperror.NewMfaInvalidCodeError("Invalid TOTP code")
 	}
 
 	// Get backup codes
@@ -111,11 +148,11 @@ func (s *MfaService) VerifyMfaCode(userID uint, totpCode string) (bool, error) {
 	}
 
 	if settings == nil || !settings.MfaEnabled {
-		return false, apperror.NewUnauthorizedError("MFA is not enabled for this user")
+		return false, apperror.NewMfaNotEnabledError("MFA is not enabled for this user")
 	}
 
 	if settings.TotpSecret == nil {
-		return false, apperror.NewUnauthorizedError("MFA is not properly configured")
+		return false, apperror.NewMfaNotEnabledError("MFA is not properly configured")
 	}
 
 	// Try TOTP code first
@@ -145,7 +182,7 @@ func (s *MfaService) ValidateBackupCode(userID uint, code string) (bool, error) 
 	}
 
 	if settings == nil {
-		return false, apperror.NewUnauthorizedError("MFA settings not found")
+		return false, apperror.NewMfaNotEnabledError("MFA settings not found")
 	}
 
 	var backupCodes []string
