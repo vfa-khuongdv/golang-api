@@ -12,7 +12,9 @@ import (
 
 func setupTestDB() *gorm.DB {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	db.AutoMigrate(&models.MfaSettings{})
+	if err := db.AutoMigrate(&models.MfaSettings{}); err != nil {
+		panic(err)
+	}
 	return db
 }
 

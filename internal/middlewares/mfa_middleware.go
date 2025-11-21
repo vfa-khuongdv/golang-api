@@ -43,19 +43,14 @@ func MfaRequiredMiddleware(mfaService interface {
 		}
 
 		// Get MFA status
-		mfaEnabled, err := mfaService.GetMfaStatus(userID)
+		_, err := mfaService.GetMfaStatus(userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check MFA status"})
 			c.Abort()
 			return
 		}
 
-		// If MFA is enabled, allow the request to proceed
-		// Note: Actual MFA verification is handled during authentication
-		if mfaEnabled {
-			// MFA is enabled, the caller should have already verified it
-			// You may want to add additional checks if needed
-		}
+		// MFA status has been verified, allow the request to proceed
 
 		c.Next()
 	}
