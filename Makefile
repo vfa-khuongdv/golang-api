@@ -1,10 +1,18 @@
-.PHONY: install-tools test-coverage test watch-test start-server start-seeder migrate
+.PHONY: install-tools test-coverage test watch-test start-server start-seeder migrate lint
 
 install-tools:
 	@echo "Ensuring Go modules are tidy..."
 	@go mod tidy
 
 	@echo "Installing Go toolchain dependencies..."
+
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		echo "Installing golangci-lint..."; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2; \
+		echo "✅ golangci-lint installed"; \
+	else \
+		echo "✅ golangci-lint already installed"; \
+	fi
 
 	@if ! command -v migrate >/dev/null 2>&1; then \
 		echo "Installing migrate CLI..."; \
@@ -103,3 +111,22 @@ migrate: install-tools
 		migrate -path internal/database/migrations -database "mysql://$${DB_USERNAME}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_DATABASE}" up; \
 	fi
 	@echo "✅ Database migrations completed"
+
+lint: install-tools
+	@echo "🔎 Running golangci-lint with 7 minute timeout..."
+	@golangci-lint run --timeout=7m --skip-dirs=cmd,docs,tests ./...
+	@echo "✅ Linting passed!"
+
+fmt: install-tools
+	@echo "📝 Formatting code with go fmt..."
+	@go fmt ./...
+	@echo "✅ Code formatted!"
+
+vet: install-tools
+	@echo "🔍 Running go vet analysis..."
+	@go vet ./...
+	@echo "✅ Go vet analysis passed!"
+
+pre-push: fmt vet lint test
+	@echo "✅ All pre-push checks passed! You're ready to push."
+
