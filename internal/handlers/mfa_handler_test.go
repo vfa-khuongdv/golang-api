@@ -149,6 +149,39 @@ func TestInitMfaSetup(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		mockMfaService.AssertExpectations(t)
 	})
+
+	t.Run("InitMfaSetup - MFA Already Enabled", func(t *testing.T) {
+		mockMfaService := new(mocks.MockMfaService)
+		mockUserRepo := new(mocks.MockUserRepository)
+		mockJwtService := new(mocks.MockJWTService)
+		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+
+		// Mock the service to return error when MFA is already enabled
+		mockMfaService.On("SetupMfa", uint(1), "test@example.com").Return(
+			"",
+			[]byte{},
+			[]string{},
+			apperror.NewBadRequestError("MFA is already enabled for this user"),
+		)
+
+		requestBody := map[string]string{
+			"email": "test@example.com",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/mfa/setup", bytes.NewBuffer(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("UserID", uint(1))
+
+		handler.InitMfaSetup(c)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockMfaService.AssertExpectations(t)
+	})
 }
 
 func TestVerifyMfaSetup(t *testing.T) {
