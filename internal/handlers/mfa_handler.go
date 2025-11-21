@@ -66,7 +66,7 @@ func (h *MfaHandler) InitMfaSetup(c *gin.Context) {
 	secret, qrCodeBytes, backupCodes, err := h.mfaService.SetupMfa(userID, input.Email)
 	if err != nil {
 		logrus.Errorf("Failed to setup MFA for user %d: %v", userID, err)
-		utils.RespondWithError(c, apperror.NewInternalError("Failed to setup MFA"))
+		utils.RespondWithError(c, err)
 		return
 	}
 
