@@ -72,6 +72,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.GET("/profile", userHandler.GetProfile)
 			authenticated.PATCH("/profile", userHandler.UpdateProfile)
 
+			authenticated.GET("/users", userHandler.GetUsers)
 			authenticated.POST("/users", userHandler.CreateUser)
 			authenticated.GET("/users/:id", userHandler.GetUser)
 			authenticated.PATCH("/users/:id", userHandler.UpdateUser)

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
@@ -55,7 +56,7 @@ func TestInitMfaSetup(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
 		assert.Equal(t, "JBSWY3DPEBLW64TMMQ======", responseBody["secret"])
 		assert.NotEmpty(t, responseBody["qr_code"])
@@ -89,7 +90,7 @@ func TestInitMfaSetup(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 		assert.NotEmpty(t, responseBody["message"])
 	})
 
@@ -182,7 +183,7 @@ func TestVerifyMfaSetup(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
 		assert.Equal(t, "MFA setup verified successfully", responseBody["message"])
 		assert.NotEmpty(t, responseBody["backup_codes"])
@@ -243,7 +244,7 @@ func TestVerifyMfaSetup(t *testing.T) {
 		// When a service error is returned from RespondWithError, it will determine the status code based on the error type
 		// InvalidPasswordError is a 401 error
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 		assert.NotNil(t, responseBody["code"])
 		mockMfaService.AssertExpectations(t)
 	})
@@ -322,7 +323,7 @@ func TestVerifyMfaCode(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
 		assert.Equal(t, "MFA verification successful", responseBody["message"])
 		assert.NotEmpty(t, responseBody["accessToken"])
@@ -359,7 +360,7 @@ func TestVerifyMfaCode(t *testing.T) {
 
 		// When VerifyMfaCode returns false, the handler returns an InvalidPasswordError which is 401
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 		assert.NotNil(t, responseBody["code"])
 		mockMfaService.AssertExpectations(t)
 	})
@@ -542,7 +543,7 @@ func TestDisableMfa(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
 		assert.Equal(t, "MFA disabled successfully", responseBody["message"])
 		mockMfaService.AssertExpectations(t)
@@ -614,7 +615,7 @@ func TestGetMfaStatus(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
 		assert.Equal(t, true, responseBody["mfa_enabled"])
 		mockMfaService.AssertExpectations(t)
@@ -641,7 +642,7 @@ func TestGetMfaStatus(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var responseBody map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &responseBody)
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &responseBody))
 
 		assert.Equal(t, false, responseBody["mfa_enabled"])
 		mockMfaService.AssertExpectations(t)
