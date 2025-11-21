@@ -173,7 +173,7 @@ func NewValidationDataError(message string) *AppError {
 // === MFA errors ===
 func NewMfaAlreadyEnabledError(message string) *AppError {
 	return &AppError{
-		HttpStatusCode: http.StatusBadRequest,
+		HttpStatusCode: http.StatusConflict,
 		Code:           ErrMfaAlreadyEnabled,
 		Message:        message,
 	}

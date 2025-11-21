@@ -146,7 +146,7 @@ func (h *MfaHandler) VerifyMfaCode(c *gin.Context) {
 	}
 
 	if !valid {
-		utils.RespondWithError(c, apperror.NewInvalidPasswordError("Invalid MFA code"))
+		utils.RespondWithError(c, apperror.NewMfaInvalidCodeError("Invalid MFA code"))
 		return
 	}
 
@@ -163,7 +163,7 @@ func (h *MfaHandler) VerifyMfaCode(c *gin.Context) {
 	accessToken, err := h.jwtService.GenerateToken(user.ID)
 	if err != nil {
 		logrus.Errorf("Failed to generate access token: %v", err)
-		utils.RespondWithError(c, apperror.NewInternalError("Failed to generate tokens"))
+		utils.RespondWithError(c, apperror.NewInternalError("Failed to generate tokens after MFA verification"))
 		return
 	}
 
@@ -205,7 +205,7 @@ func (h *MfaHandler) DisableMfa(c *gin.Context) {
 	// Disable MFA
 	if err := h.mfaService.DisableMfa(userID); err != nil {
 		logrus.Errorf("Failed to disable MFA for user %d: %v", userID, err)
-		utils.RespondWithError(c, apperror.NewInternalError("Failed to disable MFA"))
+		utils.RespondWithError(c, apperror.NewInternalError("Failed to disable MFA - please try again"))
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *MfaHandler) GetMfaStatus(c *gin.Context) {
 	enabled, err := h.mfaService.GetMfaStatus(userID)
 	if err != nil {
 		logrus.Errorf("Failed to get MFA status for user %d: %v", userID, err)
-		utils.RespondWithError(c, apperror.NewInternalError("Failed to get MFA status"))
+		utils.RespondWithError(c, apperror.NewInternalError("Failed to retrieve MFA status"))
 		return
 	}
 
