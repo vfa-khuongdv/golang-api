@@ -2,7 +2,6 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
@@ -31,24 +30,21 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	refreshRepo := repositories.NewRefreshTokenRepository(db)
+	mfaRepo := repositories.NewMfaRepository(db)
 
 	// Initialize services
-	client := redis.NewClient(&redis.Options{
-		Addr:     utils.GetEnv("REDIS_HOST", "localhost:6379"),
-		Password: utils.GetEnv("REDIS_PASS", ""),
-		DB:       utils.GetEnvAsInt("REDIS_DB", 0),
-	})
-
-	redisService := services.NewRedisService(client)
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
 	userService := services.NewUserService(userRepo)
 	bcryptService := services.NewBcryptService()
 	jwtService := services.NewJWTService()
-	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
+	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService, mfaRepo)
+	totpService := services.NewTotpService("GolangCMS")
+	mfaService := services.NewMfaService(mfaRepo, totpService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService, redisService, bcryptService)
+	userHandler := handlers.NewUserHandler(userService, bcryptService)
+	mfaHandler := handlers.NewMfaHandler(mfaService, userRepo, jwtService, refreshTokenService)
 
 	// Add middleware for CORS and logging
 	router.Use(
@@ -76,10 +72,18 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.GET("/profile", userHandler.GetProfile)
 			authenticated.PATCH("/profile", userHandler.UpdateProfile)
 
+			authenticated.GET("/users", userHandler.GetUsers)
 			authenticated.POST("/users", userHandler.CreateUser)
 			authenticated.GET("/users/:id", userHandler.GetUser)
 			authenticated.PATCH("/users/:id", userHandler.UpdateUser)
 			authenticated.DELETE("/users/:id", userHandler.DeleteUser)
+
+			// MFA routes
+			authenticated.POST("/mfa/setup", mfaHandler.InitMfaSetup)
+			authenticated.POST("/mfa/verify-setup", mfaHandler.VerifyMfaSetup)
+			authenticated.POST("/mfa/verify-code", mfaHandler.VerifyMfaCode)
+			authenticated.POST("/mfa/disable", mfaHandler.DisableMfa)
+			authenticated.GET("/mfa/status", mfaHandler.GetMfaStatus)
 		}
 	}
 
