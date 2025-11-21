@@ -45,7 +45,7 @@ func TestErrorConstructors(t *testing.T) {
 		{"ValidationDataError", NewValidationDataError, ErrValidationFailed, http.StatusBadRequest},
 
 		// MFA errors
-		{"MfaAlreadyEnabledError", NewMfaAlreadyEnabledError, ErrMfaAlreadyEnabled, http.StatusBadRequest},
+		{"MfaAlreadyEnabledError", NewMfaAlreadyEnabledError, ErrMfaAlreadyEnabled, http.StatusConflict},
 		{"MfaNotEnabledError", NewMfaNotEnabledError, ErrMfaNotEnabled, http.StatusBadRequest},
 		{"MfaSetupNotInitiatedError", NewMfaSetupNotInitiatedError, ErrMfaSetupNotInitiated, http.StatusBadRequest},
 		{"MfaInvalidCodeError", NewMfaInvalidCodeError, ErrMfaInvalidCode, http.StatusBadRequest},
