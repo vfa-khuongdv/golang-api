@@ -232,7 +232,7 @@ func TestRefreshToken(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method
-		mockService.On("RefreshToken", "testrefreshtoken", mock.Anything).Return(
+		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
 			&services.LoginResponse{
 				AccessToken: services.JwtResult{
 					Token:     "newtesttoken",
@@ -246,6 +246,97 @@ func TestRefreshToken(t *testing.T) {
 		)
 		requestBody := map[string]string{
 			"refresh_token": "testrefreshtoken",
+			"access_token":  "testaccesstoken",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
+		// Create a test context
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		// Call the handler
+		handler.RefreshToken(c)
+
+		// Assert response
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.JSONEq(t, `
+		{
+			"access_token": {"token":"newtesttoken","expires_at":0},
+			"refresh_token": {"token":"newtestrefreshtoken","expires_at":0}
+		}
+		`, w.Body.String())
+
+		// Assert mocks
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("RefreshToken - Success With AccessToken", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		// Mock the service method when using access token
+		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
+			&services.LoginResponse{
+				AccessToken: services.JwtResult{
+					Token:     "newtesttoken",
+					ExpiresAt: 0,
+				},
+				RefreshToken: services.JwtResult{
+					Token:     "newtestrefreshtoken",
+					ExpiresAt: 0,
+				},
+			}, nil,
+		)
+		requestBody := map[string]string{
+			"refresh_token": "testrefreshtoken",
+			"access_token":  "testaccesstoken",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
+		// Create a test context
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		// Call the handler
+		handler.RefreshToken(c)
+
+		// Assert response
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.JSONEq(t, `
+		{
+			"access_token": {"token":"newtesttoken","expires_at":0},
+			"refresh_token": {"token":"newtestrefreshtoken","expires_at":0}
+		}
+		`, w.Body.String())
+
+		// Assert mocks
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("RefreshToken - Success With Both Tokens", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		// Mock the service method - should prefer refresh token
+		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
+			&services.LoginResponse{
+				AccessToken: services.JwtResult{
+					Token:     "newtesttoken",
+					ExpiresAt: 0,
+				},
+				RefreshToken: services.JwtResult{
+					Token:     "newtestrefreshtoken",
+					ExpiresAt: 0,
+				},
+			}, nil,
+		)
+		requestBody := map[string]string{
+			"refresh_token": "testrefreshtoken",
+			"access_token":  "testaccesstoken",
 		}
 		reqBody, _ := json.Marshal(requestBody)
 
@@ -276,9 +367,10 @@ func TestRefreshToken(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method
-		mockService.On("RefreshToken", "invalidtoken", mock.Anything).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
+		mockService.On("RefreshToken", "invalidtoken", "validaccesstoken", mock.Anything).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 		reqBody := map[string]string{
 			"refresh_token": "invalidtoken",
+			"access_token":  "validaccesstoken",
 		}
 		reqBodyBytes, _ := json.Marshal(reqBody)
 
@@ -302,8 +394,6 @@ func TestRefreshToken(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
-		assert.Equal(t, expectedBody["code"], actualBody["code"])
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
 
 		// Assert mocks
 		mockService.AssertExpectations(t)
@@ -321,8 +411,28 @@ func TestRefreshToken(t *testing.T) {
 			expectedFields []apperror.FieldError
 		}{
 			{
-				name:         "MissingRefreshToken",
+				name:         "MissingBothTokens",
 				reqBody:      `{}`,
+				expectedCode: float64(4001),
+				expectedMsg:  "Validation failed",
+				expectedFields: []apperror.FieldError{
+					{Field: "refresh_token", Message: "refresh_token is required"},
+					{Field: "access_token", Message: "access_token is required"},
+				},
+			},
+			{
+				name:         "BothTokensEmpty",
+				reqBody:      `{"refresh_token":"","access_token":""}`,
+				expectedCode: float64(4001),
+				expectedMsg:  "Validation failed",
+				expectedFields: []apperror.FieldError{
+					{Field: "refresh_token", Message: "refresh_token is required"},
+					{Field: "access_token", Message: "access_token is required"},
+				},
+			},
+			{
+				name:         "MissingRefreshToken",
+				reqBody:      `{"access_token":"testaccesstoken"}`,
 				expectedCode: float64(4001),
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
@@ -330,12 +440,12 @@ func TestRefreshToken(t *testing.T) {
 				},
 			},
 			{
-				name:         "EmptyRefreshToken",
-				reqBody:      `{"refresh_token":""}`,
+				name:         "MissingAccessToken",
+				reqBody:      `{"refresh_token":"testrefreshtoken"}`,
 				expectedCode: float64(4001),
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
-					{Field: "refresh_token", Message: "refresh_token is required"},
+					{Field: "access_token", Message: "access_token is required"},
 				},
 			},
 		}

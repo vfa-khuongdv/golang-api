@@ -8,7 +8,7 @@ import (
 
 type IAuthService interface {
 	Login(email, password string, ctx *gin.Context) (interface{}, error)
-	RefreshToken(token string, ctx *gin.Context) (*LoginResponse, error)
+	RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*LoginResponse, error)
 }
 
 type AuthService struct {
@@ -80,8 +80,8 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (int
 
 	// If MFA is enabled, return temporary token for MFA verification
 	if mfaSettings != nil && mfaSettings.MfaEnabled {
-		// Generate temporary token (short-lived, only for MFA verification)
-		tempToken, err := service.jwtService.GenerateToken(user.ID)
+		// Generate temporary MFA verification token (10-minute expiration, only for MFA verification)
+		tempToken, err := service.jwtService.GenerateMfaToken(user.ID)
 		if err != nil {
 			return nil, apperror.NewInternalError(err.Error())
 		}
@@ -95,7 +95,7 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (int
 
 	// MFA is not enabled, proceed with normal login
 	// Generate access token
-	accessToken, err := service.jwtService.GenerateToken(user.ID)
+	accessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
 		return nil, apperror.NewInternalError(err.Error())
 	}
@@ -122,42 +122,62 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (int
 	return res, nil
 }
 
-// RefreshToken generates new access and refresh tokens using an existing refresh token
+// RefreshToken generates new access and refresh tokens using refresh_token and validates with access_token
 // Parameters:
-//   - token: The existing refresh token string
+//   - refreshToken: The existing refresh token string (used to identify user and generate new tokens)
+//   - accessToken: The existing access token string (used to verify token ownership, can be expired)
 //   - ctx: Gin context containing request information
 //
 // Returns:
 //   - *LoginResponse: Contains new access token and refresh token if successful
-//   - error: Returns error if token refresh fails (invalid token, user not found, token generation fails)
-func (service *AuthService) RefreshToken(token string, ctx *gin.Context) (*LoginResponse, error) {
+//   - error: Returns error if token refresh fails (invalid tokens, user not found, token generation fails)
+func (service *AuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*LoginResponse, error) {
 	ipAddress := ctx.ClientIP()
 
-	// Update the refresh token
-	refreshResult, err := service.refreshTokenService.Update(token, ipAddress)
+	// Step 1: Validate refresh token (used to identify user)
+	refreshResult, err := service.refreshTokenService.Update(refreshToken, ipAddress)
 	if err != nil {
-		return nil, apperror.NewDBUpdateError(err.Error())
+		return nil, apperror.NewUnauthorizedError("Invalid refresh token")
 	}
 
-	// Get user details
+	// Step 2: Validate access token (verify token ownership, works even if expired)
+	claims, err := service.jwtService.ValidateTokenIgnoreExpiration(accessToken)
+	if err != nil {
+		return nil, apperror.NewUnauthorizedError("Invalid access token")
+	}
+
+	// Step 3: Verify access token has correct scope
+	if claims.Scope != TokenScopeAccess {
+		return nil, apperror.NewUnauthorizedError("Invalid access token scope")
+	}
+
+	// Step 4: Verify that both tokens belong to the same user
+	if claims.ID != refreshResult.UserId {
+		return nil, apperror.NewUnauthorizedError("Token mismatch: refresh and access tokens belong to different users")
+	}
+
+	// Step 5: Get user details
 	user, err := service.repo.GetByID(refreshResult.UserId)
 	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
+		return nil, apperror.NewNotFoundError("User not found")
 	}
 
-	// Generate new access token
-	newToken, err := service.jwtService.GenerateToken(user.ID)
+	// Step 6: Generate new access token
+	newAccessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
 		return nil, apperror.NewInternalError(err.Error())
 	}
 
-	// Build response
+	// Step 7: Build response (refresh token already updated in Step 1)
 	response := &LoginResponse{
 		AccessToken: JwtResult{
-			Token:     newToken.Token,
-			ExpiresAt: newToken.ExpiresAt,
+			Token:     newAccessToken.Token,
+			ExpiresAt: newAccessToken.ExpiresAt,
 		},
-		RefreshToken: *refreshResult.Token,
+		RefreshToken: JwtResult{
+			Token:     refreshResult.Token.Token,
+			ExpiresAt: refreshResult.Token.ExpiresAt,
+		},
 	}
 
 	return response, nil

@@ -65,6 +65,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		api.POST("/forgot-password", userHandler.ForgotPassword)
 		api.POST("/reset-password", userHandler.ResetPassword)
 
+		// MFA verification route (requires mfa_verification token scope)
+		api.POST("/mfa/verify-code", middlewares.MfaMiddleware(), mfaHandler.VerifyMfaCode)
+
 		authenticated := api.Group("/")
 		authenticated.Use(middlewares.AuthMiddleware())
 		{
@@ -78,10 +81,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.PATCH("/users/:id", userHandler.UpdateUser)
 			authenticated.DELETE("/users/:id", userHandler.DeleteUser)
 
-			// MFA routes
+			// MFA routes (require access token scope)
 			authenticated.POST("/mfa/setup", mfaHandler.InitMfaSetup)
 			authenticated.POST("/mfa/verify-setup", mfaHandler.VerifyMfaSetup)
-			authenticated.POST("/mfa/verify-code", mfaHandler.VerifyMfaCode)
 			authenticated.POST("/mfa/disable", mfaHandler.DisableMfa)
 			authenticated.GET("/mfa/status", mfaHandler.GetMfaStatus)
 		}

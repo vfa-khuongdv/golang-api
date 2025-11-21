@@ -18,8 +18,8 @@ func (m *MockAuthService) Login(email, password string, ctx *gin.Context) (inter
 	return args.Get(0), args.Error(1)
 }
 
-func (m *MockAuthService) RefreshToken(token string, ctx *gin.Context) (*services.LoginResponse, error) {
-	args := m.Called(token, ctx)
+func (m *MockAuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*services.LoginResponse, error) {
+	args := m.Called(refreshToken, accessToken, ctx)
 	if res, ok := args.Get(0).(*services.LoginResponse); ok {
 		return res, args.Error(1)
 	}
