@@ -311,7 +311,7 @@ func (s *UserRepositoryTestSuite) TestUpdate() {
 	s.Equal(int16(1), updatedUser.Gender, "Expected user gender to be 1")
 }
 
-func (s *UserRepositoryTestSuite) TestPaginateUser() {
+func (s *UserRepositoryTestSuite) TestGetUsers() {
 	// Create test users
 	mockUsers := []*models.User{
 		{Name: "User1", Email: "user1@example.com", Password: "password1", Gender: 1},
@@ -377,7 +377,7 @@ func (s *UserRepositoryTestSuite) TestPaginateUser() {
 	s.Len(pagination.Data, 5, "Expected 5 users when limit is 10")
 }
 
-func (s *UserRepositoryTestSuite) TestPaginateUserError() {
+func (s *UserRepositoryTestSuite) TestGetUsersError() {
 	// Close the underlying DB connection to simulate error on DB access
 	sqlDB, err := s.db.DB()
 	s.Require().NoError(err)
