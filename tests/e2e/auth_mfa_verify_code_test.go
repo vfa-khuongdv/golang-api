@@ -14,6 +14,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 func TestAuthMfaVerifyCode(t *testing.T) {
@@ -110,7 +111,7 @@ func TestAuthMfaVerifyCode(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 5003, errResp.Code) // ErrMfaInvalidCode
+		assert.Equal(t, apperror.ErrMfaInvalidCode, errResp.Code)
 	})
 
 	t.Run("Verify MFA Code - Missing Token", func(t *testing.T) {
@@ -135,6 +136,6 @@ func TestAuthMfaVerifyCode(t *testing.T) {
 		var errResp ErrorResponse
 		err = json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 3000, errResp.Code) // ErrUnauthorized
+		assert.Equal(t, apperror.ErrUnauthorized, errResp.Code)
 	})
 }
