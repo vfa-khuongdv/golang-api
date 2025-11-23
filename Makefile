@@ -48,6 +48,11 @@ test: install-tools
 	@gotestsum --format=short-verbose -- $(shell go list ./... | grep -v -E '/(cmd|docs|tests)')
 	@echo "✅ Tests completed."
 
+test-e2e: install-tools
+	@echo "Running E2E tests..."
+	@gotestsum --format=short-verbose -- ./tests/e2e/...
+	@echo "✅ E2E Tests completed."
+
 test-coverage: install-tools
 	@echo "Running tests with coverage..."
 	@gotestsum -- -coverprofile=coverage.out $(shell go list ./... | grep -v -E '/(cmd|docs|tests)')
