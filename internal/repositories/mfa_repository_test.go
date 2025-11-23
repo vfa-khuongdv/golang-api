@@ -71,4 +71,22 @@ func TestMfaRepository(t *testing.T) {
 		retrieved, _ := repo.GetMfaSettingsByUserID(1)
 		assert.True(t, retrieved.MfaEnabled)
 	})
+
+	t.Run("DeleteMfaSettings", func(t *testing.T) {
+		db := setupTestDB()
+		repo := NewMfaRepository(db)
+
+		settings := &models.MfaSettings{
+			UserID:     1,
+			MfaEnabled: true,
+		}
+		db.Create(settings)
+
+		err := repo.DeleteMfaSettings(1)
+		require.NoError(t, err)
+
+		retrieved, err := repo.GetMfaSettingsByUserID(1)
+		require.NoError(t, err)
+		assert.Nil(t, retrieved)
+	})
 }
