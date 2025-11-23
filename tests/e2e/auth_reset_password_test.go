@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 func TestAuthResetPassword(t *testing.T) {
@@ -78,7 +79,7 @@ func TestAuthResetPassword(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 1001, errResp.Code) // ErrNotFound
+		assert.Equal(t, apperror.ErrNotFound, errResp.Code)
 	})
 
 	t.Run("Reset Password - Expired Token", func(t *testing.T) {
@@ -113,6 +114,6 @@ func TestAuthResetPassword(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 3002, errResp.Code) // ErrTokenExpired
+		assert.Equal(t, apperror.ErrTokenExpired, errResp.Code)
 	})
 }
