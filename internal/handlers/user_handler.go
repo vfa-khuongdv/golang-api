@@ -178,7 +178,7 @@ func (handler *UserHandler) ResetPassword(ctx *gin.Context) {
 
 	// Hash the password using the utils.HashPassword function
 	// If hashing fails (returns empty string), return a 400 error
-	hashpassword, err := handler.bcryptService.HashPassword(input.Password)
+	hashpassword, err := handler.bcryptService.HashPassword(input.NewPassword)
 	if err != nil {
 		utils.RespondWithError(ctx, apperror.NewPasswordHashFailedError("Failed to hash password"))
 		return
