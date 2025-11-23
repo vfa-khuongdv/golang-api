@@ -12,6 +12,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 func TestAuthLogin(t *testing.T) {
@@ -77,7 +78,7 @@ func TestAuthLogin(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 3003, errResp.Code) // ErrInvalidPassword
+		assert.Equal(t, apperror.ErrInvalidPassword, errResp.Code)
 	})
 
 	t.Run("Login - Missing Fields", func(t *testing.T) {
@@ -97,6 +98,6 @@ func TestAuthLogin(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 4001, errResp.Code) // ErrValidationFailed
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
 	})
 }

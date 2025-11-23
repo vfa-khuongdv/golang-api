@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 func TestAuthForgotPassword(t *testing.T) {
@@ -54,7 +55,7 @@ func TestAuthForgotPassword(t *testing.T) {
 			var errResp ErrorResponse
 			err := json.Unmarshal(w.Body.Bytes(), &errResp)
 			require.NoError(t, err)
-			assert.Equal(t, 1000, errResp.Code) // ErrInternal (email sending failed)
+			assert.Equal(t, apperror.ErrInternal, errResp.Code)
 		} else {
 			// If SMTP is configured, should succeed
 			assert.Equal(t, http.StatusOK, w.Code)
@@ -78,7 +79,7 @@ func TestAuthForgotPassword(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 1001, errResp.Code) // ErrNotFound
+		assert.Equal(t, apperror.ErrNotFound, errResp.Code)
 	})
 
 	t.Run("Forgot Password - Invalid Email Format", func(t *testing.T) {
@@ -98,6 +99,6 @@ func TestAuthForgotPassword(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, 4001, errResp.Code) // ErrValidationFailed
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
 	})
 }
