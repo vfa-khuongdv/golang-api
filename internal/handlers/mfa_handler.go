@@ -27,15 +27,18 @@ type MfaHandler struct {
 	userRepository      repositories.IUserRepository
 	jwtService          services.IJWTService
 	refreshTokenService services.IRefreshTokenService
+	bcryptService       services.IBcryptService
 }
 
 // NewMfaHandler creates a new instance of MfaHandler
-func NewMfaHandler(mfaService services.IMfaService, userRepository repositories.IUserRepository, jwtService services.IJWTService, refreshTokenService services.IRefreshTokenService) IMfaHandler {
+// NewMfaHandler creates a new instance of MfaHandler
+func NewMfaHandler(mfaService services.IMfaService, userRepository repositories.IUserRepository, jwtService services.IJWTService, refreshTokenService services.IRefreshTokenService, bcryptService services.IBcryptService) IMfaHandler {
 	return &MfaHandler{
 		mfaService:          mfaService,
 		userRepository:      userRepository,
 		jwtService:          jwtService,
 		refreshTokenService: refreshTokenService,
+		bcryptService:       bcryptService,
 	}
 }
 
@@ -199,6 +202,30 @@ func (h *MfaHandler) DisableMfa(c *gin.Context) {
 			c,
 			apperror.NewParseError("Invalid UserID"),
 		)
+		return
+	}
+
+	// Verify password
+	var input struct {
+		Password string `json:"password" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		validateError := utils.TranslateValidationErrors(err, input)
+		utils.RespondWithError(c, validateError)
+		return
+	}
+
+	// Get user to verify password
+	user, err := h.userRepository.GetByID(userID)
+	if err != nil {
+		logrus.Errorf("Failed to get user details for ID %d: %v", userID, err)
+		utils.RespondWithError(c, apperror.NewNotFoundError("User not found"))
+		return
+	}
+
+	if !h.bcryptService.CheckPasswordHash(input.Password, user.Password) {
+		utils.RespondWithError(c, apperror.NewInvalidPasswordError("Invalid password"))
 		return
 	}
 

@@ -57,8 +57,11 @@ func LogMiddleware() gin.HandlerFunc {
 		// Only log request body if method is POST or PUT, and limit to 64KB
 		if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH" {
 			const maxBodySize = 1 << 16 // 64 KB
-			bodyBytes, _ := io.ReadAll(io.LimitReader(c.Request.Body, maxBodySize))
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			var bodyBytes []byte
+			if c.Request.Body != nil {
+				bodyBytes, _ = io.ReadAll(io.LimitReader(c.Request.Body, maxBodySize))
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			}
 
 			if strings.Contains(c.Request.Header.Get("Content-Type"), "application/json") {
 				var requestBody any
