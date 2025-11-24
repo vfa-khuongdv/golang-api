@@ -9,6 +9,11 @@ MIGRATIONS_PATH := internal/database/migrations
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 
+# Core modules for coverage reporting (excluding cmd, models, routes, seeders, mocks)
+# These modules represent the business logic that should be tested
+CORE_MODULES := ./internal/configs ./internal/handlers ./internal/middlewares \
+                ./internal/repositories ./internal/services ./internal/utils ./pkg/...
+
 # Database variables (can be overridden by env vars)
 DB_HOST ?= 127.0.0.1
 DB_PORT ?= 3306
@@ -69,7 +74,7 @@ test-e2e: install-tools
 ## Test Coverage: Run tests with coverage
 test-coverage: install-tools
 	@echo "Running tests with coverage..."
-	@gotestsum -- -coverprofile=$(COVERAGE_FILE) $(shell $(GO) list ./... | grep -v -E '/(cmd|docs|tests)')
+	@gotestsum -- -coverprofile=$(COVERAGE_FILE) -covermode=atomic $(CORE_MODULES)
 	@$(GO) tool cover -func=$(COVERAGE_FILE) | tee coverage-summary.txt
 	@$(GO) tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
 	@echo "✅ Coverage report generated."
