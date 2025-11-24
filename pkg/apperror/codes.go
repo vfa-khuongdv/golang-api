@@ -33,14 +33,4 @@ const (
 	ErrCacheDelete = 4004 // Delete cache error
 	ErrCacheList   = 4005 // List cache error
 	ErrCacheExists = 4006 // Cache key exists check error
-
-	// MFA errors
-	ErrMfaAlreadyEnabled    = 5000 // MFA is already enabled
-	ErrMfaNotEnabled        = 5001 // MFA is not enabled
-	ErrMfaSetupNotInitiated = 5002 // MFA setup not initiated
-	ErrMfaInvalidCode       = 5003 // Invalid MFA code
-	ErrMfaExpired           = 5004 // MFA session expired
-	ErrMfaSecretGeneration  = 5005 // Failed to generate MFA secret
-	ErrMfaQRCodeGeneration  = 5006 // Failed to generate QR code
-	ErrMfaBackupCodeError   = 5007 // Backup code error
 )

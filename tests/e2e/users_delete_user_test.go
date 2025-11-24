@@ -38,12 +38,6 @@ func TestUsersDeleteUser(t *testing.T) {
 	}
 	db.Create(&authUser)
 
-	// Create MFA settings
-	mfaSettings := models.MfaSettings{
-		UserID:     authUser.ID,
-		MfaEnabled: false,
-	}
-	db.Create(&mfaSettings)
 
 	// Generate access token
 	jwtService := services.NewJWTService()

@@ -30,12 +30,6 @@ func TestAuthRefreshToken(t *testing.T) {
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
 
-	// Create MFA settings for the user
-	mfaSettings := models.MfaSettings{
-		UserID:     user.ID,
-		MfaEnabled: false,
-	}
-	db.Create(&mfaSettings)
 
 	// Login to get tokens
 	loginPayload := map[string]string{

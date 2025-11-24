@@ -30,21 +30,17 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	refreshRepo := repositories.NewRefreshTokenRepository(db)
-	mfaRepo := repositories.NewMfaRepository(db)
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
 	userService := services.NewUserService(userRepo)
 	bcryptService := services.NewBcryptService()
 	jwtService := services.NewJWTService()
-	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService, mfaRepo)
-	totpService := services.NewTotpService("GolangCMS")
-	mfaService := services.NewMfaService(mfaRepo, totpService)
+	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService, bcryptService)
-	mfaHandler := handlers.NewMfaHandler(mfaService, userRepo, jwtService, refreshTokenService, bcryptService)
 
 	// Add middleware for CORS and logging
 	router.Use(
@@ -65,9 +61,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		api.POST("/forgot-password", userHandler.ForgotPassword)
 		api.POST("/reset-password", userHandler.ResetPassword)
 
-		// MFA verification route (requires mfa_verification token scope)
-		api.POST("/mfa/verify-code", middlewares.MfaMiddleware(), mfaHandler.VerifyMfaCode)
-
 		authenticated := api.Group("/")
 		authenticated.Use(middlewares.AuthMiddleware())
 		{
@@ -80,12 +73,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.GET("/users/:id", userHandler.GetUser)
 			authenticated.PATCH("/users/:id", userHandler.UpdateUser)
 			authenticated.DELETE("/users/:id", userHandler.DeleteUser)
-
-			// MFA routes (require access token scope)
-			authenticated.POST("/mfa/setup", mfaHandler.InitMfaSetup)
-			authenticated.POST("/mfa/verify-setup", mfaHandler.VerifyMfaSetup)
-			authenticated.POST("/mfa/disable", mfaHandler.DisableMfa)
-			authenticated.GET("/mfa/status", mfaHandler.GetMfaStatus)
 		}
 	}
 

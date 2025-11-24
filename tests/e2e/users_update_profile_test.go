@@ -34,12 +34,6 @@ func TestUsersUpdateProfile(t *testing.T) {
 	}
 	db.Create(&testUser)
 
-	// Create MFA settings
-	mfaSettings := models.MfaSettings{
-		UserID:     testUser.ID,
-		MfaEnabled: false,
-	}
-	db.Create(&mfaSettings)
 
 	// Generate access token for test user
 	jwtService := services.NewJWTService()
