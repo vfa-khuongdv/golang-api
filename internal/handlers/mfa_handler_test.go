@@ -26,8 +26,9 @@ func TestInitMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		// Mock the service method
 		mockMfaService.On("SetupMfa", uint(1), "test@example.com").Return(
@@ -71,8 +72,9 @@ func TestInitMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		requestBody := map[string]string{
 			"email": "test@example.com",
@@ -99,8 +101,9 @@ func TestInitMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		requestBody := map[string]string{
 			"email": "invalid-email",
@@ -123,8 +126,9 @@ func TestInitMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("SetupMfa", uint(1), "test@example.com").Return(
 			"",
@@ -155,8 +159,9 @@ func TestInitMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		// Mock the service to return error when MFA is already enabled
 		mockMfaService.On("SetupMfa", uint(1), "test@example.com").Return(
@@ -192,8 +197,9 @@ func TestVerifyMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("VerifyMfaSetup", uint(1), "123456").Return(
 			[]string{"BACKUP1", "BACKUP2", "BACKUP3"},
@@ -229,8 +235,9 @@ func TestVerifyMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		requestBody := map[string]string{
 			"code": "12345", // Invalid - should be 6 digits
@@ -253,8 +260,9 @@ func TestVerifyMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("VerifyMfaSetup", uint(1), "000000").Return(
 			[]string{},
@@ -287,8 +295,9 @@ func TestVerifyMfaSetup(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		requestBody := map[string]string{
 			"code": "123456",
@@ -315,8 +324,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		// Mock the service methods
 		mockMfaService.On("VerifyMfaCode", uint(1), "123456").Return(true, nil)
@@ -372,8 +382,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("VerifyMfaCode", uint(1), "000000").Return(false, nil)
 
@@ -402,8 +413,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		requestBody := map[string]string{}
 		reqBody, _ := json.Marshal(requestBody)
@@ -424,8 +436,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("VerifyMfaCode", uint(1), "123456").Return(true, nil)
 		mockUserRepo.On("GetByID", uint(1)).Return(nil, apperror.NewNotFoundError("User not found"))
@@ -453,8 +466,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("VerifyMfaCode", uint(1), "123456").Return(true, nil)
 		mockUserRepo.On("GetByID", uint(1)).Return(&models.User{
@@ -488,8 +502,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("VerifyMfaCode", uint(1), "123456").Return(true, nil)
 		mockUserRepo.On("GetByID", uint(1)).Return(&models.User{
@@ -531,8 +546,9 @@ func TestVerifyMfaCode(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		requestBody := map[string]string{
 			"code": "123456",
@@ -559,14 +575,28 @@ func TestDisableMfa(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
+
+		mockUserRepo.On("GetByID", uint(1)).Return(&models.User{
+			ID:       1,
+			Email:    "test@example.com",
+			Password: "hashed_password",
+		}, nil)
+
+		mockBcryptService.On("CheckPasswordHash", "password123", "hashed_password").Return(true)
 
 		mockMfaService.On("DisableMfa", uint(1)).Return(nil)
 
+		requestBody := map[string]string{
+			"password": "password123",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/mfa/disable", bytes.NewReader([]byte{}))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/mfa/disable", bytes.NewBuffer(reqBody))
 		c.Request.Header.Set("Content-Type", "application/json")
 		c.Set("UserID", uint(1))
 
@@ -579,6 +609,8 @@ func TestDisableMfa(t *testing.T) {
 
 		assert.Equal(t, "MFA disabled successfully", responseBody["message"])
 		mockMfaService.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+		mockBcryptService.AssertExpectations(t)
 	})
 
 	t.Run("DisableMfa - Service Error", func(t *testing.T) {
@@ -586,14 +618,28 @@ func TestDisableMfa(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
+
+		mockUserRepo.On("GetByID", uint(1)).Return(&models.User{
+			ID:       1,
+			Email:    "test@example.com",
+			Password: "hashed_password",
+		}, nil)
+
+		mockBcryptService.On("CheckPasswordHash", "password123", "hashed_password").Return(true)
 
 		mockMfaService.On("DisableMfa", uint(1)).Return(apperror.NewInternalError("Database error"))
 
+		requestBody := map[string]string{
+			"password": "password123",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/mfa/disable", bytes.NewReader([]byte{}))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/mfa/disable", bytes.NewBuffer(reqBody))
 		c.Request.Header.Set("Content-Type", "application/json")
 		c.Set("UserID", uint(1))
 
@@ -601,6 +647,8 @@ func TestDisableMfa(t *testing.T) {
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		mockMfaService.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
+		mockBcryptService.AssertExpectations(t)
 	})
 
 	t.Run("DisableMfa - Missing UserID", func(t *testing.T) {
@@ -608,8 +656,9 @@ func TestDisableMfa(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -631,8 +680,9 @@ func TestGetMfaStatus(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("GetMfaStatus", uint(1)).Return(true, nil)
 
@@ -658,8 +708,9 @@ func TestGetMfaStatus(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("GetMfaStatus", uint(1)).Return(false, nil)
 
@@ -685,8 +736,9 @@ func TestGetMfaStatus(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		mockMfaService.On("GetMfaStatus", uint(1)).Return(false, apperror.NewInternalError("Database error"))
 
@@ -707,8 +759,9 @@ func TestGetMfaStatus(t *testing.T) {
 		mockUserRepo := new(mocks.MockUserRepository)
 		mockJwtService := new(mocks.MockJWTService)
 		mockRefreshTokenService := new(mocks.MockRefreshTokenService)
+		mockBcryptService := new(mocks.MockBcryptService)
 
-		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService)
+		handler := handlers.NewMfaHandler(mockMfaService, mockUserRepo, mockJwtService, mockRefreshTokenService, mockBcryptService)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)

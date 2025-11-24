@@ -13,8 +13,16 @@ import (
 func EmptyBodyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if c.Request.Method == http.MethodPost || c.Request.Method == http.MethodPut || c.Request.Method == http.MethodPatch {
-			bodyBytes, err := io.ReadAll(c.Request.Body)
-			if err != nil || len(bytes.TrimSpace(bodyBytes)) == 0 {
+			var bodyBytes []byte
+			var err error
+
+			// Check if body is not nil before reading
+			if c.Request.Body != nil {
+				bodyBytes, err = io.ReadAll(c.Request.Body)
+			}
+
+			// Check if body is nil, error reading, or empty content
+			if c.Request.Body == nil || err != nil || len(bytes.TrimSpace(bodyBytes)) == 0 {
 				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 					"code":    apperror.ErrEmptyData,
 					"message": "Request body cannot be empty",
