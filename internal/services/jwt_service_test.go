@@ -41,8 +41,8 @@ func TestJWTService(t *testing.T) {
 		assert.Equal(t, uint(789), claims.ID)
 		assert.Equal(t, services.TokenScopeMfaVerification, claims.Scope)
 		// MFA token expires in 10 minutes
-		assert.True(t, claims.ExpiresAt.Time.After(time.Now()))
-		assert.True(t, claims.ExpiresAt.Time.Before(time.Now().Add(15*time.Minute)))
+		assert.True(t, claims.ExpiresAt.After(time.Now()))
+		assert.True(t, claims.ExpiresAt.Before(time.Now().Add(15*time.Minute)))
 	})
 
 	t.Run("ValidateTokenWithScope_AccessToken", func(t *testing.T) {
