@@ -36,8 +36,8 @@ The project follows a clean architecture and is organized into the following dir
 │   ├── logger                        # Logger utility
 │   └── mailer                        # Mailer for sending emails
 ├── tests                             # Unit and integration tests
-│   └── internal/utils
-│       └── security_test.go
+│   ├── e2e                           # End-to-end tests
+│   └── mocks                         # Mocks for internal package tests
 ```
 
 ## Prerequisites
@@ -64,7 +64,8 @@ make install-tools
 This will install:
 - Migrate CLI (for database migrations)
 - Air (for live reloading)
-- gocov and gocov-html (for test coverage reports)
+- gotestsum (for running tests)
+- golangci-lint (for linting)
 
 ### 2. Clone the repository
 
@@ -109,6 +110,12 @@ The project includes migrations for creating the necessary tables in the MySQL d
 To apply the migrations:
 
 ```bash
+make migrate
+```
+
+Or manually:
+
+```bash
 migrate -path ./internal/database/migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/golang_db_2" up
 ```
 
@@ -124,14 +131,12 @@ You can also revert a specific number of migrations by adding the number after t
 migrate -path ./internal/database/migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/golang_db_2" down 1
 ```
 
-This will run the migration scripts and populate the database.
-
 ### 5. Seeding the Database
 
 To seed the database with initial data (e.g., default users, roles, permissions), run:
 
 ```bash
-go run cmd/seeder/seeder.go
+make start-seeder
 ```
 
 ### 6. Running the Server
@@ -180,25 +185,29 @@ The following environment variables are required for the application:
 
 Database Configuration:
 - `DB_HOST` - MySQL database host
+- `DB_PORT` - MySQL port number
 - `DB_USERNAME` - MySQL database username
 - `DB_PASSWORD` - MySQL database password
 - `DB_DATABASE` - MySQL database name
-- `DB_PORT` - MySQL port number
-
-JWT Configuration:
-- `JWT_SECRET_KEY` - Secret key for JWT token generation
-- `JWT_EXPIRES_IN` - JWT token expiration time (e.g., "24h")
 
 Server Configuration:
-- `SERVER_PORT` - Port number for the application server (default: 3000)
-- `SERVER_MODE` - Server mode ("development" or "production")
+- `PORT` - Port number for the application server (default: 3000)
+- `GIN_MODE` - Gin mode ("debug" or "release")
+- `RUN_MIGRATE` - Whether to run migrations on startup
+- `STAGE` - Environment stage ("local", "dev", "prod")
 
-Mail Configuration (if using email features):
-- `SMTP_HOST` - SMTP server host
-- `SMTP_PORT` - SMTP server port
-- `SMTP_USERNAME` - SMTP username
-- `SMTP_PASSWORD` - SMTP password
-- `SMTP_FROM_ADDRESS` - Email address used as sender
+JWT Configuration:
+- `JWT_KEY` - Secret key for JWT token generation
+
+URL Configuration:
+- `FRONTEND_URL` - URL of the frontend application
+
+Mail Configuration:
+- `MAIL_HOST` - SMTP server host
+- `MAIL_PORT` - SMTP server port
+- `MAIL_USERNAME` - SMTP username
+- `MAIL_PASSWORD` - SMTP password
+- `MAIL_FROM` - Email address used as sender
 
 These can be set in the `.env` file or passed directly as environment variables. A sample `.env.example` file is provided in the repository.
 
@@ -217,6 +226,7 @@ The API is documented using OpenAPI 3.0 specification. You can access the docume
 - `POST /api/v1/refresh-token` - Refresh access token
 - `POST /api/v1/forgot-password` - Request password reset
 - `POST /api/v1/reset-password` - Reset password with token
+- `POST /api/v1/mfa/verify-code` - Verify MFA code during login
 
 #### User Profile (Authenticated)
 - `GET /api/v1/profile` - Get user profile
@@ -233,7 +243,6 @@ The API is documented using OpenAPI 3.0 specification. You can access the docume
 #### Multi-Factor Authentication (Authenticated)
 - `POST /api/v1/mfa/setup` - Initialize MFA setup
 - `POST /api/v1/mfa/verify-setup` - Verify MFA setup
-- `POST /api/v1/mfa/verify-code` - Verify MFA code during login
 - `POST /api/v1/mfa/disable` - Disable MFA
 - `GET /api/v1/mfa/status` - Get MFA status
 
@@ -249,15 +258,22 @@ make test-coverage
 ```
 
 This command will:
-1. Install required tools (gocov and gocov-html) if not already installed
-2. Run all tests and generate coverage.json
-3. Generate an HTML coverage report at coverage.html
+1. Install required tools (gotestsum, gocov, gocov-html) if not already installed
+2. Run all tests and generate coverage.out
+3. Generate a coverage summary at coverage-summary.txt
+4. Generate an HTML coverage report at coverage.html
 
 For specific tests, you can still use:
 
 ```bash
 go test -v path/to/test
 ```
+
+### Other Testing Commands
+
+- `make test`: Run all unit tests using gotestsum
+- `make test-e2e`: Run end-to-end tests
+- `make watch-test`: Watch for changes and run tests automatically
 
 ### Unit Tests Directory
 
@@ -274,12 +290,3 @@ The test files are located under the `tests` directory. The tests follow the Go 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### Key Sections:
-1. **Project Structure**: A breakdown of the directories and files with brief descriptions.
-2. **Setup Instructions**: Instructions for setting up the project locally, including dependencies and Docker setup.
-3. **Environment Variables**: Key environment variables needed for the project to run properly.
-4. **Testing**: How to run unit tests in the project.
-5. **Contribution Guidelines**: Instructions for contributing to the project.
-
-Feel free to customize this `README.md` based on your actual project requirements.
