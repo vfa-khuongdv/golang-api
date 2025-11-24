@@ -43,16 +43,6 @@ func TestErrorConstructors(t *testing.T) {
 		// Common errors
 		{"ParseError", NewParseError, ErrParseError, http.StatusBadRequest},
 		{"ValidationDataError", NewValidationDataError, ErrValidationFailed, http.StatusBadRequest},
-
-		// MFA errors
-		{"MfaAlreadyEnabledError", NewMfaAlreadyEnabledError, ErrMfaAlreadyEnabled, http.StatusConflict},
-		{"MfaNotEnabledError", NewMfaNotEnabledError, ErrMfaNotEnabled, http.StatusBadRequest},
-		{"MfaSetupNotInitiatedError", NewMfaSetupNotInitiatedError, ErrMfaSetupNotInitiated, http.StatusBadRequest},
-		{"MfaInvalidCodeError", NewMfaInvalidCodeError, ErrMfaInvalidCode, http.StatusBadRequest},
-		{"MfaExpiredError", NewMfaExpiredError, ErrMfaExpired, http.StatusBadRequest},
-		{"MfaSecretGenerationError", NewMfaSecretGenerationError, ErrMfaSecretGeneration, http.StatusInternalServerError},
-		{"MfaQRCodeGenerationError", NewMfaQRCodeGenerationError, ErrMfaQRCodeGeneration, http.StatusInternalServerError},
-		{"MfaBackupCodeError", NewMfaBackupCodeError, ErrMfaBackupCodeError, http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {

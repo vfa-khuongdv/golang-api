@@ -30,13 +30,6 @@ func TestAuthLogin(t *testing.T) {
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
 
-	// Create MFA settings for the user
-	mfaSettings := models.MfaSettings{
-		UserID:     user.ID,
-		MfaEnabled: false,
-	}
-	db.Create(&mfaSettings)
-
 	t.Run("Login - Success", func(t *testing.T) {
 		loginPayload := map[string]string{
 			"email":    "test_login@example.com",

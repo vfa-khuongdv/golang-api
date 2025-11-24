@@ -7,7 +7,7 @@ import (
 )
 
 type IAuthService interface {
-	Login(email, password string, ctx *gin.Context) (interface{}, error)
+	Login(email, password string, ctx *gin.Context) (*LoginResponse, error)
 	RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*LoginResponse, error)
 }
 
@@ -16,19 +16,11 @@ type AuthService struct {
 	refreshTokenService IRefreshTokenService
 	bcryptService       IBcryptService
 	jwtService          IJWTService
-	mfaRepository       repositories.IMfaRepository
 }
 
 type LoginResponse struct {
 	AccessToken  JwtResult `json:"access_token"`
 	RefreshToken JwtResult `json:"refresh_token"`
-}
-
-// MfaRequiredResponse is returned when user has MFA enabled but hasn't verified it yet
-type MfaRequiredResponse struct {
-	MfaRequired    bool   `json:"mfa_required"`
-	TemporaryToken string `json:"temporary_token"`
-	Message        string `json:"message"`
 }
 
 // NewAuthService creates and returns a new instance of AuthService
@@ -37,17 +29,15 @@ type MfaRequiredResponse struct {
 //   - refreshTokenService: IRefreshTokenService for managing refresh tokens
 //   - bcryptService: IBcryptService for password hashing and verification
 //   - jwtService: IJWTService for JWT token generation and validation
-//   - mfaRepository: IMfaRepository for accessing MFA settings
 //
 // Returns:
 //   - *AuthService: New AuthService instance initialized with the provided dependencies
-func NewAuthService(repo repositories.IUserRepository, refreshTokenService IRefreshTokenService, bcryptService IBcryptService, jwtService IJWTService, mfaRepository repositories.IMfaRepository) *AuthService {
+func NewAuthService(repo repositories.IUserRepository, refreshTokenService IRefreshTokenService, bcryptService IBcryptService, jwtService IJWTService) *AuthService {
 	return &AuthService{
 		repo:                repo,
 		refreshTokenService: refreshTokenService,
 		bcryptService:       bcryptService,
 		jwtService:          jwtService,
-		mfaRepository:       mfaRepository,
 	}
 }
 
@@ -58,10 +48,9 @@ func NewAuthService(repo repositories.IUserRepository, refreshTokenService IRefr
 //   - ctx: Gin context containing request information
 //
 // Returns:
-//   - interface{}: Returns either LoginResponse (full tokens) if MFA not enabled,
-//     or MfaRequiredResponse (temporary token) if MFA is enabled
+//   - *LoginResponse: Contains access token and refresh token if successful
 //   - error: Returns error if login fails (user not found, invalid password, token generation fails)
-func (service *AuthService) Login(email, password string, ctx *gin.Context) (interface{}, error) {
+func (service *AuthService) Login(email, password string, ctx *gin.Context) (*LoginResponse, error) {
 	user, err := service.repo.FindByField("email", email)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -72,28 +61,6 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (int
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
-	// Check if user has MFA enabled
-	mfaSettings, err := service.mfaRepository.GetMfaSettingsByUserID(user.ID)
-	if err != nil {
-		return nil, apperror.NewInternalError(err.Error())
-	}
-
-	// If MFA is enabled, return temporary token for MFA verification
-	if mfaSettings != nil && mfaSettings.MfaEnabled {
-		// Generate temporary MFA verification token (10-minute expiration, only for MFA verification)
-		tempToken, err := service.jwtService.GenerateMfaToken(user.ID)
-		if err != nil {
-			return nil, apperror.NewInternalError(err.Error())
-		}
-
-		return &MfaRequiredResponse{
-			MfaRequired:    true,
-			TemporaryToken: tempToken.Token,
-			Message:        "MFA code required",
-		}, nil
-	}
-
-	// MFA is not enabled, proceed with normal login
 	// Generate access token
 	accessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {

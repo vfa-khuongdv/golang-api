@@ -10,8 +10,6 @@ import (
 const (
 	// TokenScopeAccess is the scope for regular access tokens
 	TokenScopeAccess = "access"
-	// TokenScopeMfaVerification is the scope for MFA verification tokens (temporary)
-	TokenScopeMfaVerification = "mfa_verification"
 )
 
 // CustomClaims represents JWT claims with a custom user ID field and scope
@@ -30,7 +28,6 @@ type JwtResult struct {
 // IJWTService defines JWT-related operations
 type IJWTService interface {
 	GenerateAccessToken(id uint) (*JwtResult, error)
-	GenerateMfaToken(id uint) (*JwtResult, error)
 	ValidateToken(tokenString string) (*CustomClaims, error)
 	ValidateTokenWithScope(tokenString string, requiredScope string) (*CustomClaims, error)
 	ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error)
@@ -56,31 +53,6 @@ func (s *jwtService) GenerateAccessToken(id uint) (*JwtResult, error) {
 	claims := CustomClaims{
 		ID:    id,
 		Scope: TokenScopeAccess,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: expiresAt,
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString(s.secret)
-	if err != nil {
-		return nil, err
-	}
-
-	return &JwtResult{
-		Token:     signedToken,
-		ExpiresAt: expiresAt.Unix(),
-	}, nil
-}
-
-// GenerateMfaToken creates a temporary JWT token for MFA verification
-// MFA tokens have 10-minute expiration and can only be used for /mfa/verify-code endpoint
-func (s *jwtService) GenerateMfaToken(id uint) (*JwtResult, error) {
-	expiresAt := jwt.NewNumericDate(time.Now().Add(10 * time.Minute))
-	claims := CustomClaims{
-		ID:    id,
-		Scope: TokenScopeMfaVerification,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: expiresAt,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
