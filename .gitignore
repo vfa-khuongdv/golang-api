@@ -43,3 +43,6 @@ coverage.out
 coverage.html
 coverage.json
 coverage-summary.txt
+
+#review code:
+best-practices/
