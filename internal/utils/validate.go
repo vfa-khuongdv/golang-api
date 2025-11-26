@@ -74,7 +74,13 @@ func TranslateValidationErrors(err error, obj any) *apperror.ValidationError {
 		jsonParts := []string{}
 		currType := objType
 
-		for i, part := range parts {
+		startIndex := 0
+		if len(parts) > 0 && parts[0] == objType.Name() {
+			startIndex = 1
+		}
+
+		for i := startIndex; i < len(parts); i++ {
+			part := parts[i]
 			fieldName := part
 			indexSuffix := ""
 

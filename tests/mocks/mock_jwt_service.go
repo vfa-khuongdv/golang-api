@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/stretchr/testify/mock"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 )
@@ -10,20 +11,20 @@ type MockJWTService struct {
 	mock.Mock
 }
 
-func (m *MockJWTService) GenerateAccessToken(id uint) (*services.JwtResult, error) {
+func (m *MockJWTService) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 	args := m.Called(id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*services.JwtResult), args.Error(1)
+	return args.Get(0).(*dto.JwtResult), args.Error(1)
 }
 
-func (m *MockJWTService) GenerateMfaToken(id uint) (*services.JwtResult, error) {
+func (m *MockJWTService) GenerateMfaToken(id uint) (*dto.JwtResult, error) {
 	args := m.Called(id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*services.JwtResult), args.Error(1)
+	return args.Get(0).(*dto.JwtResult), args.Error(1)
 }
 
 func (m *MockJWTService) ValidateToken(tokenString string) (*services.CustomClaims, error) {

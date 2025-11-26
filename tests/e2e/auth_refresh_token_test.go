@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
@@ -30,7 +30,6 @@ func TestAuthRefreshToken(t *testing.T) {
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
 
-
 	// Login to get tokens
 	loginPayload := map[string]string{
 		"email":    "test_refresh@example.com",
@@ -43,7 +42,7 @@ func TestAuthRefreshToken(t *testing.T) {
 	router.ServeHTTP(w, req)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var loginResponse services.LoginResponse
+	var loginResponse dto.LoginResponse
 	err := json.Unmarshal(w.Body.Bytes(), &loginResponse)
 	require.NoError(t, err)
 
@@ -65,7 +64,7 @@ func TestAuthRefreshToken(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response services.LoginResponse
+		var response dto.LoginResponse
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
@@ -331,7 +332,7 @@ func TestCreateUser(t *testing.T) {
 				name:           "StringGender",
 				reqBody:        `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address", "gender": "not_numeric"}`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field .gender of type int16",
+				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.gender of type int16",
 				expectedFields: nil, // specific error case
 			},
 			{
@@ -347,14 +348,14 @@ func TestCreateUser(t *testing.T) {
 				name:           "EmptyRoleIDs",
 				reqBody:        `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address","gender":1,"role_ids":""}`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field .role_ids of type []uint",
+				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.role_ids of type []uint",
 				expectedFields: nil, // specific error case
 			},
 			{
 				name:           "InvalidRoleIDsIdNotNumeric",
 				reqBody:        `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address","gender":1,"role_ids":["not_numeric"]}`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field .role_ids of type uint",
+				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.role_ids of type uint",
 				expectedFields: nil, // specific error case
 			},
 			{
@@ -645,7 +646,7 @@ func TestUpdateProfile(t *testing.T) {
 				name:           "StringGender",
 				reqBody:        `{"name": "User", "birthday": "2000-01-01", "address": "123 Street", "gender": "male"}`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field .gender of type int16",
+				expectedMsg:    "json: cannot unmarshal string into Go struct field UpdateProfileInput.gender of type int16",
 				expectedFields: nil, // specific error case
 			},
 		}
@@ -1802,7 +1803,7 @@ func TestUpdateUser(t *testing.T) {
 				name:           "StringGender",
 				reqBody:        `{"name":"User","birthday":"2000-01-01","address":"123 Street","gender":"male"}`,
 				expectedCode:   4001,
-				expectedMsg:    "json: cannot unmarshal string into Go struct field .gender of type int16",
+				expectedMsg:    "json: cannot unmarshal string into Go struct field UpdateUserInput.gender of type int16",
 				expectedFields: nil,
 			},
 		}
@@ -2797,7 +2798,7 @@ func TestGetUsers(t *testing.T) {
 		}
 
 		// Mock the GetUsers method
-		expectedPagination := &utils.Pagination{
+		expectedPagination := &dto.Pagination{
 			Page:       1,
 			Limit:      10,
 			TotalItems: 2,
@@ -2832,7 +2833,7 @@ func TestGetUsers(t *testing.T) {
 		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the GetUsers method with default values (page=1, limit=50)
-		expectedPagination := &utils.Pagination{
+		expectedPagination := &dto.Pagination{
 			Page:       1,
 			Limit:      50,
 			TotalItems: 0,
@@ -2861,7 +2862,7 @@ func TestGetUsers(t *testing.T) {
 		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the GetUsers method with default page=1
-		expectedPagination := &utils.Pagination{
+		expectedPagination := &dto.Pagination{
 			Page:       1,
 			Limit:      5,
 			TotalItems: 0,

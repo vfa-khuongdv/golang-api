@@ -1,16 +1,16 @@
 package services
 
 import (
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 type IUserService interface {
 	GetUser(id uint) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
-	GetUsers(page int, limit int) (*utils.Pagination, error)
+	GetUsers(page int, limit int) (*dto.Pagination, error)
 	CreateUser(user *models.User, roleIds []uint) error
 	UpdateUser(user *models.User) error
 	DeleteUser(id uint) error
@@ -29,7 +29,7 @@ func NewUserService(repo repositories.IUserRepository) *UserService {
 	}
 }
 
-func (service *UserService) GetUsers(page int, limit int) (*utils.Pagination, error) {
+func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination, error) {
 	users, err := service.repo.GetUsers(page, limit)
 	if err != nil {
 		return nil, apperror.NewDBQueryError(err.Error())
@@ -43,13 +43,13 @@ func (service *UserService) GetUsers(page int, limit int) (*utils.Pagination, er
 //   - limit: The number of users per page (default is 10)
 //
 // Returns:
-//   - *utils.Pagination: A pointer to the pagination object containing user data
+//   - *dto.Pagination: A pointer to the pagination object containing user data
 //   - error: nil if successful, otherwise returns the error that occurred
 //
 // Example:
 //
 //	users, err := service.PaginateUsers(1, 10) // Gets the first page of users with 10 items per page
-func (service *UserService) PaginateUsers(page int, limit int) (*utils.Pagination, error) {
+func (service *UserService) PaginateUsers(page int, limit int) (*dto.Pagination, error) {
 	pagination, err := service.repo.GetUsers(page, limit)
 	if err != nil {
 		return nil, apperror.NewDBQueryError(err.Error())

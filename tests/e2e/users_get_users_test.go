@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -71,7 +72,7 @@ func TestUsersGetUsers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response utils.Pagination
+		var response dto.Pagination
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
@@ -90,7 +91,7 @@ func TestUsersGetUsers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response utils.Pagination
+		var response dto.Pagination
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
@@ -119,7 +120,7 @@ func TestUsersGetUsers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response utils.Pagination
+		var response dto.Pagination
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
@@ -157,7 +158,7 @@ func TestUsersGetUsersEmpty(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response utils.Pagination
+		var response dto.Pagination
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 

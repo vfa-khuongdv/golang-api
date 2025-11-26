@@ -3,7 +3,7 @@ package mocks
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
-	"github.com/vfa-khuongdv/golang-cms/internal/services"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 )
 
 type MockAuthService struct {
@@ -11,17 +11,17 @@ type MockAuthService struct {
 }
 
 // Login provides a mock function with given fields: email, password, ctx
-func (m *MockAuthService) Login(email string, password string, ctx *gin.Context) (*services.LoginResponse, error) {
+func (m *MockAuthService) Login(email string, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	args := m.Called(email, password, ctx)
-	if res, ok := args.Get(0).(*services.LoginResponse); ok {
+	if res, ok := args.Get(0).(*dto.LoginResponse); ok {
 		return res, args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockAuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*services.LoginResponse, error) {
+func (m *MockAuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	args := m.Called(refreshToken, accessToken, ctx)
-	if res, ok := args.Get(0).(*services.LoginResponse); ok {
+	if res, ok := args.Get(0).(*dto.LoginResponse); ok {
 		return res, args.Error(1)
 	}
 	return nil, args.Error(1)

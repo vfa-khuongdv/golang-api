@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
-	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
@@ -27,12 +27,12 @@ func TestLogin(t *testing.T) {
 
 		// Mock the service method
 		mockService.On("Login", "email@gmail.com", "testpassword", mock.Anything).Return(
-			&services.LoginResponse{
-				AccessToken: services.JwtResult{
+			&dto.LoginResponse{
+				AccessToken: dto.JwtResult{
 					Token:     "testtoken",
 					ExpiresAt: 0,
 				},
-				RefreshToken: services.JwtResult{
+				RefreshToken: dto.JwtResult{
 					Token:     "testrefreshtoken",
 					ExpiresAt: 0,
 				},
@@ -233,12 +233,12 @@ func TestRefreshToken(t *testing.T) {
 
 		// Mock the service method
 		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
-			&services.LoginResponse{
-				AccessToken: services.JwtResult{
+			&dto.LoginResponse{
+				AccessToken: dto.JwtResult{
 					Token:     "newtesttoken",
 					ExpiresAt: 0,
 				},
-				RefreshToken: services.JwtResult{
+				RefreshToken: dto.JwtResult{
 					Token:     "newtestrefreshtoken",
 					ExpiresAt: 0,
 				},
@@ -278,12 +278,12 @@ func TestRefreshToken(t *testing.T) {
 
 		// Mock the service method when using access token
 		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
-			&services.LoginResponse{
-				AccessToken: services.JwtResult{
+			&dto.LoginResponse{
+				AccessToken: dto.JwtResult{
 					Token:     "newtesttoken",
 					ExpiresAt: 0,
 				},
-				RefreshToken: services.JwtResult{
+				RefreshToken: dto.JwtResult{
 					Token:     "newtestrefreshtoken",
 					ExpiresAt: 0,
 				},
@@ -323,12 +323,12 @@ func TestRefreshToken(t *testing.T) {
 
 		// Mock the service method - should prefer refresh token
 		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
-			&services.LoginResponse{
-				AccessToken: services.JwtResult{
+			&dto.LoginResponse{
+				AccessToken: dto.JwtResult{
 					Token:     "newtesttoken",
 					ExpiresAt: 0,
 				},
-				RefreshToken: services.JwtResult{
+				RefreshToken: dto.JwtResult{
 					Token:     "newtestrefreshtoken",
 					ExpiresAt: 0,
 				},

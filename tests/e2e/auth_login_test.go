@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
@@ -45,7 +45,7 @@ func TestAuthLogin(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response services.LoginResponse
+		var response dto.LoginResponse
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 

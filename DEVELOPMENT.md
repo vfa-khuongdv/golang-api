@@ -69,6 +69,7 @@ project/
 │   ├── database/                 # Database setup
 │   │   ├── migrations/           # Migration files
 │   │   └── seeders/              # Seeder implementations
+│   ├── dto/                      # Data transfer objects for request and response
 │   ├── handlers/                 # HTTP handlers/controllers
 │   ├── middlewares/              # HTTP middlewares
 │   ├── models/                   # Data models
