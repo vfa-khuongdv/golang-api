@@ -11,7 +11,7 @@ type IUserService interface {
 	GetUser(id uint) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
 	GetUsers(page int, limit int) (*dto.Pagination, error)
-	CreateUser(user *models.User, roleIds []uint) error
+	CreateUser(user *models.User) error
 	UpdateUser(user *models.User) error
 	DeleteUser(id uint) error
 	GetUserByToken(token string) (*models.User, error)
@@ -35,26 +35,6 @@ func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination, erro
 		return nil, apperror.NewDBQueryError(err.Error())
 	}
 	return users, nil
-}
-
-// PaginateUsers retrieves a paginated list of users from the database.
-// Parameters:
-//   - page: The page number to retrieve (default is 1)
-//   - limit: The number of users per page (default is 10)
-//
-// Returns:
-//   - *dto.Pagination: A pointer to the pagination object containing user data
-//   - error: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	users, err := service.PaginateUsers(1, 10) // Gets the first page of users with 10 items per page
-func (service *UserService) PaginateUsers(page int, limit int) (*dto.Pagination, error) {
-	pagination, err := service.repo.GetUsers(page, limit)
-	if err != nil {
-		return nil, apperror.NewDBQueryError(err.Error())
-	}
-	return pagination, nil
 }
 
 // GetUser retrieves a user by their ID from the database.
@@ -98,11 +78,10 @@ func (service *UserService) GetUserByEmail(email string) (*models.User, error) {
 // CreateUser creates a new user in the database and assigns roles to them.
 // Parameters:
 //   - user: Pointer to models.User containing the user information to create
-//   - roleIds: Slice of role IDs to assign to the user
 //
 // Returns:
 //   - *error: nil if successful, otherwise returns the error that occurred
-func (service *UserService) CreateUser(user *models.User, roleIds []uint) error {
+func (service *UserService) CreateUser(user *models.User) error {
 	tx := service.repo.GetDB().Begin()
 	if tx.Error != nil {
 		return apperror.NewDBInsertError(tx.Error.Error())
@@ -200,7 +179,7 @@ func (service *UserService) GetUserByToken(token string) (*models.User, error) {
 //
 //	profile, err := service.GetProfile(1) // Gets profile for user with ID 1
 func (service *UserService) GetProfile(id uint) (*models.User, error) {
-	data, err := service.repo.GetProfile(id)
+	data, err := service.repo.GetByID(id)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
 	}
@@ -216,14 +195,9 @@ func (service *UserService) GetProfile(id uint) (*models.User, error) {
 //
 // Example:
 //
-//	user := &models.User{
-//	    ID: 1,
-//	    Name: "Updated Name",
-//	    Bio: "Updated bio"
-//	}
 //	err := service.UpdateProfile(user)
 func (service *UserService) UpdateProfile(user *models.User) error {
-	err := service.repo.UpdateProfile(user)
+	err := service.repo.Update(user)
 	if err != nil {
 		return apperror.NewDBUpdateError(err.Error())
 	}

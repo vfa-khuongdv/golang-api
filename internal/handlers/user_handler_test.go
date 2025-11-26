@@ -36,7 +36,7 @@ func TestCreateUser(t *testing.T) {
 		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the CreateUser method
-		userService.On("CreateUser", mock.AnythingOfType("*models.User"), mock.AnythingOfType("[]uint")).Return(nil)
+		userService.On("CreateUser", mock.AnythingOfType("*models.User")).Return(nil)
 		bcryptService.On("HashPassword", "password").Return("$2a$10$examplehash", nil)
 
 		requestBody := map[string]any{
@@ -46,7 +46,6 @@ func TestCreateUser(t *testing.T) {
 			"birthday": "2000-01-01",
 			"address":  "123 Street",
 			"gender":   1,
-			"role_ids": []uint{1, 2},
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -90,7 +89,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -105,7 +103,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -120,7 +117,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -134,7 +130,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -148,7 +143,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -162,7 +156,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -176,7 +169,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -189,7 +181,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -202,7 +193,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -215,7 +205,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -225,7 +214,6 @@ func TestCreateUser(t *testing.T) {
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
 					{Field: "name", Message: "name must be at most 45 characters long or numeric"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -237,7 +225,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday is required"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -249,7 +236,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday must be a valid date (YYYY-MM-DD) and not in the future"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -261,7 +247,6 @@ func TestCreateUser(t *testing.T) {
 					{Field: "birthday", Message: "birthday must be a valid date (YYYY-MM-DD) and not in the future"},
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -272,7 +257,6 @@ func TestCreateUser(t *testing.T) {
 				expectedFields: []apperror.FieldError{
 					{Field: "address", Message: "address is required"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -283,7 +267,6 @@ func TestCreateUser(t *testing.T) {
 				expectedFields: []apperror.FieldError{
 					{Field: "address", Message: "address must not be blank"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -294,7 +277,6 @@ func TestCreateUser(t *testing.T) {
 				expectedFields: []apperror.FieldError{
 					{Field: "address", Message: "address must be at least 1 characters long or numeric"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -305,7 +287,6 @@ func TestCreateUser(t *testing.T) {
 				expectedFields: []apperror.FieldError{
 					{Field: "address", Message: "address must be at most 255 characters long or numeric"},
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -315,7 +296,6 @@ func TestCreateUser(t *testing.T) {
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
 					{Field: "gender", Message: "gender is required"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -325,7 +305,6 @@ func TestCreateUser(t *testing.T) {
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
 					{Field: "gender", Message: "gender must be one of [1 2 3]"},
-					{Field: "role_ids", Message: "role_ids is required"},
 				},
 			},
 			{
@@ -334,39 +313,6 @@ func TestCreateUser(t *testing.T) {
 				expectedCode:   float64(4001),
 				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.gender of type int16",
 				expectedFields: nil, // specific error case
-			},
-			{
-				name:         "MissingRoleIDs",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address","gender":1}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "role_ids", Message: "role_ids is required"},
-				},
-			},
-			{
-				name:           "EmptyRoleIDs",
-				reqBody:        `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address","gender":1,"role_ids":""}`,
-				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.role_ids of type []uint",
-				expectedFields: nil, // specific error case
-			},
-			{
-				name:           "InvalidRoleIDsIdNotNumeric",
-				reqBody:        `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address","gender":1,"role_ids":["not_numeric"]}`,
-				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.role_ids of type uint",
-				expectedFields: nil, // specific error case
-			},
-			{
-				name:         "InvalidRoleIDIsEmptyArray",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address","gender":1,"role_ids":[]}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					// TODO: fixed in the future assume that role_ids is array of uint, so it must be at least 1 characters long or numeric
-					{Field: "role_ids", Message: "role_ids must be at least 1 characters long or numeric"},
-				},
 			},
 		}
 
@@ -409,7 +355,7 @@ func TestCreateUser(t *testing.T) {
 
 		// Mock the service methods
 		bcryptService.On("HashPassword", "password").Return("$2a$10$examplehash", nil)
-		userService.On("CreateUser", mock.AnythingOfType("*models.User"), mock.AnythingOfType("[]uint")).
+		userService.On("CreateUser", mock.AnythingOfType("*models.User")).
 			Return(apperror.NewDBInsertError("Database insert error"))
 
 		requestBody := map[string]any{

@@ -125,7 +125,7 @@ func (s *UserServiceTestSuite) TestGetProfile() {
 	s.Run("Success", func() {
 		// Mock repo
 		expectedUser := &models.User{ID: 1, Email: "email@example.com", Password: "password123"}
-		s.repo.On("GetProfile", uint(1)).Return(expectedUser, nil).Once()
+		s.repo.On("GetByID", uint(1)).Return(expectedUser, nil).Once()
 		// Call service
 		user, err := s.service.GetProfile(1)
 		s.NoError(err)
@@ -133,7 +133,7 @@ func (s *UserServiceTestSuite) TestGetProfile() {
 	})
 	s.Run("Error", func() {
 		// Mock repo
-		s.repo.On("GetProfile", uint(999)).Return(&models.User{}, errors.New("profile not found")).Once()
+		s.repo.On("GetByID", uint(999)).Return(&models.User{}, errors.New("profile not found")).Once()
 
 		// Call service
 		user, err := s.service.GetProfile(999)
@@ -146,7 +146,7 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 	s.Run("Success", func() {
 		// Mock repo
 		user := &models.User{ID: 1, Email: "", Password: "newpassword123"}
-		s.repo.On("UpdateProfile", user).Return(nil).Once()
+		s.repo.On("Update", user).Return(nil).Once()
 		// Call service
 		err := s.service.UpdateProfile(user)
 		s.NoError(err)
@@ -154,7 +154,7 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 	s.Run("Error", func() {
 		// Mock repo
 		user := &models.User{ID: 999, Email: "", Password: "newpassword123"}
-		s.repo.On("UpdateProfile", user).Return(errors.New("update failed")).Once()
+		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
 
 		// Call service
 		err := s.service.UpdateProfile(user)
@@ -191,7 +191,6 @@ func (s *UserServiceTestSuite) TestCreateUser() {
 		Name:     "New User",
 		Gender:   1,
 	}
-	roleIds := []uint{1, 2}
 
 	// Test 1: Transaction Begin Error
 	// Create a new closed database to simulate the error
@@ -205,7 +204,7 @@ func (s *UserServiceTestSuite) TestCreateUser() {
 	s.repo.On("GetDB").Return(closedDB).Once()
 
 	// Call service
-	err = s.service.CreateUser(user, roleIds)
+	err = s.service.CreateUser(user)
 	s.Error(err)
 	s.Contains(err.Error(), "sql: database is closed")
 
@@ -219,7 +218,7 @@ func (s *UserServiceTestSuite) TestCreateUser() {
 	s.repo.On("CreateWithTx", mock.AnythingOfType("*gorm.DB"), user).Return((*models.User)(nil), errors.New("create failed")).Once()
 
 	// Call service
-	err = s.service.CreateUser(user, roleIds)
+	err = s.service.CreateUser(user)
 	s.Error(err)
 	s.Contains(err.Error(), "create failed")
 }

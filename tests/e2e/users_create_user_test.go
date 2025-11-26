@@ -29,7 +29,6 @@ func TestUsersCreateUser(t *testing.T) {
 	}
 	db.Create(&authUser)
 
-
 	// Generate access token
 	jwtService := services.NewJWTService()
 	tokenResult, err := jwtService.GenerateAccessToken(authUser.ID)
@@ -209,35 +208,6 @@ func TestUsersCreateUser(t *testing.T) {
 
 		// Database constraint violations return 500, not 400
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
-	})
-
-	t.Run("Create User - Empty Role IDs", func(t *testing.T) {
-		birthday := "1990-01-15"
-		address := "123 Main Street"
-		payload := map[string]interface{}{
-			"email":    "norole@example.com",
-			"password": "password123",
-			"name":     "No Role User",
-			"birthday": birthday,
-			"address":  address,
-			"gender":   1,
-			"role_ids": []uint{},
-		}
-		payloadBytes, _ := json.Marshal(payload)
-
-		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/api/v1/users", bytes.NewBuffer(payloadBytes))
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-
-		router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-
-		var errResp ErrorResponse
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
-		require.NoError(t, err)
-		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
 	})
 
 	t.Run("Create User - Unauthorized without Token", func(t *testing.T) {

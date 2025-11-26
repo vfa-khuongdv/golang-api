@@ -52,16 +52,6 @@ func (m *MockUserRepository) FindByField(field string, value string) (*models.Us
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserRepository) GetProfile(id uint) (*models.User, error) {
-	args := m.Called(id)
-	return args.Get(0).(*models.User), args.Error(1)
-}
-
-func (m *MockUserRepository) UpdateProfile(user *models.User) error {
-	args := m.Called(user)
-	return args.Error(0)
-}
-
 func (m *MockUserRepository) CreateWithTx(tx *gorm.DB, user *models.User) (*models.User, error) {
 	args := m.Called(tx, user)
 	return args.Get(0).(*models.User), args.Error(1)

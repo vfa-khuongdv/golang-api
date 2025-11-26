@@ -28,8 +28,8 @@ func (m *MockUserService) GetUserByEmail(email string) (*models.User, error) {
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserService) CreateUser(user *models.User, roleIds []uint) error {
-	args := m.Called(user, roleIds)
+func (m *MockUserService) CreateUser(user *models.User) error {
+	args := m.Called(user)
 	return args.Error(0)
 }
 
