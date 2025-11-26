@@ -205,7 +205,7 @@ func (s *UserRepositoryTestSuite) TestGetProfile() {
 		s.NoError(err, "Expected no error when creating mock user")
 		s.NotNil(createdUser, "Expected created user to be not nil")
 	}
-	profile, err := s.repo.GetProfile(mockUsers[0].users.ID)
+	profile, err := s.repo.GetByID(mockUsers[0].users.ID)
 
 	s.NoError(err, "Expected no error when getting user profile")
 	s.NotNil(profile, "Expected user profile to be not nil")
@@ -215,7 +215,7 @@ func (s *UserRepositoryTestSuite) TestGetProfile() {
 
 func (s *UserRepositoryTestSuite) TestGetProfileError() {
 	// Test getting profile for non-existing user
-	profile, err := s.repo.GetProfile(999)
+	profile, err := s.repo.GetByID(999)
 	s.Error(err, "Expected error when getting profile for non-existing user")
 	s.Nil(profile, "Expected profile to be nil when user does not exist")
 }
@@ -235,7 +235,7 @@ func (s *UserRepositoryTestSuite) TestUpdateProfile() {
 
 	// 2. Update the user profile
 	createdUser.Name = "Updated Profile User"
-	err = s.repo.UpdateProfile(createdUser)
+	err = s.repo.Update(createdUser)
 	s.NoError(err, "Expected no error when updating user profile")
 
 	// 3. Retrieve the updated user profile

@@ -15,8 +15,6 @@ type IUserRepository interface {
 	Update(user *models.User) error
 	Delete(userId uint) error
 	FindByField(field string, value string) (*models.User, error)
-	GetProfile(id uint) (*models.User, error)
-	UpdateProfile(user *models.User) error
 	GetUsers(page int, limit int) (*dto.Pagination, error)
 	GetDB() *gorm.DB
 }
@@ -171,31 +169,6 @@ func (repo *UserRepository) FindByField(field string, value string) (*models.Use
 		return nil, err
 	}
 	return &user, nil
-}
-
-// GetProfile retrieves a user's profile from the database by their ID
-// Parameters:
-//   - id: The unique identifier of the user whose profile is to be retrieved
-//
-// Returns:
-//   - *models.User: Pointer to the retrieved User model containing profile information
-//   - error: Error if the profile is not found or if there was a database error
-func (repo *UserRepository) GetProfile(id uint) (*models.User, error) {
-	var user models.User
-	if err := repo.db.First(&user, id).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
-}
-
-// UpdateProfile updates a user's profile information in the database
-// Parameters:
-//   - user: Pointer to the User model containing updated profile information
-//
-// Returns:
-//   - error: Error if there was a problem updating the profile, nil on success
-func (repo *UserRepository) UpdateProfile(user *models.User) error {
-	return repo.db.Save(&user).Error
 }
 
 // GetDB returns the database connection

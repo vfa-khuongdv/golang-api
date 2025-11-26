@@ -15,14 +15,19 @@ import (
 )
 
 type IUserhandler interface {
+	// User Management
 	CreateUser(c *gin.Context)
-	ForgotPassword(c *gin.Context)
-	ResetPassword(c *gin.Context)
-	ChangePassword(c *gin.Context)
 	GetUser(c *gin.Context)
 	GetUsers(c *gin.Context)
 	UpdateUser(c *gin.Context)
 	DeleteUser(c *gin.Context)
+
+	// Authentication and Password Management
+	ForgotPassword(c *gin.Context)
+	ResetPassword(c *gin.Context)
+	ChangePassword(c *gin.Context)
+
+	// Profile Management for the authenticated user
 	GetProfile(c *gin.Context)
 	UpdateProfile(c *gin.Context)
 }
@@ -86,7 +91,7 @@ func (handler *UserHandler) CreateUser(ctx *gin.Context) {
 
 	// Attempt to create the user in the database
 	// Return 400 Bad Request if creation fails
-	if err := handler.userService.CreateUser(&user, input.RoleIds); err != nil {
+	if err := handler.userService.CreateUser(&user); err != nil {
 		utils.RespondWithError(ctx, err)
 		return
 	}

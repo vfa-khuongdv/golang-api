@@ -7,7 +7,6 @@ type CreateUserInput struct {
 	Birthday *string `json:"birthday" binding:"required,valid_birthday"`         // Assumes birthday is valid format: YYYY-MM-DD
 	Address  *string `json:"address" binding:"required,min=1,max=255,not_blank"` // Address must be between 1-255 chars and not blank
 	Gender   int16   `json:"gender" binding:"required,oneof=1 2 3"`
-	RoleIds  []uint  `json:"role_ids" binding:"required,min=1,dive,required"` // RoleIds must be a non-empty array of uints
 }
 
 type ForgotPasswordInput struct {
