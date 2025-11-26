@@ -2,8 +2,8 @@ package mocks
 
 import (
 	"github.com/stretchr/testify/mock"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -11,12 +11,12 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
-func (m *MockUserRepository) GetUsers(page int, limit int) (*utils.Pagination, error) {
+func (m *MockUserRepository) GetUsers(page int, limit int) (*dto.Pagination, error) {
 	args := m.Called(page, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*utils.Pagination), args.Error(1)
+	return args.Get(0).(*dto.Pagination), args.Error(1)
 }
 
 func (m *MockUserRepository) GetAll() ([]models.User, error) {

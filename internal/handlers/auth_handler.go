@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 )
@@ -24,10 +25,7 @@ func NewAuthHandler(authService services.IAuthService) *AuthHandler {
 }
 
 func (handler *AuthHandler) Login(ctx *gin.Context) {
-	var credentials struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=6,max=255"`
-	}
+	var credentials dto.LoginInput
 
 	if err := ctx.ShouldBindJSON(&credentials); err != nil {
 		validateErr := utils.TranslateValidationErrors(err, credentials)
@@ -49,10 +47,7 @@ func (handler *AuthHandler) Login(ctx *gin.Context) {
 }
 
 func (handler *AuthHandler) RefreshToken(ctx *gin.Context) {
-	var input struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
-		AccessToken  string `json:"access_token" binding:"required"`
-	}
+	var input dto.RefreshTokenInput
 
 	// Bind JSON request body to token struct
 	if err := ctx.ShouldBindJSON(&input); err != nil {

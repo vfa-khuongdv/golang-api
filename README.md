@@ -25,6 +25,7 @@ The project follows a clean architecture and is organized into the following dir
 │   ├── configs                       # Configuration files for database, environment variables, JWT, etc.
 │   ├── constants                     # Constants and error handling
 │   ├── database                      # Database migrations and seeding
+│   ├── dto                           # Data transfer objects for request and response
 │   ├── handlers                      # HTTP request handlers
 │   ├── middlewares                   # Middlewares for authentication and logging
 │   ├── models                        # Data models for the application

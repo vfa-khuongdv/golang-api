@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"gorm.io/gorm"
@@ -16,7 +17,7 @@ type IUserRepository interface {
 	FindByField(field string, value string) (*models.User, error)
 	GetProfile(id uint) (*models.User, error)
 	UpdateProfile(user *models.User) error
-	GetUsers(page int, limit int) (*utils.Pagination, error)
+	GetUsers(page int, limit int) (*dto.Pagination, error)
 	GetDB() *gorm.DB
 }
 
@@ -34,12 +35,12 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 //   - limit: The number of users per page (default is 10)
 //
 // Returns:
-//   - *utils.Pagination: A pointer to the pagination object containing user data
+//   - *dto.Pagination: A pointer to the pagination object containing user data
 //   - error: nil if successful, otherwise returns the error that occurred
 //
 // Example:
 //   - users, err := repo.GetUsers(1, 50) // Gets the first page of users
-func (repo *UserRepository) GetUsers(page, limit int) (*utils.Pagination, error) {
+func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination, error) {
 	var totalRows int64
 	offset := (page - 1) * limit
 
@@ -54,7 +55,7 @@ func (repo *UserRepository) GetUsers(page, limit int) (*utils.Pagination, error)
 		return nil, err
 	}
 
-	pagination := &utils.Pagination{
+	pagination := &dto.Pagination{
 		Page:       page,
 		Limit:      limit,
 		TotalItems: int(totalRows),

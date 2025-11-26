@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
@@ -57,13 +58,13 @@ func (s *AuthServiceTestSuite) TestLoginSuccess() {
 	// Mock the methods of the dependencies
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
-	s.jwtService.On("GenerateAccessToken", user.ID).Return(&services.JwtResult{
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "mocked-access-token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 	}, nil)
 
 	// Mock Create to return a valid JWT result
-	s.refreshTokenService.On("Create", user, ip).Return(&services.JwtResult{
+	s.refreshTokenService.On("Create", user, ip).Return(&dto.JwtResult{
 		Token:     "mocked-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 	}, nil)
@@ -150,7 +151,7 @@ func (s *AuthServiceTestSuite) TestLogin_CreateTokenError() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).
-		Return(&services.JwtResult{
+		Return(&dto.JwtResult{
 			Token:     "mocked-access-token",
 			ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 		}, nil).Once()
@@ -196,7 +197,7 @@ func (s *AuthServiceTestSuite) TestLogin_JwtError() {
 	s.repo.On("FindByField", "email", email).Return(user, nil)
 	s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).
-		Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
+		Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
 
 	w := httptest.NewRecorder()
 	ginCtx, _ := gin.CreateTestContext(w)
@@ -230,7 +231,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_Success() {
 	userID := uint(1)
 
 	// Mock new refresh token that would be returned by refresh token service
-	mockRefreshToken := &services.JwtResult{
+	mockRefreshToken := &dto.JwtResult{
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(), // 30 days
 	}
@@ -258,7 +259,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_Success() {
 	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(mockClaims, nil).Once()
 
 	s.repo.On("GetByID", mockRes.UserId).Return(mockUser, nil).Once()
-	s.jwtService.On("GenerateAccessToken", mockUser.ID).Return(&services.JwtResult{
+	s.jwtService.On("GenerateAccessToken", mockUser.ID).Return(&dto.JwtResult{
 		Token:     "new-access-token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 	}, nil).Once()
@@ -326,7 +327,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_GetByIDError() {
 	userID := uint(1)
 
 	// Mock new refresh token that would be returned by refresh token service
-	mockRefreshToken := &services.JwtResult{
+	mockRefreshToken := &dto.JwtResult{
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(), // 30 days
 	}
@@ -387,7 +388,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_JwtError() {
 
 	ipAddress := "127.0.0.1"
 	// Mock new refresh token that would be returned by refresh token service
-	mockRefreshToken := &services.JwtResult{
+	mockRefreshToken := &dto.JwtResult{
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(), // 30 days
 	}
@@ -411,7 +412,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_JwtError() {
 	// Should fetch user with ID from refresh token
 	s.repo.On("GetByID", mockRes.UserId).Return(user, nil).Once()
 	// Should generate new access token for user
-	s.jwtService.On("GenerateAccessToken", user.ID).Return(&services.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token")).Once()
 
 	// Setup gin test context with IP
 	w := httptest.NewRecorder()
@@ -444,7 +445,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_InvalidAccessToken() {
 	userID := uint(1)
 
 	// Mock new refresh token that would be returned by refresh token service
-	mockRefreshToken := &services.JwtResult{
+	mockRefreshToken := &dto.JwtResult{
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(),
 	}
@@ -487,7 +488,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_TokenMismatch() {
 	accessUserID := uint(2)
 
 	// Mock new refresh token that would be returned by refresh token service
-	mockRefreshToken := &services.JwtResult{
+	mockRefreshToken := &dto.JwtResult{
 		Token:     "new-refresh-token",
 		ExpiresAt: time.Now().Add(24 * time.Hour * 30).Unix(),
 	}

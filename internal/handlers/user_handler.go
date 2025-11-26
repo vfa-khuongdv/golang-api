@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
@@ -55,15 +56,7 @@ func (handler *UserHandler) GetUsers(ctx *gin.Context) {
 
 func (handler *UserHandler) CreateUser(ctx *gin.Context) {
 
-	var input struct {
-		Email    string  `json:"email" binding:"required,email"`
-		Password string  `json:"password" binding:"required,min=6,max=255"`
-		Name     string  `json:"name" binding:"required,min=1,max=45,not_blank"`     // Name must be between 1-45 chars and not blank
-		Birthday *string `json:"birthday" binding:"required,valid_birthday"`         // Assumes birthday is valid format: YYYY-MM-DD
-		Address  *string `json:"address" binding:"required,min=1,max=255,not_blank"` // Address must be between 1-255 chars and not blank
-		Gender   int16   `json:"gender" binding:"required,oneof=1 2 3"`
-		RoleIds  []uint  `json:"role_ids" binding:"required,min=1,dive,required"` // RoleIds must be a non-empty array of uints
-	}
+	var input dto.CreateUserInput
 
 	// Bind and validate the JSON request body to the input struct
 	if err := ctx.ShouldBindJSON(&input); err != nil {
@@ -102,9 +95,7 @@ func (handler *UserHandler) CreateUser(ctx *gin.Context) {
 }
 
 func (handle *UserHandler) ForgotPassword(ctx *gin.Context) {
-	var input struct {
-		Email string `json:"email" binding:"required,email"`
-	}
+	var input dto.ForgotPasswordInput
 	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -145,11 +136,7 @@ func (handle *UserHandler) ForgotPassword(ctx *gin.Context) {
 }
 
 func (handler *UserHandler) ResetPassword(ctx *gin.Context) {
-	var input struct {
-		Token       string `json:"token" binding:"required"`
-		Password    string `json:"password" binding:"required,min=6,max=255"`
-		NewPassword string `json:"new_password" binding:"required,min=6,max=255"`
-	}
+	var input dto.ResetPasswordInput
 	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -210,11 +197,7 @@ func (handler *UserHandler) ChangePassword(ctx *gin.Context) {
 		return
 	}
 
-	var input struct {
-		OldPassword     string `json:"old_password" binding:"required,min=6,max=255"`
-		NewPassword     string `json:"new_password" binding:"required,min=6,max=255"`
-		ConfirmPassword string `json:"confirm_password" binding:"required,min=6,max=255"`
-	}
+	var input dto.ChangePasswordInput
 	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -319,12 +302,7 @@ func (handler *UserHandler) UpdateUser(ctx *gin.Context) {
 	}
 
 	// Define input struct with validation tags
-	var input struct {
-		Name     *string `json:"name" binding:"omitempty,min=1,max=45,not_blank"`     // Name must be between 1-45 chars and not blank
-		Birthday *string `json:"birthday" binding:"omitempty,valid_birthday"`         // Assumes birthday is valid format: YYYY-MM-DD
-		Address  *string `json:"address" binding:"omitempty,min=1,max=255,not_blank"` // Address must be between 1-255 chars and not blank
-		Gender   *int16  `json:"gender" binding:"omitempty,oneof=1 2 3"`              // Gender must be one of [1 2 3]
-	}
+	var input dto.UpdateUserInput
 
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -419,12 +397,7 @@ func (handler *UserHandler) UpdateProfile(ctx *gin.Context) {
 	}
 
 	// Define input struct for profile update with validation rules
-	var input struct {
-		Name     *string `json:"name" binding:"omitempty,min=1,max=45,not_blank"`     // Name must be between 1 and 45 characters and not blank if provided
-		Birthday *string `json:"birthday" binding:"omitempty,valid_birthday"`         // Birthday must be a valid date (YYYY-MM-DD) if provided
-		Address  *string `json:"address" binding:"omitempty,min=1,max=255,not_blank"` // Address must be between 1 and 255 characters and not blank if provided
-		Gender   *int16  `json:"gender" binding:"omitempty,oneof=1 2 3"`              // Gender must be 1, 2, or 3 if provided
-	}
+	var input dto.UpdateProfileInput
 
 	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {

@@ -2,13 +2,14 @@ package services
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 type IAuthService interface {
-	Login(email, password string, ctx *gin.Context) (*LoginResponse, error)
-	RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*LoginResponse, error)
+	Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error)
+	RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error)
 }
 
 type AuthService struct {
@@ -16,11 +17,6 @@ type AuthService struct {
 	refreshTokenService IRefreshTokenService
 	bcryptService       IBcryptService
 	jwtService          IJWTService
-}
-
-type LoginResponse struct {
-	AccessToken  JwtResult `json:"access_token"`
-	RefreshToken JwtResult `json:"refresh_token"`
 }
 
 // NewAuthService creates and returns a new instance of AuthService
@@ -48,9 +44,9 @@ func NewAuthService(repo repositories.IUserRepository, refreshTokenService IRefr
 //   - ctx: Gin context containing request information
 //
 // Returns:
-//   - *LoginResponse: Contains access token and refresh token if successful
+//   - *dto.LoginResponse: Contains access token and refresh token if successful
 //   - error: Returns error if login fails (user not found, invalid password, token generation fails)
-func (service *AuthService) Login(email, password string, ctx *gin.Context) (*LoginResponse, error) {
+func (service *AuthService) Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	user, err := service.repo.FindByField("email", email)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -75,12 +71,12 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (*Lo
 		return nil, errToken
 	}
 
-	res := &LoginResponse{
-		AccessToken: JwtResult{
+	res := &dto.LoginResponse{
+		AccessToken: dto.JwtResult{
 			Token:     accessToken.Token,
 			ExpiresAt: accessToken.ExpiresAt,
 		},
-		RefreshToken: JwtResult{
+		RefreshToken: dto.JwtResult{
 			Token:     refreshToken.Token,
 			ExpiresAt: refreshToken.ExpiresAt,
 		},
@@ -96,9 +92,9 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (*Lo
 //   - ctx: Gin context containing request information
 //
 // Returns:
-//   - *LoginResponse: Contains new access token and refresh token if successful
+//   - *dto.LoginResponse: Contains new access token and refresh token if successful
 //   - error: Returns error if token refresh fails (invalid tokens, user not found, token generation fails)
-func (service *AuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*LoginResponse, error) {
+func (service *AuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	ipAddress := ctx.ClientIP()
 
 	// Step 1: Validate refresh token (used to identify user)
@@ -136,12 +132,12 @@ func (service *AuthService) RefreshToken(refreshToken, accessToken string, ctx *
 	}
 
 	// Step 7: Build response (refresh token already updated in Step 1)
-	response := &LoginResponse{
-		AccessToken: JwtResult{
+	response := &dto.LoginResponse{
+		AccessToken: dto.JwtResult{
 			Token:     newAccessToken.Token,
 			ExpiresAt: newAccessToken.ExpiresAt,
 		},
-		RefreshToken: JwtResult{
+		RefreshToken: dto.JwtResult{
 			Token:     refreshResult.Token.Token,
 			ExpiresAt: refreshResult.Token.ExpiresAt,
 		},

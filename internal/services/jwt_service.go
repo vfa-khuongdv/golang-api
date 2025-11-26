@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 )
 
@@ -19,15 +20,9 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// JwtResult represents the result of a token generation
-type JwtResult struct {
-	Token     string `json:"token"`
-	ExpiresAt int64  `json:"expires_at"`
-}
-
 // IJWTService defines JWT-related operations
 type IJWTService interface {
-	GenerateAccessToken(id uint) (*JwtResult, error)
+	GenerateAccessToken(id uint) (*dto.JwtResult, error)
 	ValidateToken(tokenString string) (*CustomClaims, error)
 	ValidateTokenWithScope(tokenString string, requiredScope string) (*CustomClaims, error)
 	ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error)
@@ -48,7 +43,7 @@ func NewJWTService() IJWTService {
 
 // GenerateAccessToken creates a new access JWT token for the given user ID
 // Access tokens have 1-hour expiration and can access all authenticated endpoints
-func (s *jwtService) GenerateAccessToken(id uint) (*JwtResult, error) {
+func (s *jwtService) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 	expiresAt := jwt.NewNumericDate(time.Now().Add(time.Hour))
 	claims := CustomClaims{
 		ID:    id,
@@ -65,7 +60,7 @@ func (s *jwtService) GenerateAccessToken(id uint) (*JwtResult, error) {
 		return nil, err
 	}
 
-	return &JwtResult{
+	return &dto.JwtResult{
 		Token:     signedToken,
 		ExpiresAt: expiresAt.Unix(),
 	}, nil
