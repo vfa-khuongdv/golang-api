@@ -24,41 +24,40 @@ func (s *RefreshTokenServiceTestSuite) SetupTest() {
 	s.refreshTokenService = services.NewRefreshTokenService(s.repo)
 }
 
-func (s *RefreshTokenServiceTestSuite) TestCreate_Success() {
-	user := &models.User{
-		ID:    1,
-		Email: "test@example.com",
-	}
-
-	ipAddress := "127.0.0.1"
-
-	s.repo.On("Create", mock.MatchedBy(func(token *models.RefreshToken) bool {
-		return token.UserID == user.ID && token.IpAddress == ipAddress
-	})).Return(nil)
-
-	result, err := s.refreshTokenService.Create(user, ipAddress)
-
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), result)
-	assert.Len(s.T(), result.Token, 60)
-	assert.Greater(s.T(), result.ExpiresAt, int64(0))
-
-	s.repo.AssertExpectations(s.T())
-}
-
-func (s *RefreshTokenServiceTestSuite) TestCreate_Error() {
+func (s *RefreshTokenServiceTestSuite) TestCreate() {
 	user := &models.User{
 		ID:    1,
 		Email: "test@example.com",
 	}
 	ipAddress := "127.0.0.1"
-	s.repo.On("Create", mock.Anything).Return(originErrors.New("database error"))
-	_, err := s.refreshTokenService.Create(user, ipAddress)
-	assert.Error(s.T(), err)
-	s.repo.AssertExpectations(s.T())
+
+	s.T().Run("Success", func(t *testing.T) {
+		s.repo.On("Create", mock.MatchedBy(func(token *models.RefreshToken) bool {
+			return token.UserID == user.ID && token.IpAddress == ipAddress
+		})).Return(nil)
+
+		result, err := s.refreshTokenService.Create(user, ipAddress)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Len(t, result.Token, 60)
+		assert.Greater(t, result.ExpiresAt, int64(0))
+
+		s.repo.AssertExpectations(t)
+	})
+
+	s.T().Run("Error", func(t *testing.T) {
+		s.repo = new(mocks.MockRefreshTokenRepository) // reset
+		s.refreshTokenService = services.NewRefreshTokenService(s.repo)
+
+		s.repo.On("Create", mock.Anything).Return(originErrors.New("database error"))
+		_, err := s.refreshTokenService.Create(user, ipAddress)
+		assert.Error(t, err)
+		s.repo.AssertExpectations(t)
+	})
 }
 
-func (s *RefreshTokenServiceTestSuite) TestUpdate_Success() {
+func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 	originalToken := &models.RefreshToken{
 		RefreshToken: "existing_token",
 		IpAddress:    "",
@@ -67,49 +66,43 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate_Success() {
 		UserID:       1,
 	}
 
-	s.repo.On("FindByToken", "existing_token").Return(originalToken, nil).Once()
-	s.repo.On("Update", mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+	s.T().Run("Success", func(t *testing.T) {
+		s.repo.On("FindByToken", "existing_token").Return(originalToken, nil).Once()
+		s.repo.On("Update", mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
-	result, err := s.refreshTokenService.Update("existing_token", "127.0.0.2")
+		result, err := s.refreshTokenService.Update("existing_token", "127.0.0.2")
 
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), result)
-	assert.Equal(s.T(), originalToken.UserID, result.UserId)
-	assert.Len(s.T(), result.Token.Token, 60)
-	assert.Greater(s.T(), result.Token.ExpiresAt, int64(0))
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, originalToken.UserID, result.UserId)
+		assert.Len(t, result.Token.Token, 60)
+		assert.Greater(t, result.Token.ExpiresAt, int64(0))
 
-	s.repo.AssertExpectations(s.T())
-}
+		s.repo.AssertExpectations(t)
+	})
 
-func (s *RefreshTokenServiceTestSuite) TestUpdate_TokenNotFound() {
-	s.repo.On("FindByToken", "missing_token").Return((*models.RefreshToken)(nil), assert.AnError).Once()
+	s.T().Run("TokenNotFound", func(t *testing.T) {
+		s.repo.On("FindByToken", "missing_token").Return((*models.RefreshToken)(nil), assert.AnError).Once()
 
-	result, err := s.refreshTokenService.Update("missing_token", "127.0.0.1")
+		result, err := s.refreshTokenService.Update("missing_token", "127.0.0.1")
 
-	assert.Error(s.T(), err)
-	assert.Nil(s.T(), result)
+		assert.Error(t, err)
+		assert.Nil(t, result)
 
-	s.repo.AssertExpectations(s.T())
-}
+		s.repo.AssertExpectations(t)
+	})
 
-func (s *RefreshTokenServiceTestSuite) TestUpdate_Error() {
-	originalToken := &models.RefreshToken{
-		RefreshToken: "existing_token",
-		IpAddress:    "",
-		UsedCount:    0,
-		ExpiredAt:    0,
-		UserID:       1,
-	}
+	s.T().Run("Error", func(t *testing.T) {
+		s.repo.On("FindByToken", "existing_token").Return(originalToken, nil).Once()
+		s.repo.On("Update", mock.AnythingOfType("*models.RefreshToken")).Return(originErrors.New("Update item error")).Once()
 
-	s.repo.On("FindByToken", "existing_token").Return(originalToken, nil).Once()
-	s.repo.On("Update", mock.AnythingOfType("*models.RefreshToken")).Return(originErrors.New("Update item error")).Once()
+		result, err := s.refreshTokenService.Update("existing_token", "127.0.0.1")
 
-	result, err := s.refreshTokenService.Update("existing_token", "127.0.0.1")
+		assert.Error(t, err)
+		assert.Nil(t, result)
 
-	assert.Error(s.T(), err)
-	assert.Nil(s.T(), result)
-
-	s.repo.AssertExpectations(s.T())
+		s.repo.AssertExpectations(t)
+	})
 }
 
 func TestRefreshTokenServiceTestSuite(t *testing.T) {
