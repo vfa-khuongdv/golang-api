@@ -34,8 +34,10 @@ The project follows a clean architecture and is organized into the following dir
 │   ├── services                      # Business logic for authentication, user, etc.
 │   └── utils                         # Utility functions (e.g., for encryption, validation)
 ├── pkg                               # External packages
+│   ├── apperror                      # Custom application errors
 │   ├── logger                        # Logger utility
-│   └── mailer                        # Mailer for sending emails
+│   ├── mailer                        # Mailer for sending emails
+│   └── migrator                      # Database migration utility
 ├── tests                             # Unit and integration tests
 │   ├── e2e                           # End-to-end tests
 │   └── mocks                         # Mocks for internal package tests
@@ -227,7 +229,7 @@ The API is documented using OpenAPI 3.0 specification. You can access the docume
 - `POST /api/v1/refresh-token` - Refresh access token
 - `POST /api/v1/forgot-password` - Request password reset
 - `POST /api/v1/reset-password` - Reset password with token
-- `POST /api/v1/mfa/verify-code` - Verify MFA code during login
+
 
 #### User Profile (Authenticated)
 - `GET /api/v1/profile` - Get user profile
@@ -241,11 +243,6 @@ The API is documented using OpenAPI 3.0 specification. You can access the docume
 - `PATCH /api/v1/users/{id}` - Update user (admin only)
 - `DELETE /api/v1/users/{id}` - Delete user (admin only)
 
-#### Multi-Factor Authentication (Authenticated)
-- `POST /api/v1/mfa/setup` - Initialize MFA setup
-- `POST /api/v1/mfa/verify-setup` - Verify MFA setup
-- `POST /api/v1/mfa/disable` - Disable MFA
-- `GET /api/v1/mfa/status` - Get MFA status
 
 #### Health Check
 - `GET /healthz` - Health status
@@ -279,6 +276,15 @@ go test -v path/to/test
 ### Unit Tests Directory
 
 The test files are located under the `tests` directory. The tests follow the Go testing conventions.
+
+### Development Commands
+
+- `make lint`: Run linter (golangci-lint)
+- `make fmt`: Format code
+- `make vet`: Run go vet
+- `make pre-push`: Run all checks (fmt, vet, lint, test) before pushing
+- `make docker-up`: Start Docker containers
+- `make dev`: Start server with Air (requires DB to be running)
 
 ## Contribution Guidelines
 
