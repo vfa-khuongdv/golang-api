@@ -1,5 +1,5 @@
 # Build stage: Use an official Go runtime as a parent image
-FROM golang:1.25.4-alpine AS builder
+FROM golang:1.25.5-alpine AS builder
 
 # Set environment variables for Go build
 ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
