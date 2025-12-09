@@ -38,7 +38,6 @@ func TestUsersDeleteUser(t *testing.T) {
 	}
 	db.Create(&authUser)
 
-
 	// Generate access token
 	jwtService := services.NewJWTService()
 	tokenResult, err := jwtService.GenerateAccessToken(authUser.ID)

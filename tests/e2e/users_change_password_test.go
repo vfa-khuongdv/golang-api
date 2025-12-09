@@ -29,7 +29,6 @@ func TestUsersChangePassword(t *testing.T) {
 	}
 	db.Create(&testUser)
 
-
 	// Generate access token for test user
 	jwtService := services.NewJWTService()
 	tokenResult, err := jwtService.GenerateAccessToken(testUser.ID)
