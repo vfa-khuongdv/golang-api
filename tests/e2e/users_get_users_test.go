@@ -1,8 +1,8 @@
 package e2e
 
 import (
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"encoding/json"
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +55,6 @@ func TestUsersGetUsers(t *testing.T) {
 		Gender:   1,
 	}
 	db.Create(&authUser)
-
 
 	// Generate access token
 	jwtService := services.NewJWTService()
@@ -141,7 +140,6 @@ func TestUsersGetUsersEmpty(t *testing.T) {
 		Gender:   1,
 	}
 	db.Create(&authUser)
-
 
 	// Generate access token
 	jwtService := services.NewJWTService()
