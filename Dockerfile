@@ -11,7 +11,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # Download all the dependencies. Dependencies will be cached if go.mod and go.sum are unchanged
-RUN go mod tidy
+RUN go mod download
 
 # Copy the source code into the container
 COPY . .
