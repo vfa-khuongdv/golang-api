@@ -10,7 +10,7 @@ import (
 type IUserService interface {
 	GetUser(id uint) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
-	GetUsers(page int, limit int) (*dto.Pagination, error)
+	GetUsers(page int, limit int) (*dto.Pagination[*models.User], error)
 	CreateUser(user *models.User) error
 	UpdateUser(user *models.User) error
 	DeleteUser(id uint) error
@@ -29,7 +29,7 @@ func NewUserService(repo repositories.IUserRepository) *UserService {
 	}
 }
 
-func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination, error) {
+func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination[*models.User], error) {
 	users, err := service.repo.GetUsers(page, limit)
 	if err != nil {
 		return nil, apperror.NewDBQueryError(err.Error())

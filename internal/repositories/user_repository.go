@@ -8,14 +8,14 @@ import (
 )
 
 type IUserRepository interface {
-	GetAll() ([]models.User, error)
+	GetAll() ([]*models.User, error)
 	GetByID(id uint) (*models.User, error)
 	Create(user *models.User) (*models.User, error)
 	CreateWithTx(tx *gorm.DB, user *models.User) (*models.User, error)
 	Update(user *models.User) error
 	Delete(userId uint) error
 	FindByField(field string, value string) (*models.User, error)
-	GetUsers(page int, limit int) (*dto.Pagination, error)
+	GetUsers(page int, limit int) (*dto.Pagination[*models.User], error)
 	GetDB() *gorm.DB
 }
 
@@ -38,7 +38,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 //
 // Example:
 //   - users, err := repo.GetUsers(1, 50) // Gets the first page of users
-func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination, error) {
+func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination[*models.User], error) {
 	var totalRows int64
 	offset := (page - 1) * limit
 
@@ -47,13 +47,13 @@ func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination, error) {
 		return nil, err
 	}
 
-	var users []models.User
+	var users []*models.User
 	// fetch paginated data
 	if err := repo.db.Offset(offset).Limit(limit).Order("id DESC").Find(&users).Error; err != nil {
 		return nil, err
 	}
 
-	pagination := &dto.Pagination{
+	pagination := &dto.Pagination[*models.User]{
 		Page:       page,
 		Limit:      limit,
 		TotalItems: int(totalRows),
@@ -68,10 +68,10 @@ func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination, error) {
 //   - None
 //
 // Returns:
-//   - []models.User: Slice containing all User models in the database
+//   - []*models.User: Slice containing all User models in the database
 //   - error: Error if there was a database error, nil on success
-func (repo *UserRepository) GetAll() ([]models.User, error) {
-	var users []models.User
+func (repo *UserRepository) GetAll() ([]*models.User, error) {
+	var users []*models.User
 	if err := repo.db.Find(&users).Error; err != nil {
 		return nil, err
 	}

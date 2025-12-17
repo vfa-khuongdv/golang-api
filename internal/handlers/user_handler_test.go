@@ -2730,7 +2730,7 @@ func TestGetUsers(t *testing.T) {
 		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Create mock user data
-		users := []models.User{
+		users := []*models.User{
 			{
 				ID:    1,
 				Name:  "User 1",
@@ -2744,7 +2744,7 @@ func TestGetUsers(t *testing.T) {
 		}
 
 		// Mock the GetUsers method
-		expectedPagination := &dto.Pagination{
+		expectedPagination := &dto.Pagination[*models.User]{
 			Page:       1,
 			Limit:      10,
 			TotalItems: 2,
@@ -2779,12 +2779,12 @@ func TestGetUsers(t *testing.T) {
 		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the GetUsers method with default values (page=1, limit=50)
-		expectedPagination := &dto.Pagination{
+		expectedPagination := &dto.Pagination[*models.User]{
 			Page:       1,
 			Limit:      50,
 			TotalItems: 0,
 			TotalPages: 0,
-			Data:       []models.User{},
+			Data:       []*models.User{},
 		}
 		userService.On("GetUsers", 1, 50).Return(expectedPagination, nil)
 
@@ -2808,12 +2808,11 @@ func TestGetUsers(t *testing.T) {
 		handler := handlers.NewUserHandler(userService, bcryptService)
 
 		// Mock the GetUsers method with default page=1
-		expectedPagination := &dto.Pagination{
-			Page:       1,
+		expectedPagination := &dto.Pagination[*models.User]{
 			Limit:      5,
 			TotalItems: 0,
 			TotalPages: 0,
-			Data:       []models.User{},
+			Data:       []*models.User{},
 		}
 		userService.On("GetUsers", 1, 5).Return(expectedPagination, nil)
 
