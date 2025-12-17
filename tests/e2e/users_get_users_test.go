@@ -2,10 +2,11 @@ package e2e
 
 import (
 	"encoding/json"
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,7 +72,7 @@ func TestUsersGetUsers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response dto.Pagination
+		var response dto.Pagination[*models.User]
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
@@ -90,15 +91,14 @@ func TestUsersGetUsers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response dto.Pagination
+		var response dto.Pagination[*models.User]
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
 		assert.Equal(t, 1, response.Page)
 		assert.Equal(t, 2, response.Limit)
 
-		data := response.Data.([]interface{})
-		assert.LessOrEqual(t, len(data), 2)
+		assert.LessOrEqual(t, len(response.Data), 2)
 	})
 
 	t.Run("Get Users - Unauthorized without Token", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestUsersGetUsers(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response dto.Pagination
+		var response dto.Pagination[*models.User]
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
@@ -156,11 +156,10 @@ func TestUsersGetUsersEmpty(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response dto.Pagination
+		var response dto.Pagination[*models.User]
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		data := response.Data.([]interface{})
-		assert.Equal(t, 1, len(data))
+		assert.Equal(t, 1, len(response.Data))
 	})
 }

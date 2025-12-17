@@ -11,17 +11,17 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
-func (m *MockUserRepository) GetUsers(page int, limit int) (*dto.Pagination, error) {
+func (m *MockUserRepository) GetUsers(page int, limit int) (*dto.Pagination[*models.User], error) {
 	args := m.Called(page, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*dto.Pagination), args.Error(1)
+	return args.Get(0).(*dto.Pagination[*models.User]), args.Error(1)
 }
 
-func (m *MockUserRepository) GetAll() ([]models.User, error) {
+func (m *MockUserRepository) GetAll() ([]*models.User, error) {
 	args := m.Called()
-	return args.Get(0).([]models.User), args.Error(1)
+	return args.Get(0).([]*models.User), args.Error(1)
 }
 
 func (m *MockUserRepository) GetByID(id uint) (*models.User, error) {
