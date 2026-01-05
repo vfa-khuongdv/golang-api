@@ -1,6 +1,32 @@
-# Golang Template Project
+# Golang Template
 
-This is a Golang project designed to handle a simple web service with user management, roles, permissions, and refresh tokens. It uses MySQL for the database, Docker for containerization, and includes support for migrations, seeding, and authentication.
+A production-ready Go REST API for a Content Management System (CMS) with user authentication, MFA (TOTP), JWT tokens, and refresh tokens. The project implements clean architecture with clear separation of concerns and comprehensive test coverage. It uses MySQL for persistence, Docker for containerization, and includes database migrations, seeding, and email support.
+
+## Key Features
+
+- **User Authentication**: JWT-based authentication with access and refresh tokens
+- **Password Management**: Secure password hashing with bcrypt, password reset via email
+- **User Management**: Create, read, update, and delete users with role-based access control
+- **Email Service**: SMTP integration for sending password reset and other notification emails
+- **API Documentation**: OpenAPI 3.0 specification with Swagger UI
+- **Database Migrations**: Automated schema management with migration support
+- **Clean Architecture**: Clear separation of concerns with handlers, services, repositories, and models layers
+- **Comprehensive Testing**: Unit tests, integration tests, and end-to-end tests with high coverage
+- **Docker Support**: Containerized application and MySQL database with Docker Compose
+- **Live Reloading**: Air integration for development with hot reload capability
+
+## Architecture
+
+The project follows clean architecture principles with the following layers:
+
+- **Handlers (HTTP)**: Parse requests, validate input format, call services, return HTTP responses
+- **Services (Business Logic)**: Implement business rules, validation, error handling, and orchestrate repositories
+- **Repositories (Data Access)**: Handle all database operations using GORM, return domain entities
+- **Models (Domain)**: Define domain objects with GORM and JSON serialization tags
+- **Middlewares**: Handle cross-cutting concerns like authentication, CORS, logging, and error recovery
+
+For detailed information on development guidelines and patterns, see [DEVELOPMENT.md](DEVELOPMENT.md).
+For testing standards and best practices, see [TESTING.md](TESTING.md).
 
 ## Project Structure
 
@@ -47,11 +73,10 @@ The project follows a clean architecture and is organized into the following dir
 
 Before getting started, ensure that you have the following installed:
 
-- [Go](https://golang.org/dl/) (Go 1.23 or later)
+- [Go](https://golang.org/dl/) (Go 1.21 or later; project targets Go 1.25.2)
 - [Docker](https://www.docker.com/products/docker-desktop)
 - [Docker Compose](https://docs.docker.com/compose/)
-- [MySQL](https://www.mysql.com/)
-- [Makefile](https://www.gnu.org/software/make/) (Usually pre-installed on macOS and Linux)
+- [Make](https://www.gnu.org/software/make/) (Usually pre-installed on macOS and Linux)
 
 ## Setup Instructions
 
@@ -70,13 +95,15 @@ This will install:
 - gotestsum (for running tests)
 - golangci-lint (for linting)
 
-### 2. Clone the repository
+### 2. Clone the repository and setup environment
 
 ```bash
-git clone https://github.com/yourusername/yourproject.git
-cd yourproject
+git clone https://github.com/vfa-khuongdv/golang-cms.git
+cd golang-cms
 cp .env.example .env
 ```
+
+Edit `.env` with your configuration values (database credentials, JWT secret, SMTP settings, etc.).
 
 ### 3. Build and run the application using Docker
 
@@ -144,7 +171,9 @@ make start-seeder
 
 ### 6. Running the Server
 
-The easiest way to run the server is using the provided make command:
+The server will be available at `http://localhost:3000` by default.
+
+**Option 1: Using Make (Recommended)**
 
 ```bash
 make start-server
@@ -155,9 +184,7 @@ This command will:
 2. Start Docker containers in detached mode
 3. Start the server with Air for live reloading
 
-Alternatively, you can run the server in other ways:
-
-#### Using Air Directly
+**Option 2: Using Air Directly**
 
 [Air](https://github.com/air-verse/air) provides live-reloading capability which is great for development:
 
@@ -165,7 +192,7 @@ Alternatively, you can run the server in other ways:
 air
 ```
 
-#### Direct Go Run
+**Option 3: Direct Go Run**
 
 If you prefer to run the server directly without live-reloading:
 
@@ -173,79 +200,83 @@ If you prefer to run the server directly without live-reloading:
 go run cmd/server/main.go
 ```
 
-The server will start and be available at `http://localhost:3000`.
+**Option 4: Using Docker**
 
-### 7. phpmyadmin
+```bash
+make docker-up
+```
 
-PHPMyAdmin is available for database management through a web interface at:
+### 7. Database Management - PHPMyAdmin
+
+PHPMyAdmin is available for database management through a web interface:
 - URL: `http://localhost:8080`
 - Username: `root`
-- Password: `root`
+- Password: (use the `DB_PASSWORD` value from your `.env` file)
 
 ## Environment Variables
 
-The following environment variables are required for the application:
+The following environment variables are required for the application. See `.env.example` for a complete template:
 
-Database Configuration:
-- `DB_HOST` - MySQL database host
-- `DB_PORT` - MySQL port number
-- `DB_USERNAME` - MySQL database username
-- `DB_PASSWORD` - MySQL database password
-- `DB_DATABASE` - MySQL database name
+**Database Configuration:**
+- `DB_HOST` - MySQL database host (default: 127.0.0.1)
+- `DB_PORT` - MySQL port number (default: 3306)
+- `DB_USERNAME` - MySQL database username (default: user)
+- `DB_PASSWORD` - MySQL database password (default: password)
+- `DB_DATABASE` - MySQL database name (default: dbname)
 
-Server Configuration:
-- `PORT` - Port number for the application server (default: 3000)
-- `GIN_MODE` - Gin mode ("debug" or "release")
-- `RUN_MIGRATE` - Whether to run migrations on startup
-- `STAGE` - Environment stage ("local", "dev", "prod")
+**Server Configuration:**
+- `APP_PORT` - Port number for the application server (default: 3000)
+- `GIN_MODE` - Gin mode ("debug" or "release", default: debug)
+- `STAGE` - Environment stage ("local", "dev", "prod", default: dev)
 
-JWT Configuration:
-- `JWT_KEY` - Secret key for JWT token generation
+**JWT Configuration:**
+- `JWT_SECRET` - Secret key for JWT token signing (required)
+- `JWT_EXPIRY` - JWT token expiration in seconds (default: 900 / 15 minutes)
+- `REFRESH_TOKEN_EXPIRY` - Refresh token expiration in seconds (default: 604800 / 7 days)
 
-URL Configuration:
-- `FRONTEND_URL` - URL of the frontend application
-
-Mail Configuration:
-- `MAIL_HOST` - SMTP server host
-- `MAIL_PORT` - SMTP server port
-- `MAIL_USERNAME` - SMTP username
-- `MAIL_PASSWORD` - SMTP password
+**SMTP/Email Configuration:**
+- `SMTP_HOST` - SMTP server host
+- `SMTP_PORT` - SMTP server port
+- `SMTP_USER` - SMTP username
+- `SMTP_PASSWORD` - SMTP password
 - `MAIL_FROM` - Email address used as sender
 
-These can be set in the `.env` file or passed directly as environment variables. A sample `.env.example` file is provided in the repository.
+**Frontend Configuration:**
+- `FRONTEND_URL` - URL of the frontend application for password reset links
+
+These can be set in the `.env` file or passed as environment variables. A sample `.env.example` file is provided in the repository.
 
 ## API Documentation
 
 The API is documented using OpenAPI 3.0 specification. You can access the documentation through:
 
-- **Swagger UI**: `http://localhost:8080/swagger` or `http://localhost:8080/api-docs`
-- **OpenAPI JSON**: `http://localhost:8080/docs/swagger.json`
-- **Login Flow**: See `docs/LOGIN_FLOW.md` for detailed authentication flow
+- **Swagger UI**: `http://localhost:3000/swagger` or `http://localhost:3000/api-docs`
+- **OpenAPI JSON**: `http://localhost:3000/docs/swagger.json`
 
 ### Main API Endpoints
 
-#### Authentication (Public)
-- `POST /api/v1/login` - User login
-- `POST /api/v1/refresh-token` - Refresh access token
-- `POST /api/v1/forgot-password` - Request password reset
-- `POST /api/v1/reset-password` - Reset password with token
+The server runs on port `3000` by default. All authenticated endpoints require a valid JWT token in the `Authorization` header: `Bearer <token>`
 
+#### Health Check (Public)
+- `GET /healthz` - Health status check
+
+#### Authentication (Public)
+- `POST /api/v1/login` - User login (returns access and refresh tokens)
+- `POST /api/v1/refresh-token` - Refresh access token using refresh token
+- `POST /api/v1/forgot-password` - Request password reset email
+- `POST /api/v1/reset-password` - Reset password using reset token
 
 #### User Profile (Authenticated)
-- `GET /api/v1/profile` - Get user profile
-- `PATCH /api/v1/profile` - Update user profile
-- `POST /api/v1/change-password` - Change user password
+- `GET /api/v1/profile` - Get authenticated user's profile
+- `PATCH /api/v1/profile` - Update authenticated user's profile
+- `POST /api/v1/change-password` - Change authenticated user's password
 
 #### User Management (Authenticated)
-- `GET /api/v1/users` - List users (admin only)
-- `POST /api/v1/users` - Create user (admin only)
+- `GET /api/v1/users` - List all users (admin only)
+- `POST /api/v1/users` - Create a new user (admin only)
 - `GET /api/v1/users/{id}` - Get user by ID
 - `PATCH /api/v1/users/{id}` - Update user (admin only)
 - `DELETE /api/v1/users/{id}` - Delete user (admin only)
-
-
-#### Health Check
-- `GET /healthz` - Health status
 
 ## Testing
 
