@@ -1,12 +1,12 @@
-# Golang Template
+# Golang Template REST API
 
-A production-ready Go REST API for a Content Management System (CMS) with user authentication, MFA (TOTP), JWT tokens, and refresh tokens. The project implements clean architecture with clear separation of concerns and comprehensive test coverage. It uses MySQL for persistence, Docker for containerization, and includes database migrations, seeding, and email support.
+A production-ready Go REST API for a Content Management System (CMS) with user authentication, JWT tokens, and refresh tokens. The project implements clean architecture with clear separation of concerns and comprehensive test coverage. It uses MySQL for persistence, Docker for containerization, and includes database migrations, seeding, and email support.
 
 ## Key Features
 
 - **User Authentication**: JWT-based authentication with access and refresh tokens
 - **Password Management**: Secure password hashing with bcrypt, password reset via email
-- **User Management**: Create, read, update, and delete users with role-based access control
+- **User Management**: Create, read, update, and delete users with permission-based access control
 - **Email Service**: SMTP integration for sending password reset and other notification emails
 - **API Documentation**: OpenAPI 3.0 specification with Swagger UI
 - **Database Migrations**: Automated schema management with migration support
@@ -77,6 +77,7 @@ Before getting started, ensure that you have the following installed:
 - [Docker](https://www.docker.com/products/docker-desktop)
 - [Docker Compose](https://docs.docker.com/compose/)
 - [Make](https://www.gnu.org/software/make/) (Usually pre-installed on macOS and Linux)
+- [MySQL](https://dev.mysql.com/downloads/mysql/) (or use Docker MySQL)
 
 ## Setup Instructions
 
@@ -90,10 +91,10 @@ make install-tools
 ```
 
 This will install:
+- golangci-lint (for linting)
 - Migrate CLI (for database migrations)
 - Air (for live reloading)
-- gotestsum (for running tests)
-- golangci-lint (for linting)
+- gotestsum (for running tests with better formatting)
 
 ### 2. Clone the repository and setup environment
 
@@ -116,8 +117,9 @@ docker-compose up --build
 This will:
 
 - Build the Docker images.
-- Start a MySQL container.
-- Start the application container.
+- Start a MySQL container on port 3306.
+- Start the application container on port 3000.
+- Start a PHPMyAdmin container on port 8080 for database management.
 
 ### 4. Database Migrations
 
@@ -272,11 +274,11 @@ The server runs on port `3000` by default. All authenticated endpoints require a
 - `POST /api/v1/change-password` - Change authenticated user's password
 
 #### User Management (Authenticated)
-- `GET /api/v1/users` - List all users (admin only)
-- `POST /api/v1/users` - Create a new user (admin only)
+- `GET /api/v1/users` - List all users (pagination supported)
+- `POST /api/v1/users` - Create a new user
 - `GET /api/v1/users/{id}` - Get user by ID
-- `PATCH /api/v1/users/{id}` - Update user (admin only)
-- `DELETE /api/v1/users/{id}` - Delete user (admin only)
+- `PATCH /api/v1/users/{id}` - Update user
+- `DELETE /api/v1/users/{id}` - Delete user
 
 ## Testing
 
@@ -310,12 +312,24 @@ The test files are located under the `tests` directory. The tests follow the Go 
 
 ### Development Commands
 
+- `make install-tools`: Install all required development tools
+- `make build`: Build the application binary
+- `make clean`: Remove generated files and binaries
+- `make test`: Run unit tests with gotestsum
+- `make test-e2e`: Run end-to-end tests
+- `make test-coverage`: Run tests with coverage report generation (HTML and summary)
+- `make watch-test`: Watch for changes and run tests automatically
 - `make lint`: Run linter (golangci-lint)
-- `make fmt`: Format code
-- `make vet`: Run go vet
+- `make fmt`: Format code using go fmt
+- `make vet`: Run go vet static analysis
 - `make pre-push`: Run all checks (fmt, vet, lint, test) before pushing
 - `make docker-up`: Start Docker containers
+- `make wait-for-db`: Wait for MySQL to be ready
 - `make dev`: Start server with Air (requires DB to be running)
+- `make start-server`: Full dev environment setup (docker-up → wait-for-db → dev)
+- `make start-seeder`: Seed the database with initial data
+- `make migrate`: Run database migrations up
+- `make migrate-down`: Revert database migrations down
 
 ## Contribution Guidelines
 
