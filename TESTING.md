@@ -20,9 +20,9 @@ Comprehensive testing guidelines for the Golang CMS project using Testify framew
 
 ```
        🧪 E2E Tests (5%)
-      /                \
-     /  Integration     \     (15%)
-    /    Tests          \
+      /              \
+     /  Integration   \     (15%)
+    /    Tests         \
    /___________________ \
   /                      \     
  /    Unit Tests (80%)    \
