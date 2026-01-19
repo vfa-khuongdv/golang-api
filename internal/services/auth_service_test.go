@@ -23,7 +23,7 @@ type AuthServiceTestSuite struct {
 	suite.Suite
 	repo                *mocks.MockUserRepository
 	refreshTokenService *mocks.MockRefreshTokenService
-	service             services.IAuthService
+	service             services.AuthService
 	bcryptService       *mocks.MockBcryptService
 	jwtService          *mocks.MockJWTService
 }

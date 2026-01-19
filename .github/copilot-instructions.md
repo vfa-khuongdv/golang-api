@@ -1,43 +1,9 @@
 # Golang CMS - Copilot Instructions
 
-## Repository Overview
+This is a Go 1.21+ CMS REST API with JWT auth, MFA (TOTP), and clean architecture. 
+See [.github/skills/golang-cms-architecture/SKILL.md](skills/golang-cms-architecture/SKILL.md) for comprehensive guidelines.
 
-This is a Go-based CMS REST API with user authentication, MFA (TOTP), JWT tokens, and refresh tokens. The project implements clean architecture with handlers → services → repositories → models layers. All code uses testify for testing and the apperror package for standardized error handling.
-
-**Key Technologies:** Go 1.21+, Gin framework, GORM, MySQL, JWT, Testify, Docker
-
-## Project Layout & Architecture
-
-```
-golang-cms/
-├── cmd/
-│   ├── server/main.go          # Application entry point
-│   └── seeder/seeder.go        # Database seeding utility
-├── internal/
-│   ├── handlers/               # HTTP handlers (Gin)
-│   ├── services/               # Business logic layer
-│   ├── repositories/           # Data access layer (GORM)
-│   ├── models/                 # Domain models
-│   ├── middlewares/            # HTTP middlewares (auth, CORS, logging)
-│   ├── configs/                # Configuration and environment loading
-│   ├── constants/              # Application constants
-│   ├── routes/                 # Route definitions
-│   ├── utils/                  # Utility functions
-│   └── database/               # Migrations and seeders
-├── pkg/                        # Reusable packages
-│   ├── apperror/               # Error codes and error types
-│   ├── logger/                 # Logging utility
-│   ├── mailer/                 # Email/SMTP service
-│   └── migrator/               # Database migration runner
-├── tests/mocks/                # Mock implementations for testing
-├── DEVELOPMENT.md              # Detailed development guidelines
-├── TESTING.md                  # Testing standards and patterns
-├── Dockerfile                  # Docker container configuration
-├── docker-compose.yml          # Multi-container orchestration
-├── go.mod                      # Go module definition
-├── Makefile                    # Build and run commands
-└── README.md                   # Project documentation
-```
+**Key Technologies:** Go 1.21+, Gin, GORM, MySQL, JWT, Testify, Docker
 
 ## Build & Validation Commands
 
@@ -118,212 +84,79 @@ go run cmd/server/main.go
 # Server runs on http://localhost:3000
 ```
 
-## Key Architectural Patterns
+## Quick Reference
 
-### Layer Responsibilities
-- **Handlers** (internal/handlers/): Parse HTTP requests, call services, return HTTP responses, minimal business logic
-- **Services** (internal/services/): Business logic, validation, orchestrate repositories, return errors via apperror
-- **Repositories** (internal/repositories/): Database operations, return domain entities, implement interfaces
-- **Models** (internal/models/): Domain objects, GORM tags, JSON serialization tags (snake_case), validation
-- **Middlewares** (internal/middlewares/): Auth/authorization, request logging, CORS, error handling
+### Layers
+- **Handlers** → Parse requests, call services, return responses
+- **Services** → Business logic, validation, orchestrate repositories
+- **Repositories** → DB operations, implement interfaces
+- **Models** → Domain objects with GORM/JSON tags (snake_case)
 
-### Dependencies & Interfaces
-- **All layers depend on abstractions (interfaces), never concrete implementations**
-- Services receive repositories via constructor (dependency injection)
-- Handlers receive services via constructor
-- Interfaces use `I` prefix: `IUserService`, `IUserRepository`
-- Keep interfaces small and focused (Interface Segregation Principle)
-- Test mocks use testify/mock package
+### Key Rules
+- Depend on interfaces, not concrete types (`Reader`, `Writer`, `UserRepository`)
+- Use apperror for all errors (validation/404/401/409/500)
+- JSON tags in snake_case: `created_at`, `user_id`
+- Test files: `*_test.go`, grouped with `t.Run()`
+- Functions: Get/Create/Update/Delete/Is/Has prefix pattern
 
-**Good Dependency Injection Pattern:**
-```go
-type UserService struct {
-    repo IUserRepository  // Depends on interface, not concrete type
-}
+## Testing Standards (see TESTING.md for details)
 
-func NewUserService(repo IUserRepository) *UserService {
-    return &UserService{repo: repo}
-}
-```
+**Framework:** Testify with AAA pattern (Arrange-Act-Assert)
+- `require`: Hard assertions (stop on failure)
+- `assert`: Soft assertions (continue on failure)
+- `mock`: Object mocking for dependencies
 
-### Naming Conventions (see DEVELOPMENT.md for full details)
-
-**Packages & Files:**
-- Use lowercase, single-word names: `handlers`, `services`, `repositories`
-- Test files: `user_service_test.go`, `*_integration_test.go`
-
-**Functions/Methods:**
-- Use verb-based names for actions
-- Use `Get` for retrieval, `Create`/`Update`/`Delete` for modifications, `Is`/`Has` for booleans
-- Example: `GetUser(id)`, `CreateUser(req)`, `IsValidEmail(email)`
-
-**Constants:**
-- All uppercase with underscores: `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT`
-
-**Test Functions:**
-- Format: `TestFunctionName` or grouped under parent: `TestUserService` with subtests
-- Use descriptive subtest names: `t.Run("CreateUser - Success", ...)`
-
-**JSON Tags:**
-- Use snake_case for API responses (REST conventions): `created_at`, `user_id`, `is_active`
-- Example: 
-  ```go
-  type User struct {
-      ID        uint      `json:"id"`
-      Email     string    `json:"email"`
-      CreatedAt time.Time `json:"created_at"`
-  }
-  ```
-
-### Error Handling
-- **All errors use** `github.com/vfa-khuongdv/golang-cms/pkg/apperror` package
-- **Validation errors**: `apperror.NewValidationError()` (HTTP 400)
-- **Not found errors**: `apperror.NewNotFoundError()` (HTTP 404)
-- **Auth errors**: `apperror.NewUnauthorizedError()` (HTTP 401)
-- **Conflict errors**: `apperror.NewConflictError()` (HTTP 409)
-- **Server errors**: Wrap with context `apperror.Wrap(statusCode, code, message, originalErr)`
-- **HTTP status mapping**: 400 (validation), 401 (auth), 403 (forbidden), 404 (not found), 409 (conflict), 500 (server error)
-
-### Authentication
-- JWT tokens generated by JWTService
-- Tokens expire (configurable, typically 15 minutes)
-- Refresh tokens stored in database via RefreshTokenRepository
-- MFA (TOTP) implemented with TotpService and MfaRepository
-- AuthMiddleware validates JWT on protected routes
-
-## Testing Standards
-
-See **TESTING.md** for comprehensive testing guidelines. Key requirements:
-
-### Test Pyramid
-- **Unit Tests (80%)**: Fast, isolated, single function/method
-- **Integration Tests (15%)**: Multiple components, external services mocked
-- **E2E Tests (5%)**: Full user flows, real database
-
-### Testify Framework Usage
-**Use three main packages:**
-1. **assert** - Soft assertions (continue on failure): `assert.Equal(t, expected, actual)`
-2. **require** - Hard assertions (stop on failure): `require.NoError(t, err)`
-3. **mock** - Object mocking: `mockRepo.On("Method", args).Return(result, nil)`
-
-### All Tests Must
-- Use testify/assert and testify/require packages (never t.Errorf)
-- Follow **AAA pattern**: Arrange (setup), Act (execute), Assert (verify)
-- Group related tests using `t.Run()` with descriptive names
-- Use `require` for critical checks, `assert` for value checks
-- Mock external dependencies (repositories, services)
-- Include both success and failure test cases
-- Never use hardcoded values (use named constants)
-- Call `mockRepo.AssertExpectations(t)` after each mock usage
-
-### Test File Structure
+**Test Structure:**
 ```go
 func TestUserService(t *testing.T) {
-    // Setup phase - creates all necessary objects
-    mockRepo := new(mocks.MockUserRepository)
-    service := services.NewUserService(mockRepo)
-
     t.Run("CreateUser - Success", func(t *testing.T) {
-        // Arrange - set up test data and expectations
-        user := &User{Email: "test@example.com", Name: "Test User"}
-        mockRepo.On("Create", mock.MatchedBy(func(u *User) bool {
-            return u.Email == user.Email
-        })).Return(nil).Once()
-
-        // Act - execute the function being tested
-        result, err := service.CreateUser(user)
-
-        // Assert - verify the results
+        // Arrange: setup and expectations
+        mockRepo := new(mocks.MockUserRepository)
+        service := services.NewUserService(mockRepo)
+        
+        // Act: execute function
+        result, err := service.CreateUser(&User{Email: "test@example.com"})
+        
+        // Assert: verify results
         require.NoError(t, err)
         assert.NotNil(t, result)
-        assert.Equal(t, user.Email, result.Email)
         mockRepo.AssertExpectations(t)
-    })
-    
-    t.Run("CreateUser - Validation Error", func(t *testing.T) {
-        // Arrange
-        user := &User{Email: "", Name: "Test"}
-        
-        // Act
-        result, err := service.CreateUser(user)
-        
-        // Assert
-        assert.Error(t, err)
-        assert.Nil(t, result)
     })
 }
 ```
 
-### Repository Testing
-- Use in-memory SQLite (`sqlite.Open(":memory:")`) for unit tests
-- Create test fixtures before each test
-- Clean up database state after each test (use `TearDownTest()`)
-- Never use real MySQL database in unit tests
-- Use testify suite pattern for shared setup/teardown
+**Coverage Targets:**
+- Handlers: 95% | Services: 85% | Repositories: 90% | Middlewares: 85% | Utils: 80%
+- Run: `go test ./... --cover`
 
-### Handler Testing (Gin)
-- Set `gin.SetMode(gin.TestMode)` at start
-- Mock service layer dependencies
-- Use `httptest.NewRecorder()` and `gin.CreateTestContext()`
-- Verify both HTTP status code and response body
-- Test both success and error paths
-
-### Service Testing
-- Mock repository layer dependencies
-- Test business logic in isolation
-- Verify error handling with different error types
-- Test validation logic before repository calls
-
-### Integration Testing
-- Use real database (in-memory SQLite)
-- Setup multiple services working together
-- Test complete workflows (e.g., auth flow, user creation)
-- Place in `*_integration_test.go` files
-
-### Coverage Goals by Layer
-- **Handlers**: 95%+ coverage required
-- **Services**: 85%+ coverage required
-- **Repositories**: 90%+ coverage required
-- **Middlewares**: 85%+ coverage required
-- **Utils**: 80%+ coverage required
-- Run: `go test ./... --cover` to verify
+**Key Rules:**
+- Mock external dependencies (repositories, services)
+- In-memory SQLite for repository unit tests
+- Both success and failure test cases
+- Never use `t.Errorf` (use testify)
 
 ## Important Implementation Rules
 
-### Always DO (from DEVELOPMENT.md & TESTING.md)
-- Use dependency injection for testability
-- Handle all errors explicitly (never `_ = err`)
-- Use apperror package for all application errors
-- Write tests immediately after writing code
-- Verify all tests pass before committing: `go test ./... -v --cover`
-- Use meaningful variable and function names
-- Add comments explaining "why", not "what" (code explains what)
-- Group related test functions with `t.Run()` subtests
-- Use `require` for critical assertions, `assert` for value checks
-- Mock all external dependencies in unit tests
-- Update DEVELOPMENT.md and TESTING.md when adding new patterns
-- Follow AAA pattern in all tests: Arrange, Act, Assert
-- Use table-driven tests for multiple scenarios
-- Keep interfaces small and focused (1-3 methods)
-- Clean up resources in test teardowns
+✓ **Always DO:**
+- Use dependency injection
+- Handle all errors explicitly
+- Use apperror for all errors
+- Write tests immediately after code
+- Follow AAA pattern in tests
+- Mock external dependencies only
+- Use meaningful names
+- Keep interfaces small (1-3 methods)
 
-### Never DO
+✗ **Never DO:**
 - Ignore errors silently
 - Use global variables
-- Mix concerns between layers (business logic in handlers)
-- Hardcode configuration values (use environment variables)
-- Create test files without grouped subtests (use `t.Run()`)
-- Use internal packages outside internal/
-- Bypass AuthMiddleware on protected endpoints
+- Mix concerns between layers
+- Hardcode config values
+- Create test files without `t.Run()`
 - Store passwords in plain text
 - Log sensitive information
-- Test multiple things in one test
-- Write tests that depend on each other
-- Skip error handling tests
-- Use time-based assertions (flaky tests)
-- Mock internal dependencies (only external ones)
-- Have complex setup in tests
-- Mix unit and integration tests in same function
+- Test multiple things per test
+- Mix unit and integration tests
 
 ## Continuous Integration Checks
 
@@ -349,113 +182,18 @@ For local development, see `.env.example` in root directory.
 
 ## When Adding New Features
 
-Follow this step-by-step workflow when implementing new features:
-
-1. **Start with the model:** Define domain model with validation tags (GORM and JSON tags)
-2. **Add repository layer:** Define interface first, implement GORM operations, write unit tests with in-memory SQLite
-3. **Add service layer:** Implement business logic, validate inputs, orchestrate repositories, write tests with mocked repositories
-4. **Add handler layer:** Accept requests, validate input format, call service, return responses in correct HTTP format, write handler tests
-5. **Add routes:** Register handler in internal/routes/routes.go
-6. **Run all tests:** `go test ./... -v --cover` must pass and meet coverage targets
-7. **Update documentation:** If introducing new patterns, update DEVELOPMENT.md and TESTING.md
-
-### Example: Adding a New Feature
-
-```go
-// 1. Define Model (internal/models/post.go)
-type Post struct {
-    ID        uint      `gorm:"primaryKey" json:"id"`
-    Title     string    `json:"title" validate:"required,min=3"`
-    Content   string    `json:"content" validate:"required"`
-    UserID    uint      `json:"user_id"`
-    CreatedAt time.Time `json:"created_at"`
-    UpdatedAt time.Time `json:"updated_at"`
-}
-
-// 2. Repository Interface (internal/repositories/post_repository.go)
-type IPostRepository interface {
-    Create(post *Post) error
-    GetByID(id uint) (*Post, error)
-    GetAll() ([]*Post, error)
-    Update(post *Post) error
-    Delete(id uint) error
-}
-
-// 3. Service (internal/services/post_service.go)
-type PostService struct {
-    repo IPostRepository
-}
-
-func (s *PostService) CreatePost(req *CreatePostRequest) (*Post, error) {
-    // Validate
-    if req.Title == "" {
-        return nil, apperror.NewValidationError("Title is required")
-    }
-    
-    // Create
-    post := &Post{Title: req.Title, Content: req.Content, UserID: req.UserID}
-    if err := s.repo.Create(post); err != nil {
-        return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternal, "Failed to create post", err)
-    }
-    return post, nil
-}
-
-// 4. Handler (internal/handlers/post_handler.go)
-type PostHandler struct {
-    postService IPostService
-}
-
-func (h *PostHandler) CreatePost(c *gin.Context) {
-    var req CreatePostRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        utils.RespondWithError(c, apperror.NewBadRequestError(err.Error()))
-        return
-    }
-    
-    post, err := h.postService.CreatePost(&req)
-    if err != nil {
-        utils.RespondWithError(c, err)
-        return
-    }
-    
-    utils.RespondWithOK(c, http.StatusCreated, post)
-}
-
-// 5. Tests (internal/handlers/post_handler_test.go)
-func TestPostHandler(t *testing.T) {
-    gin.SetMode(gin.TestMode)
-    
-    t.Run("CreatePost - Success", func(t *testing.T) {
-        // Arrange
-        mockService := new(mocks.MockPostService)
-        post := &Post{ID: 1, Title: "Test", UserID: 1}
-        mockService.On("CreatePost", mock.Anything).Return(post, nil)
-        
-        handler := handlers.NewPostHandler(mockService)
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        
-        body, _ := json.Marshal(map[string]any{"title": "Test", "content": "Test content"})
-        c.Request, _ = http.NewRequest("POST", "/api/v1/posts", bytes.NewBuffer(body))
-        c.Request.Header.Set("Content-Type", "application/json")
-        
-        // Act
-        handler.CreatePost(c)
-        
-        // Assert
-        require.Equal(t, http.StatusCreated, w.Code)
-        mockService.AssertExpectations(t)
-    })
-}
-```
+1. **Start with the model** - Define domain model with validation tags
+2. **Add repository layer** - Define interface, implement GORM ops, write unit tests
+3. **Add service layer** - Business logic, validate inputs, orchestrate repos
+4. **Add handler layer** - Accept requests, call service, return responses
+5. **Add routes** - Register handler in internal/routes/routes.go
+6. **Run all tests** - `go test ./... -v --cover` must pass with coverage targets
+7. **Update docs** - If introducing new patterns, update DEVELOPMENT.md and TESTING.md
 
 ## Debugging Tips
 
-- Enable verbose logging by checking logger.go implementation
-- Use `go test -run TestName -v` to run specific tests
-- Use `go test -race` to detect race conditions
-- Check `internal/configs/database_test.go` for test database setup patterns
-- Check `tests/mocks/` for mock implementation examples
-- View swagger documentation at `/docs` endpoint when server is running
-
-Trust these instructions. Only search the codebase if you find inconsistencies between these instructions and actual implementation.
+- Use `go test -run TestName -v` for specific tests
+- Use `go test -race` for race conditions
+- Check `internal/configs/database_test.go` for test database setup
+- Check `tests/mocks/` for mock examples
+- View swagger at `/docs` when server is running
