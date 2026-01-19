@@ -151,10 +151,11 @@ project/
   )
   ```
 
-- **Interfaces**: End with `I` prefix or descriptive name
+- **Interfaces**: Descriptive names without `I` prefix (idiomatic Go)
   ```go
-  type IUserService interface {}    // Prefix pattern
-  type UserService interface {}      // Descriptive pattern
+  type UserService interface {}      // Correct: no prefix
+  type Reader interface {}            // Standard: io.Reader pattern
+  type UserRepository interface {}    // Correct: descriptive
   ```
 
 - **Variables**: CamelCase for exported, camelCase for unexported
@@ -184,14 +185,19 @@ type User struct {
 
 #### **Interfaces**
 - Describe the contract clearly
-- Use `I` prefix for repository/service interfaces
+- Use descriptive names without `I` prefix (idiomatic Go)
 - Keep interfaces small and focused
+- Return interface types from constructors, not concrete types
 
 ```go
-type IUserRepository interface {
+type UserRepository interface {
     GetByID(id uint) (*User, error)
     GetByEmail(email string) (*User, error)
     Create(user *User) error
+}
+
+func NewUserRepository(db *gorm.DB) UserRepository {
+    return &userRepositoryImpl{db: db}
 }
 ```
 
@@ -233,25 +239,25 @@ func TestUserService(t *testing.T) {
    ```go
    // Good - depends on interface
    type UserService struct {
-       repo IUserRepository
+       repo UserRepository
    }
 
    // Bad - depends on concrete type
    type UserService struct {
-       repo *UserRepository
+       repo *userRepositoryImpl
    }
    ```
 
 2. **Single Responsibility**
    ```go
    // Good - focused interface
-   type IUserRepository interface {
+   type UserRepository interface {
        GetByID(id uint) (*User, error)
        Create(user *User) error
    }
 
    // Bad - too many responsibilities
-   type IDatabase interface {
+   type Database interface {
        Query(sql string) Results
        Execute(sql string) error
        GetUser(id uint) (*User, error)
@@ -282,7 +288,7 @@ func TestUserService(t *testing.T) {
 
 ```go
 // Define interface
-type IUserHandler interface {
+type UserHandler interface {
     GetUser(c *gin.Context)
     CreateUser(c *gin.Context)
     UpdateUser(c *gin.Context)
@@ -290,13 +296,13 @@ type IUserHandler interface {
 }
 
 // Implement with dependency injection
-type UserHandler struct {
-    userService IUserService
-    jwtService  IJWTService
+type userHandlerImpl struct {
+    userService UserService
+    jwtService  JWTService
 }
 
-func NewUserHandler(userService IUserService, jwtService IJWTService) IUserHandler {
-    return &UserHandler{
+func NewUserHandler(userService UserService, jwtService JWTService) UserHandler {
+    return &userHandlerImpl{
         userService: userService,
         jwtService:  jwtService,
     }

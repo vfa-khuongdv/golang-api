@@ -9,22 +9,22 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 )
 
-type IAuthHandler interface {
+type AuthHandler interface {
 	Login(c *gin.Context)
 	RefreshToken(c *gin.Context)
 }
 
-type AuthHandler struct {
-	authService services.IAuthService
+type authHandlerImpl struct {
+	authService services.AuthService
 }
 
-func NewAuthHandler(authService services.IAuthService) *AuthHandler {
-	return &AuthHandler{
+func NewAuthHandler(authService services.AuthService) AuthHandler {
+	return &authHandlerImpl{
 		authService: authService,
 	}
 }
 
-func (handler *AuthHandler) Login(ctx *gin.Context) {
+func (handler *authHandlerImpl) Login(ctx *gin.Context) {
 	var credentials dto.LoginInput
 
 	if err := ctx.ShouldBindJSON(&credentials); err != nil {
@@ -46,7 +46,7 @@ func (handler *AuthHandler) Login(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, res)
 }
 
-func (handler *AuthHandler) RefreshToken(ctx *gin.Context) {
+func (handler *authHandlerImpl) RefreshToken(ctx *gin.Context) {
 	var input dto.RefreshTokenInput
 
 	// Bind JSON request body to token struct

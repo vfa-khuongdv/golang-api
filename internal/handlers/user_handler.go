@@ -14,7 +14,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
-type IUserhandler interface {
+type UserHandler interface {
 	// User Management
 	CreateUser(c *gin.Context)
 	GetUser(c *gin.Context)
@@ -32,19 +32,19 @@ type IUserhandler interface {
 	UpdateProfile(c *gin.Context)
 }
 
-type UserHandler struct {
-	userService   services.IUserService
-	bcryptService services.IBcryptService
+type userHandlerImpl struct {
+	userService   services.UserService
+	bcryptService services.BcryptService
 }
 
-func NewUserHandler(userService services.IUserService, bcryptService services.IBcryptService) *UserHandler {
-	return &UserHandler{
+func NewUserHandler(userService services.UserService, bcryptService services.BcryptService) UserHandler {
+	return &userHandlerImpl{
 		userService:   userService,
 		bcryptService: bcryptService,
 	}
 }
 
-func (handler *UserHandler) GetUsers(ctx *gin.Context) {
+func (handler *userHandlerImpl) GetUsers(ctx *gin.Context) {
 	// Parse pagination query parameters with default values
 	page, limit := utils.ParsePageAndLimit(ctx)
 
@@ -59,7 +59,7 @@ func (handler *UserHandler) GetUsers(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, pagination)
 }
 
-func (handler *UserHandler) CreateUser(ctx *gin.Context) {
+func (handler *userHandlerImpl) CreateUser(ctx *gin.Context) {
 
 	var input dto.CreateUserInput
 
@@ -99,7 +99,7 @@ func (handler *UserHandler) CreateUser(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusCreated, gin.H{"message": "Create user successfully"})
 }
 
-func (handle *UserHandler) ForgotPassword(ctx *gin.Context) {
+func (handle *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 	var input dto.ForgotPasswordInput
 	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {
@@ -140,7 +140,7 @@ func (handle *UserHandler) ForgotPassword(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Forgot password successfully"})
 }
 
-func (handler *UserHandler) ResetPassword(ctx *gin.Context) {
+func (handler *userHandlerImpl) ResetPassword(ctx *gin.Context) {
 	var input dto.ResetPasswordInput
 	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {
@@ -190,7 +190,7 @@ func (handler *UserHandler) ResetPassword(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Reset password successfully"})
 }
 
-func (handler *UserHandler) ChangePassword(ctx *gin.Context) {
+func (handler *userHandlerImpl) ChangePassword(ctx *gin.Context) {
 	// Get user ID from the context
 	// If user ID is 0 or not found, return bad request error
 	userId := ctx.GetUint("UserID")
@@ -264,7 +264,7 @@ func (handler *UserHandler) ChangePassword(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Change password successfully"})
 }
 
-func (handler *UserHandler) DeleteUser(ctx *gin.Context) {
+func (handler *userHandlerImpl) DeleteUser(ctx *gin.Context) {
 	// Get user ID from the context
 	id := ctx.Param("id")
 	userId, err := strconv.Atoi(id)
@@ -293,7 +293,7 @@ func (handler *UserHandler) DeleteUser(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Delete user successfully"})
 }
 
-func (handler *UserHandler) UpdateUser(ctx *gin.Context) {
+func (handler *userHandlerImpl) UpdateUser(ctx *gin.Context) {
 	// Get user ID from the context
 	id := ctx.Param("id")
 	userId, err := strconv.Atoi(id)
@@ -346,7 +346,7 @@ func (handler *UserHandler) UpdateUser(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Update user successfully"})
 }
 
-func (handler *UserHandler) GetUser(ctx *gin.Context) {
+func (handler *userHandlerImpl) GetUser(ctx *gin.Context) {
 	// Get user ID from the context
 	id := ctx.Param("id")
 	userId, err := strconv.Atoi(id)
@@ -368,7 +368,7 @@ func (handler *UserHandler) GetUser(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, user)
 }
 
-func (handler *UserHandler) GetProfile(ctx *gin.Context) {
+func (handler *userHandlerImpl) GetProfile(ctx *gin.Context) {
 	// Get user ID from context and validate
 	userId := ctx.GetUint("UserID")
 	if userId == 0 {
@@ -390,7 +390,7 @@ func (handler *UserHandler) GetProfile(ctx *gin.Context) {
 	utils.RespondWithOK(ctx, http.StatusOK, dbUser)
 }
 
-func (handler *UserHandler) UpdateProfile(ctx *gin.Context) {
+func (handler *userHandlerImpl) UpdateProfile(ctx *gin.Context) {
 	// Get user ID from context and validate
 	userId := ctx.GetUint("UserID")
 	if userId == 0 {

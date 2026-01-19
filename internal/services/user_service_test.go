@@ -17,7 +17,7 @@ type UserServiceTestSuite struct {
 	suite.Suite
 	db      *gorm.DB
 	repo    *mocks.MockUserRepository
-	service *services.UserService
+	service services.UserService
 }
 
 func (s *UserServiceTestSuite) SetupTest() {

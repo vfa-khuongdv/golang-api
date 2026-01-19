@@ -11,7 +11,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/mailer"
 )
 
-type IMailerService interface {
+type MailerService interface {
 	SendMailForgotPassword(user *models.User) error
 }
 

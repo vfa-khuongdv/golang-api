@@ -7,7 +7,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
-type IUserService interface {
+type UserService interface {
 	GetUser(id uint) (*models.User, error)
 	GetUserByEmail(email string) (*models.User, error)
 	GetUsers(page int, limit int) (*dto.Pagination[*models.User], error)
@@ -19,17 +19,17 @@ type IUserService interface {
 	UpdateProfile(user *models.User) error
 }
 
-type UserService struct {
-	repo repositories.IUserRepository
+type userServiceImpl struct {
+	repo repositories.UserRepository
 }
 
-func NewUserService(repo repositories.IUserRepository) *UserService {
-	return &UserService{
+func NewUserService(repo repositories.UserRepository) UserService {
+	return &userServiceImpl{
 		repo: repo,
 	}
 }
 
-func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination[*models.User], error) {
+func (service *userServiceImpl) GetUsers(page int, limit int) (*dto.Pagination[*models.User], error) {
 	users, err := service.repo.GetUsers(page, limit)
 	if err != nil {
 		return nil, apperror.NewDBQueryError(err.Error())
@@ -48,7 +48,7 @@ func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination[*mode
 // Example:
 //
 //	user, err := service.GetUser(1) // Gets user with ID 1
-func (service *UserService) GetUser(id uint) (*models.User, error) {
+func (service *userServiceImpl) GetUser(id uint) (*models.User, error) {
 	data, err := service.repo.GetByID(id)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -67,7 +67,7 @@ func (service *UserService) GetUser(id uint) (*models.User, error) {
 // Example:
 //
 //	user, err := service.GetUserByEmail("john@example.com")
-func (service *UserService) GetUserByEmail(email string) (*models.User, error) {
+func (service *userServiceImpl) GetUserByEmail(email string) (*models.User, error) {
 	data, err := service.repo.FindByField("email", email)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -81,7 +81,7 @@ func (service *UserService) GetUserByEmail(email string) (*models.User, error) {
 //
 // Returns:
 //   - *error: nil if successful, otherwise returns the error that occurred
-func (service *UserService) CreateUser(user *models.User) error {
+func (service *userServiceImpl) CreateUser(user *models.User) error {
 	tx := service.repo.GetDB().Begin()
 	if tx.Error != nil {
 		return apperror.NewDBInsertError(tx.Error.Error())
@@ -122,7 +122,7 @@ func (service *UserService) CreateUser(user *models.User) error {
 //	    Email: "updated@example.com",
 //	}
 //	err := service.UpdateUser(user)
-func (service *UserService) UpdateUser(user *models.User) error {
+func (service *userServiceImpl) UpdateUser(user *models.User) error {
 	err := service.repo.Update(user)
 	if err != nil {
 		return apperror.NewDBUpdateError(err.Error())
@@ -140,7 +140,7 @@ func (service *UserService) UpdateUser(user *models.User) error {
 // Example:
 //
 //	err := service.DeleteUser(1) // Deletes user with ID 1
-func (service *UserService) DeleteUser(id uint) error {
+func (service *userServiceImpl) DeleteUser(id uint) error {
 	err := service.repo.Delete(id)
 	if err != nil {
 		return apperror.NewDBDeleteError(err.Error())
@@ -159,7 +159,7 @@ func (service *UserService) DeleteUser(id uint) error {
 // Example:
 //
 //	user, err := service.GetUserByToken("abc123token")
-func (service *UserService) GetUserByToken(token string) (*models.User, error) {
+func (service *userServiceImpl) GetUserByToken(token string) (*models.User, error) {
 	data, err := service.repo.FindByField("token", token)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -178,7 +178,7 @@ func (service *UserService) GetUserByToken(token string) (*models.User, error) {
 // Example:
 //
 //	profile, err := service.GetProfile(1) // Gets profile for user with ID 1
-func (service *UserService) GetProfile(id uint) (*models.User, error) {
+func (service *userServiceImpl) GetProfile(id uint) (*models.User, error) {
 	data, err := service.repo.GetByID(id)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -196,7 +196,7 @@ func (service *UserService) GetProfile(id uint) (*models.User, error) {
 // Example:
 //
 //	err := service.UpdateProfile(user)
-func (service *UserService) UpdateProfile(user *models.User) error {
+func (service *userServiceImpl) UpdateProfile(user *models.User) error {
 	err := service.repo.Update(user)
 	if err != nil {
 		return apperror.NewDBUpdateError(err.Error())

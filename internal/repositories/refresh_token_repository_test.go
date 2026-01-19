@@ -14,7 +14,7 @@ import (
 type RefreshTokenRepositoryTestSuite struct {
 	suite.Suite
 	db   *gorm.DB
-	repo *repositories.RefreshTokenRepository
+	repo repositories.RefreshTokenRepository
 }
 
 func (s *RefreshTokenRepositoryTestSuite) SetupTest() {

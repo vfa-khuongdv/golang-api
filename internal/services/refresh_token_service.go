@@ -10,13 +10,13 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
-type IRefreshTokenService interface {
+type RefreshTokenService interface {
 	Create(user *models.User, ipAddress string) (*dto.JwtResult, error)
 	Update(token string, ipAddress string) (*RefreshTokenResult, error)
 }
 
-type RefreshTokenService struct {
-	repo repositories.IRefreshTokenRepository
+type refreshTokenServiceImpl struct {
+	repo repositories.RefreshTokenRepository
 }
 
 // NewRefreshTokenService creates a new instance of RefreshTokenService
@@ -24,9 +24,9 @@ type RefreshTokenService struct {
 //   - repo: Pointer to RefreshTokenRepository that handles refresh token database operations
 //
 // Returns:
-//   - *RefreshTokenService: New instance of RefreshTokenService initialized with the provided repository
-func NewRefreshTokenService(repo repositories.IRefreshTokenRepository) *RefreshTokenService {
-	return &RefreshTokenService{
+//   - RefreshTokenService: New instance of RefreshTokenService initialized with the provided repository
+func NewRefreshTokenService(repo repositories.RefreshTokenRepository) RefreshTokenService {
+	return &refreshTokenServiceImpl{
 		repo: repo,
 	}
 }
@@ -39,7 +39,7 @@ func NewRefreshTokenService(repo repositories.IRefreshTokenRepository) *RefreshT
 // Returns:
 //   - *dto.JwtResult: Contains the generated token and expiration time
 //   - error: Error if token creation fails
-func (service *RefreshTokenService) Create(user *models.User, ipAddress string) (*dto.JwtResult, error) {
+func (service *refreshTokenServiceImpl) Create(user *models.User, ipAddress string) (*dto.JwtResult, error) {
 	tokenString := utils.GenerateRandomString(60)
 	expiredAt := time.Now().Add(time.Hour * 24 * 30).Unix()
 	token := models.RefreshToken{
@@ -80,7 +80,7 @@ type RefreshTokenResult struct {
 //  2. Generates a new random token string
 //  3. Updates the token record with new token, expiry and IP
 //  4. Returns the new token details and associated user ID
-func (service *RefreshTokenService) Update(tokenString string, ipAddress string) (*RefreshTokenResult, error) {
+func (service *refreshTokenServiceImpl) Update(tokenString string, ipAddress string) (*RefreshTokenResult, error) {
 	result, err := service.repo.FindByToken(tokenString)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())

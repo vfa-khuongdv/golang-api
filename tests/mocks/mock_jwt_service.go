@@ -6,7 +6,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 )
 
-// MockJWTService is a mock implementation of services.IJWTService
+// MockJWTService is a mock implementation of services.JWTService
 type MockJWTService struct {
 	mock.Mock
 }

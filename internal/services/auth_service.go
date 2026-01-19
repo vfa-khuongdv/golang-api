@@ -7,29 +7,30 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
-type IAuthService interface {
+// AuthService defines the interface for authentication operations
+type AuthService interface {
 	Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error)
 	RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error)
 }
 
-type AuthService struct {
-	repo                repositories.IUserRepository
-	refreshTokenService IRefreshTokenService
-	bcryptService       IBcryptService
-	jwtService          IJWTService
+type authServiceImpl struct {
+	repo                repositories.UserRepository
+	refreshTokenService RefreshTokenService
+	bcryptService       BcryptService
+	jwtService          JWTService
 }
 
 // NewAuthService creates and returns a new instance of AuthService
 // Parameters:
-//   - repo: IUserRepository for user data access
-//   - refreshTokenService: IRefreshTokenService for managing refresh tokens
-//   - bcryptService: IBcryptService for password hashing and verification
-//   - jwtService: IJWTService for JWT token generation and validation
+//   - repo: UserRepository for user data access
+//   - refreshTokenService: RefreshTokenService for managing refresh tokens
+//   - bcryptService: BcryptService for password hashing and verification
+//   - jwtService: JWTService for JWT token generation and validation
 //
 // Returns:
-//   - *AuthService: New AuthService instance initialized with the provided dependencies
-func NewAuthService(repo repositories.IUserRepository, refreshTokenService IRefreshTokenService, bcryptService IBcryptService, jwtService IJWTService) *AuthService {
-	return &AuthService{
+//   - AuthService: New AuthService instance initialized with the provided dependencies
+func NewAuthService(repo repositories.UserRepository, refreshTokenService RefreshTokenService, bcryptService BcryptService, jwtService JWTService) AuthService {
+	return &authServiceImpl{
 		repo:                repo,
 		refreshTokenService: refreshTokenService,
 		bcryptService:       bcryptService,
@@ -46,7 +47,7 @@ func NewAuthService(repo repositories.IUserRepository, refreshTokenService IRefr
 // Returns:
 //   - *dto.LoginResponse: Contains access token and refresh token if successful
 //   - error: Returns error if login fails (user not found, invalid password, token generation fails)
-func (service *AuthService) Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
+func (service *authServiceImpl) Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	user, err := service.repo.FindByField("email", email)
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
@@ -94,7 +95,7 @@ func (service *AuthService) Login(email, password string, ctx *gin.Context) (*dt
 // Returns:
 //   - *dto.LoginResponse: Contains new access token and refresh token if successful
 //   - error: Returns error if token refresh fails (invalid tokens, user not found, token generation fails)
-func (service *AuthService) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error) {
+func (service *authServiceImpl) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	ipAddress := ctx.ClientIP()
 
 	// Step 1: Validate refresh token (used to identify user)
