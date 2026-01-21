@@ -33,7 +33,8 @@ func TestCreateUser(t *testing.T) {
 	t.Run("CreateUser - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the CreateUser method
 		userService.On("CreateUser", mock.AnythingOfType("*models.User")).Return(nil)
@@ -69,7 +70,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("CreateUser - Validation Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-
+		mailerService := new(mocks.MockMailerService)
 		tests := []struct {
 			name           string
 			reqBody        string
@@ -318,7 +319,7 @@ func TestCreateUser(t *testing.T) {
 
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -351,7 +352,8 @@ func TestCreateUser(t *testing.T) {
 	t.Run("Create user Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the service methods
 		bcryptService.On("HashPassword", "password").Return("$2a$10$examplehash", nil)
@@ -398,7 +400,8 @@ func TestCreateUser(t *testing.T) {
 	t.Run("Error Bcrypt Hash Password", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the service methods
 		bcryptService.On("HashPassword", "password").Return("", errors.New("bcrypt error"))
@@ -449,7 +452,8 @@ func TestUpdateProfile(t *testing.T) {
 	t.Run("UpdateProfile - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -488,6 +492,7 @@ func TestUpdateProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - Validation Error", func(t *testing.T) {
@@ -601,7 +606,8 @@ func TestUpdateProfile(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -630,6 +636,7 @@ func TestUpdateProfile(t *testing.T) {
 				// Assert mocks
 				userService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
@@ -637,7 +644,8 @@ func TestUpdateProfile(t *testing.T) {
 	t.Run("UpdateProfile - Invalid UserID ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -662,12 +670,14 @@ func TestUpdateProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		requestBody := map[string]any{
 			"name":     "Updated User",
@@ -708,7 +718,8 @@ func TestUpdateProfile(t *testing.T) {
 	t.Run("Error Update User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -757,7 +768,8 @@ func TestUpdateProfile(t *testing.T) {
 	t.Run("Error Delete Cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -797,6 +809,7 @@ func TestUpdateProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 }
 
@@ -806,7 +819,8 @@ func TestGetProfile(t *testing.T) {
 	t.Run("Success get profile from database", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:        1,
@@ -846,12 +860,13 @@ func TestGetProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Success get profile from redis cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-
+		mailerService := new(mocks.MockMailerService)
 		user := &models.User{
 			ID:        1,
 			Email:     "email@example.com",
@@ -863,7 +878,8 @@ func TestGetProfile(t *testing.T) {
 		// Mock the service to return the cached profile
 		userService.On("GetProfile", uint(1)).Return(user, nil)
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
+
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -891,13 +907,16 @@ func TestGetProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error Invalid User ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
+		mailerService := new(mocks.MockMailerService)
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
+
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -919,12 +938,13 @@ func TestGetProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-
+		mailerService := new(mocks.MockMailerService)
 		userId := uint(1)
 		// Assuming the cache key is constructed as "profile:<user_id>"
 
@@ -932,7 +952,7 @@ func TestGetProfile(t *testing.T) {
 		userService.On("GetProfile", userId).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 		// Mock the Redis Get method to return an empty string
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -955,12 +975,13 @@ func TestGetProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Success Get Profile but Error Cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
+		mailerService := new(mocks.MockMailerService)
 
 		// Mock the GetUser method to return a user
 		user := &models.User{
@@ -973,7 +994,7 @@ func TestGetProfile(t *testing.T) {
 		}
 		userService.On("GetProfile", uint(1)).Return(user, nil)
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -1008,7 +1029,8 @@ func TestGetUser(t *testing.T) {
 	t.Run("GetUser - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:        1,
@@ -1054,7 +1076,8 @@ func TestGetUser(t *testing.T) {
 	t.Run("GetUser - Not found the user", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the service method
 		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
@@ -1082,12 +1105,14 @@ func TestGetUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("GetUser - Invalid UserID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Create http request with invalid UserID
 		w := httptest.NewRecorder()
@@ -1112,6 +1137,7 @@ func TestGetUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 }
 
@@ -1124,7 +1150,8 @@ func TestChangePassword(t *testing.T) {
 	t.Run("ChangePassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:        1,
@@ -1164,6 +1191,7 @@ func TestChangePassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Validation Error", func(t *testing.T) {
@@ -1270,7 +1298,8 @@ func TestChangePassword(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 				// Create http request and context
 				w := httptest.NewRecorder()
@@ -1297,6 +1326,7 @@ func TestChangePassword(t *testing.T) {
 				// Assert mock expectations
 				userService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
@@ -1304,7 +1334,8 @@ func TestChangePassword(t *testing.T) {
 	t.Run("ChangePassword - NotFound User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -1339,12 +1370,14 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:       1,
@@ -1387,12 +1420,14 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - New Password and Confirm Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:       1,
@@ -1439,7 +1474,8 @@ func TestChangePassword(t *testing.T) {
 	t.Run("ChangePassword - Failed To Update", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:       1,
@@ -1483,12 +1519,14 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - User Not found from ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1506,12 +1544,14 @@ func TestChangePassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password equal to New Password", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:       1,
@@ -1553,12 +1593,14 @@ func TestChangePassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Hash Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:       1,
@@ -1601,6 +1643,7 @@ func TestChangePassword(t *testing.T) {
 		// Assert mock expectations
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 }
@@ -1614,7 +1657,8 @@ func TestUpdateUser(t *testing.T) {
 		// Mock the dependencies
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -1759,7 +1803,8 @@ func TestUpdateUser(t *testing.T) {
 				// Mock services
 				userService := new(mocks.MockUserService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -1781,6 +1826,7 @@ func TestUpdateUser(t *testing.T) {
 				// Assert mock expectations
 				userService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 
 			})
 		}
@@ -1789,7 +1835,8 @@ func TestUpdateUser(t *testing.T) {
 	t.Run("UpdateUser - Error Parse ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		requestBody := map[string]any{
 			"name":     "Updated User",
@@ -1820,12 +1867,14 @@ func TestUpdateUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateUser - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		var requestBody = map[string]any{
 			"name":     "Updated User",
@@ -1858,12 +1907,14 @@ func TestUpdateUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateUser - Update User Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -1901,6 +1952,7 @@ func TestUpdateUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 }
@@ -1911,7 +1963,8 @@ func TestDeleteUser(t *testing.T) {
 	t.Run("DelelteUser - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -1943,7 +1996,8 @@ func TestDeleteUser(t *testing.T) {
 	t.Run("DeleteUser - Failed To Parse UserID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1967,12 +2021,14 @@ func TestDeleteUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("DeleteUser - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the service method
 		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
@@ -1999,12 +2055,14 @@ func TestDeleteUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("DeleteUser - Failed To Delete", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -2037,6 +2095,7 @@ func TestDeleteUser(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 }
 
@@ -2048,7 +2107,8 @@ func TestResetPassword(t *testing.T) {
 	t.Run("ResetPassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2087,12 +2147,14 @@ func TestResetPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Not found user by token", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
@@ -2128,12 +2190,14 @@ func TestResetPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Token Expired", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		expiredAt := time.Now().Add(-24 * time.Hour).Unix() // Token expired
 		user := &models.User{
@@ -2176,13 +2240,14 @@ func TestResetPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
-
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Passwords Incorrect", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2225,12 +2290,14 @@ func TestResetPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Error Hashing Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2276,12 +2343,14 @@ func TestResetPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error failed to UpdateUser", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		expiredAt := time.Now().Add(24 * time.Hour).Unix()
 		user := &models.User{
@@ -2330,6 +2399,7 @@ func TestResetPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Validation Error", func(t *testing.T) {
@@ -2450,7 +2520,8 @@ func TestResetPassword(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -2472,6 +2543,7 @@ func TestResetPassword(t *testing.T) {
 				// Assert mocks
 				userService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
@@ -2485,7 +2557,6 @@ func TestForgotPassword(t *testing.T) {
 	utils.InitValidator()
 
 	t.Run("ForgotPassword - Success", func(t *testing.T) {
-		// Set up environment variables to avoid mail service crash
 		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
 		_ = os.Setenv("MAIL_PORT", "587")
 		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
@@ -2503,7 +2574,8 @@ func TestForgotPassword(t *testing.T) {
 
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -2519,31 +2591,27 @@ func TestForgotPassword(t *testing.T) {
 		// Mock the service methods
 		userService.On("GetUserByEmail", "test@example.com").Return(user, nil)
 		userService.On("UpdateUser", mock.AnythingOfType("*models.User")).Return(nil)
+		mailerService.On("SendMailForgotPassword", mock.AnythingOfType("*models.User")).Return(nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("POST", "/api/v1/forgot-password", bytes.NewBuffer(body))
 
-		// Call the handler - this will fail at template parsing because template path is relative
 		handler.ForgotPassword(c)
 
-		// The function should fail at template parsing step because template path is relative to working directory
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 
-		// Verify the error is related to template parsing (which is expected in test environment)
 		var responseBody map[string]any
 		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
-		// Accept either template parsing error or email sending error as both are expected in test environment
-		errorMessage := responseBody["message"].(string)
-		assert.True(t,
-			strings.Contains(errorMessage, "error parsing template") ||
-				strings.Contains(errorMessage, "error sending email"),
-			"Expected template or email error, got: %s", errorMessage)
+		message := responseBody["message"].(string)
+
+		assert.Equal(t, "Forgot password successfully", message)
 
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Validation Error", func(t *testing.T) {
@@ -2587,7 +2655,8 @@ func TestForgotPassword(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
 				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -2613,6 +2682,7 @@ func TestForgotPassword(t *testing.T) {
 				// Assert mocks
 				userService.AssertExpectations(t)
 				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
@@ -2620,7 +2690,8 @@ func TestForgotPassword(t *testing.T) {
 	t.Run("ForgotPassword - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		requestBody := map[string]any{
 			"email": "notfound@example.com",
@@ -2652,12 +2723,14 @@ func TestForgotPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Update User Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -2696,12 +2769,14 @@ func TestForgotPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - JSON Parse Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Create a test context with invalid JSON
 		w := httptest.NewRecorder()
@@ -2717,6 +2792,7 @@ func TestForgotPassword(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 }
 
@@ -2727,7 +2803,8 @@ func TestGetUsers(t *testing.T) {
 	t.Run("GetUsers - Success with pagination", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Create mock user data
 		users := []*models.User{
@@ -2776,7 +2853,8 @@ func TestGetUsers(t *testing.T) {
 	t.Run("GetUsers - Default pagination values", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the GetUsers method with default values (page=1, limit=50)
 		expectedPagination := &dto.Pagination[*models.User]{
@@ -2800,12 +2878,14 @@ func TestGetUsers(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("GetUsers - Invalid page parameter", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the GetUsers method with default page=1
 		expectedPagination := &dto.Pagination[*models.User]{
@@ -2828,12 +2908,14 @@ func TestGetUsers(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("GetUsers - Service error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 		// Mock the GetUsers method to return an error
 		userService.On("GetUsers", 1, 50).Return(nil, apperror.NewDBQueryError("database error"))
@@ -2850,5 +2932,6 @@ func TestGetUsers(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		userService.AssertExpectations(t)
 		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 }

@@ -37,10 +37,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	bcryptService := services.NewBcryptService()
 	jwtService := services.NewJWTService()
 	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
+	mailerService := services.NewMailerService()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService, bcryptService)
+	userHandler := handlers.NewUserHandler(userService, bcryptService, mailerService)
 
 	// Add middleware for CORS and logging
 	router.Use(

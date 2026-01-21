@@ -15,6 +15,12 @@ type MailerService interface {
 	SendMailForgotPassword(user *models.User) error
 }
 
+type mailerServiceImpl struct{}
+
+func NewMailerService() MailerService {
+	return &mailerServiceImpl{}
+}
+
 // SendMailForgotPassword sends a password reset email to the user
 // Parameters:
 //   - user: Pointer to models.User containing user information including email and reset token
@@ -28,7 +34,7 @@ type MailerService interface {
 //  3. Parses email template
 //  4. Executes template with user data
 //  5. Sends password reset email to user
-func SendMailForgotPassword(user *models.User) error {
+func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 
 	var config = mailer.GomailSenderConfig{
 		Host:     utils.GetEnv("MAIL_HOST", "smtp.gmail.com"),
