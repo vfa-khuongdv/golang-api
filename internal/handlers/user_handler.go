@@ -35,12 +35,18 @@ type UserHandler interface {
 type userHandlerImpl struct {
 	userService   services.UserService
 	bcryptService services.BcryptService
+	mallerService services.MailerService
 }
 
-func NewUserHandler(userService services.UserService, bcryptService services.BcryptService) UserHandler {
+func NewUserHandler(
+	userService services.UserService,
+	bcryptService services.BcryptService,
+	mailerService services.MailerService,
+) UserHandler {
 	return &userHandlerImpl{
 		userService:   userService,
 		bcryptService: bcryptService,
+		mallerService: mailerService,
 	}
 }
 
@@ -131,7 +137,7 @@ func (handle *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 	}
 
 	// Send password reset email to user
-	if err := services.SendMailForgotPassword(user); err != nil {
+	if err := handle.mallerService.SendMailForgotPassword(user); err != nil {
 		utils.RespondWithError(ctx, err)
 		return
 	}

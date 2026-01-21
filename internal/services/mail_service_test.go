@@ -6,12 +6,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 )
 
-func TestSendMailForgotPassword(t *testing.T) {
-	t.Run("SendMailForgotPassword - Success", func(t *testing.T) {
+type mailerServiceTestSuite struct {
+	suite.Suite
+	mailerService services.MailerService
+}
+
+func (s *mailerServiceTestSuite) SetupTest() {
+	s.mailerService = services.NewMailerService()
+}
+
+func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
+	s.T().Run("SendMailForgotPassword - Success", func(t *testing.T) {
 		// Set required environment variables for the test
 		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
 		_ = os.Setenv("MAIL_PORT", "587")
@@ -66,7 +76,7 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 		// Note: This test will fail on actual email sending since we don't have real SMTP credentials
 		// But it will test the template parsing and execution logic
-		err = services.SendMailForgotPassword(user)
+		err = s.mailerService.SendMailForgotPassword(user)
 
 		// The function should work up to the email sending part
 		// Since we're using test credentials, it will likely fail at the SMTP send
@@ -77,7 +87,7 @@ func TestSendMailForgotPassword(t *testing.T) {
 		}
 	})
 
-	t.Run("SendMailForgotPassword - Template Not Found", func(t *testing.T) {
+	s.T().Run("SendMailForgotPassword - Template Not Found", func(t *testing.T) {
 		// Set required environment variables for the test
 		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
 		_ = os.Setenv("MAIL_PORT", "587")
@@ -107,14 +117,14 @@ func TestSendMailForgotPassword(t *testing.T) {
 		}
 
 		// Call the function with missing template
-		err := services.SendMailForgotPassword(user)
+		err := s.mailerService.SendMailForgotPassword(user)
 
 		// Should return template parsing error
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "error parsing template")
 	})
 
-	t.Run("SendMailForgotPassword - Invalid Template", func(t *testing.T) {
+	s.T().Run("SendMailForgotPassword - Invalid Template", func(t *testing.T) {
 		// Set required environment variables for the test
 		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
 		_ = os.Setenv("MAIL_PORT", "587")
@@ -168,14 +178,14 @@ func TestSendMailForgotPassword(t *testing.T) {
 		}
 
 		// Call the function with invalid template
-		err = services.SendMailForgotPassword(user)
+		err = s.mailerService.SendMailForgotPassword(user)
 
 		// Should return template parsing error
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "error parsing template")
 	})
 
-	t.Run("SendMailForgotPassword - Nil Token", func(t *testing.T) {
+	s.T().Run("SendMailForgotPassword - Nil Token", func(t *testing.T) {
 		// Set required environment variables for the test
 		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
 		_ = os.Setenv("MAIL_PORT", "587")
@@ -229,11 +239,11 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 		// Call the function should panic due to nil pointer dereference
 		assert.Panics(t, func() {
-			_ = services.SendMailForgotPassword(user)
+			_ = s.mailerService.SendMailForgotPassword(user)
 		})
 	})
 
-	t.Run("SendMailForgotPassword - Environment Variables Test", func(t *testing.T) {
+	s.T().Run("SendMailForgotPassword - Environment Variables Test", func(t *testing.T) {
 		// Test with default environment values
 		defer func() {
 			_ = os.Unsetenv("MAIL_HOST")
@@ -282,7 +292,7 @@ func TestSendMailForgotPassword(t *testing.T) {
 
 		// Test that environment variables are properly used
 		// This should fail because of missing/invalid SMTP configuration
-		err = services.SendMailForgotPassword(user)
+		err = s.mailerService.SendMailForgotPassword(user)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "error sending email")
 	})
