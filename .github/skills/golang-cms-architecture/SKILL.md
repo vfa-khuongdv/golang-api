@@ -76,18 +76,15 @@ This project targets Go 1.22+ (minimum supported version).
 All layers depend on abstractions (interfaces), never concrete implementations:
 
 ```go
-// Good - depends on interface
-type UserService struct {
-    repo UserRepository  // Interface, not concrete type
-}
-
+// Good: Return an interface from constructors and depend on interfaces.
+type UserService interface { /* ... methods */ }
+type userServiceImpl struct { repo UserRepository }
 func NewUserService(repo UserRepository) UserService {
     return &userServiceImpl{repo: repo}
 }
-
-// Bad - directly depends on concrete type
-type userServiceImpl struct {
-    repo userRepositoryImpl  // Concrete implementation, not reusable
+// Bad: Depending on concrete implementations makes code rigid.
+type badUserService struct {
+    repo *userRepositoryImpl // <-- Concrete type, hard to mock
 }
 ```
 
