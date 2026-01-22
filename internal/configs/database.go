@@ -20,6 +20,7 @@ type DatabaseConfig struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 var DB *gorm.DB
@@ -31,9 +32,10 @@ var DB *gorm.DB
 // - Monitor database performance and adjust accordingly
 // - Ensure the database server can handle the configured number of connections
 const (
-	DEFAULT_MAX_OPEN_CONNS    = 25
-	DEFAULT_MAX_IDLE_CONNS    = 10
-	DEFAULT_CONN_MAX_LIFETIME = 30 * time.Minute
+	DEFAULT_MAX_OPEN_CONNS     = 50
+	DEFAULT_MAX_IDLE_CONNS     = 10
+	DEFAULT_CONN_MAX_IDLE_TIME = 5 * time.Minute
+	DEFAULT_CONN_MAX_LIFETIME  = 30 * time.Minute
 )
 
 // InitDB initializes MySQL with GORM and configures a resilient connection pool
@@ -49,7 +51,7 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 
 	// Open GORM connection
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		PrepareStmt: true,
+		PrepareStmt: false,
 	})
 	if err != nil {
 		logger.Fatalf("Failed to connect to MySQL: %+v", err)
@@ -69,6 +71,7 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(config.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(config.ConnMaxIdleTime)
 
 	// Validate connection
 	if err := pingDB(sqlDB); err != nil {
@@ -76,10 +79,11 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 	}
 
 	logger.Infof(
-		"MySQL connected | open=%d idle=%d lifetime=%s",
+		"MySQL connected | open=%d idle=%d lifetime=%s idleTime=%s",
 		config.MaxOpenConns,
 		config.MaxIdleConns,
 		config.ConnMaxLifetime,
+		config.ConnMaxIdleTime,
 	)
 
 	DB = db
@@ -96,6 +100,9 @@ func setDefaults(config *DatabaseConfig) {
 	}
 	if config.ConnMaxLifetime == 0 {
 		config.ConnMaxLifetime = DEFAULT_CONN_MAX_LIFETIME
+	}
+	if config.ConnMaxIdleTime == 0 {
+		config.ConnMaxIdleTime = DEFAULT_CONN_MAX_IDLE_TIME
 	}
 }
 
