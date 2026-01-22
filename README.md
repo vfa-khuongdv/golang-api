@@ -98,8 +98,8 @@ This will install:
 ### 2. Clone the repository and setup environment
 
 ```bash
-git clone https://github.com/vfa-khuongdv/golang-cms.git
-cd golang-cms
+git clone git@github.com:vfa-khuongdv/golang-api.git
+cd golang-api
 cp .env.example .env
 ```
 
