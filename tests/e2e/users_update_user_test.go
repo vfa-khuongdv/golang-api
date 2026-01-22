@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ func TestUsersUpdateUser(t *testing.T) {
 	// Create test user
 	password := "password123"
 	hashedPassword := utils.HashPassword(password)
-	birthday := "1990-01-15"
+	birthday := time.Date(1990, 1, 15, 0, 0, 0, 0, time.UTC)
 	address := "Original Address"
 	testUser := models.User{
 		Name:     "Original Name",
@@ -95,8 +95,7 @@ func TestUsersUpdateUser(t *testing.T) {
 		// Verify update in database
 		var updatedUser models.User
 		db.First(&updatedUser, testUser.ID)
-		// Birthday may be returned as ISO timestamp, so check if it starts with the expected date
-		assert.True(t, strings.HasPrefix(*updatedUser.Birthday, newBirthday), "Expected birthday to start with %s, got %s", newBirthday, *updatedUser.Birthday)
+		assert.Equal(t, newBirthday, updatedUser.Birthday.Format("2006-01-02"))
 	})
 
 	t.Run("Update User - Address Only", func(t *testing.T) {
@@ -166,8 +165,7 @@ func TestUsersUpdateUser(t *testing.T) {
 		var updatedUser models.User
 		db.First(&updatedUser, testUser.ID)
 		assert.Equal(t, "Multi Update Name", updatedUser.Name)
-		// Birthday may be returned as ISO timestamp, so check if it starts with the expected date
-		assert.True(t, strings.HasPrefix(*updatedUser.Birthday, newBirthday), "Expected birthday to start with %s, got %s", newBirthday, *updatedUser.Birthday)
+		assert.Equal(t, newBirthday, updatedUser.Birthday.Format("2006-01-02"))
 		assert.Equal(t, newAddress, *updatedUser.Address)
 		assert.Equal(t, int16(3), updatedUser.Gender)
 	})

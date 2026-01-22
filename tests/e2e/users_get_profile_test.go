@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ func TestUsersGetProfile(t *testing.T) {
 	// Create test user
 	password := "password123"
 	hashedPassword := utils.HashPassword(password)
-	birthday := "1990-05-15"
+	birthday := time.Date(1990, 5, 15, 0, 0, 0, 0, time.UTC)
 	address := "123 Test Street"
 	testUser := models.User{
 		Name:     "Test User",
@@ -53,8 +53,8 @@ func TestUsersGetProfile(t *testing.T) {
 		assert.Equal(t, testUser.ID, response.ID)
 		assert.Equal(t, testUser.Email, response.Email)
 		assert.Equal(t, testUser.Name, response.Name)
-		// Birthday may be returned as ISO timestamp, so check if it starts with the expected date
-		assert.True(t, strings.HasPrefix(*response.Birthday, birthday), "Expected birthday to start with %s, got %s", birthday, *response.Birthday)
+
+		assert.Equal(t, birthday.Format("2006-01-02"), response.Birthday.Format("2006-01-02"))
 		assert.Equal(t, address, *response.Address)
 		assert.Equal(t, int16(1), response.Gender)
 	})

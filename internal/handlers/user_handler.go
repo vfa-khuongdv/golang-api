@@ -90,9 +90,19 @@ func (handler *userHandlerImpl) CreateUser(ctx *gin.Context) {
 		Name:     input.Name,
 		Email:    input.Email,
 		Password: hashpassword,
-		Birthday: input.Birthday,
 		Address:  input.Address,
 		Gender:   input.Gender,
+	}
+	if input.Birthday != nil {
+		birthdayDate, err := utils.ParseDateStringYYYYMMDD(*input.Birthday)
+		if err != nil {
+			utils.RespondWithError(
+				ctx,
+				apperror.NewParseError("Invalid birthday format, expected YYYY-MM-DD"),
+			)
+			return
+		}
+		user.Birthday = birthdayDate
 	}
 
 	// Attempt to create the user in the database
@@ -165,12 +175,6 @@ func (handler *userHandlerImpl) ResetPassword(ctx *gin.Context) {
 	// Check if token is expired
 	if time.Now().Unix() > *user.ExpiredAt {
 		utils.RespondWithError(ctx, apperror.NewTokenExpiredError("Token is expired"))
-		return
-	}
-
-	// Check if new password is the same as old password
-	if isValid := handler.bcryptService.CheckPasswordHash(input.Password, user.Password); !isValid {
-		utils.RespondWithError(ctx, apperror.NewInvalidPasswordError("Old password is incorrect"))
 		return
 	}
 
@@ -334,7 +338,15 @@ func (handler *userHandlerImpl) UpdateUser(ctx *gin.Context) {
 		user.Name = *input.Name
 	}
 	if input.Birthday != nil {
-		user.Birthday = input.Birthday
+		birthdayDate, err := utils.ParseDateStringYYYYMMDD(*input.Birthday)
+		if err != nil {
+			utils.RespondWithError(
+				ctx,
+				apperror.NewParseError("Invalid birthday format, expected YYYY-MM-DD"),
+			)
+			return
+		}
+		user.Birthday = birthdayDate
 	}
 	if input.Address != nil {
 		user.Address = input.Address
@@ -431,7 +443,15 @@ func (handler *userHandlerImpl) UpdateProfile(ctx *gin.Context) {
 		user.Name = *input.Name
 	}
 	if input.Birthday != nil {
-		user.Birthday = input.Birthday
+		birthdayDate, err := utils.ParseDateStringYYYYMMDD(*input.Birthday)
+		if err != nil {
+			utils.RespondWithError(
+				ctx,
+				apperror.NewParseError("Invalid birthday format, expected YYYY-MM-DD"),
+			)
+			return
+		}
+		user.Birthday = birthdayDate
 	}
 	if input.Address != nil {
 		user.Address = input.Address
