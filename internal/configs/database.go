@@ -24,6 +24,12 @@ type DatabaseConfig struct {
 
 var DB *gorm.DB
 
+// Default connection pool settings
+// Note: When hight traffic is expected, consider increasing these values
+// Example:
+// - For 1000 concurrent connections, set MaxOpenConns to 500 and MaxIdleConns to 100
+// - Monitor database performance and adjust accordingly
+// - Ensure the database server can handle the configured number of connections
 const (
 	DEFAULT_MAX_OPEN_CONNS    = 25
 	DEFAULT_MAX_IDLE_CONNS    = 10
