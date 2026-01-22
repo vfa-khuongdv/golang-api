@@ -51,3 +51,33 @@ func TestStringToPtr(t *testing.T) {
 		assert.Nil(t, ptr)
 	})
 }
+
+func TestIntToPtr(t *testing.T) {
+	t.Run("returns pointer to int", func(t *testing.T) {
+		input := 42
+		ptr := utils.IntToPtr(input)
+		assert.NotNil(t, ptr)
+		assert.Equal(t, input, *ptr)
+	})
+
+	t.Run("returns pointer to float64", func(t *testing.T) {
+		input := 3.14
+		ptr := utils.IntToPtr(input)
+		assert.NotNil(t, ptr)
+		assert.Equal(t, input, *ptr)
+	})
+
+	t.Run("returns pointer to bool", func(t *testing.T) {
+		input := true
+		ptr := utils.IntToPtr(input)
+		assert.NotNil(t, ptr)
+		assert.Equal(t, input, *ptr)
+	})
+
+	t.Run("returns pointer to string", func(t *testing.T) {
+		input := "test"
+		ptr := utils.IntToPtr(input)
+		assert.NotNil(t, ptr)
+		assert.Equal(t, input, *ptr)
+	})
+}

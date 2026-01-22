@@ -7,14 +7,14 @@ import (
 	"gorm.io/gorm"
 )
 
-type IRefreshTokenRepository interface {
+type RefreshTokenRepository interface {
 	Create(token *models.RefreshToken) error
 	Update(token *models.RefreshToken) error
 	FindByToken(token string) (*models.RefreshToken, error)
 	First(token string) (*models.RefreshToken, error)
 }
 
-type RefreshTokenRepository struct {
+type refreshTokenRepositoryImpl struct {
 	db *gorm.DB
 }
 
@@ -23,9 +23,9 @@ type RefreshTokenRepository struct {
 //   - db: pointer to the gorm.DB instance for database operations
 //
 // Returns:
-//   - *RefreshTokenRepository: pointer to the newly created RefreshTokenRepository
-func NewRefreshTokenRepository(db *gorm.DB) *RefreshTokenRepository {
-	return &RefreshTokenRepository{db: db}
+//   - RefreshTokenRepository: pointer to the newly created RefreshTokenRepository
+func NewRefreshTokenRepository(db *gorm.DB) RefreshTokenRepository {
+	return &refreshTokenRepositoryImpl{db: db}
 }
 
 // Create creates a new refresh token in the database
@@ -34,7 +34,7 @@ func NewRefreshTokenRepository(db *gorm.DB) *RefreshTokenRepository {
 //
 // Returns:
 //   - error: nil if successful, error otherwise
-func (repo *RefreshTokenRepository) Create(token *models.RefreshToken) error {
+func (repo *refreshTokenRepositoryImpl) Create(token *models.RefreshToken) error {
 	return repo.db.Create(token).Error
 }
 
@@ -45,7 +45,7 @@ func (repo *RefreshTokenRepository) Create(token *models.RefreshToken) error {
 // Returns:
 //   - *models.RefreshToken: pointer to the found RefreshToken model, nil if not found
 //   - error: nil if successful, error otherwise
-func (repo *RefreshTokenRepository) First(token string) (*models.RefreshToken, error) {
+func (repo *refreshTokenRepositoryImpl) First(token string) (*models.RefreshToken, error) {
 	var refreshToken models.RefreshToken
 	if err := repo.db.Where("refresh_token = ?", token).First(&refreshToken).Error; err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (repo *RefreshTokenRepository) First(token string) (*models.RefreshToken, e
 // Returns:
 //   - *models.RefreshToken: pointer to the found RefreshToken model, nil if not found
 //   - error: nil if successful, error otherwise
-func (repo *RefreshTokenRepository) FindByToken(token string) (*models.RefreshToken, error) {
+func (repo *refreshTokenRepositoryImpl) FindByToken(token string) (*models.RefreshToken, error) {
 	var refreshToken models.RefreshToken
 	if err := repo.db.Where("refresh_token = ? and expired_at > ?", token, time.Now().Unix()).First(&refreshToken).Error; err != nil {
 		return nil, err
@@ -74,6 +74,6 @@ func (repo *RefreshTokenRepository) FindByToken(token string) (*models.RefreshTo
 //
 // Returns:
 //   - error: nil if successful, error otherwise
-func (repo *RefreshTokenRepository) Update(token *models.RefreshToken) error {
+func (repo *refreshTokenRepositoryImpl) Update(token *models.RefreshToken) error {
 	return repo.db.Save(token).Error
 }

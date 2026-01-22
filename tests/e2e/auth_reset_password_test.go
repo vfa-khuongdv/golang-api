@@ -18,8 +18,7 @@ import (
 func TestAuthResetPassword(t *testing.T) {
 	router, db := setupTestRouter()
 
-	password := "password123"
-	hashedPassword := utils.HashPassword(password)
+	hashedPassword := utils.HashPassword("oldpassword123")
 	token := "valid_reset_token"
 	expiredAt := time.Now().Add(time.Hour).Unix()
 
@@ -38,7 +37,6 @@ func TestAuthResetPassword(t *testing.T) {
 		newPassword := "newpassword123"
 		payload := map[string]string{
 			"token":        token,
-			"password":     password, // Current implementation requires old password
 			"new_password": newPassword,
 		}
 		payloadBytes, _ := json.Marshal(payload)
@@ -63,7 +61,6 @@ func TestAuthResetPassword(t *testing.T) {
 	t.Run("Reset Password - Invalid Token", func(t *testing.T) {
 		payload := map[string]string{
 			"token":        "invalid_token",
-			"password":     password,
 			"new_password": "newpassword123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
@@ -98,7 +95,6 @@ func TestAuthResetPassword(t *testing.T) {
 
 		payload := map[string]string{
 			"token":        expiredToken,
-			"password":     password,
 			"new_password": "newpassword123",
 		}
 		payloadBytes, _ := json.Marshal(payload)

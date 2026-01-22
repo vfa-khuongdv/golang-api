@@ -16,7 +16,7 @@ import (
 type RefreshTokenServiceTestSuite struct {
 	suite.Suite
 	repo                *mocks.MockRefreshTokenRepository
-	refreshTokenService *services.RefreshTokenService
+	refreshTokenService services.RefreshTokenService
 }
 
 func (s *RefreshTokenServiceTestSuite) SetupTest() {

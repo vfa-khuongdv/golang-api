@@ -14,7 +14,7 @@ import (
 type UserRepositoryTestSuite struct {
 	suite.Suite
 	db   *gorm.DB
-	repo *repositories.UserRepository
+	repo repositories.UserRepository
 }
 
 func (s *UserRepositoryTestSuite) SetupTest() {

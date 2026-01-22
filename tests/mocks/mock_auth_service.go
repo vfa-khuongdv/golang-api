@@ -10,7 +10,6 @@ type MockAuthService struct {
 	mock.Mock
 }
 
-// Login provides a mock function with given fields: email, password, ctx
 func (m *MockAuthService) Login(email string, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	args := m.Called(email, password, ctx)
 	if res, ok := args.Get(0).(*dto.LoginResponse); ok {
