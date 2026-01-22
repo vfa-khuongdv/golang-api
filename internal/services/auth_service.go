@@ -50,7 +50,7 @@ func NewAuthService(repo repositories.UserRepository, refreshTokenService Refres
 func (service *authServiceImpl) Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
 	user, err := service.repo.FindByField("email", email)
 	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
+		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
 	// Validate password

@@ -76,7 +76,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				s.repo.On("FindByField", "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
 			},
 			expectErr: true,
-			errCode:   apperror.ErrNotFound,
+			errCode:   apperror.ErrInvalidPassword,
 		},
 		{
 			name: "InvalidPassword",

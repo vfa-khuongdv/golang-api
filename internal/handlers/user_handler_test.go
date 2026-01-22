@@ -1372,7 +1372,7 @@ func TestForgotPassword(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
 		message := responseBody["message"].(string)
 
-		assert.Equal(t, "Forgot password successfully", message)
+		assert.Equal(t, "If your email is in our system, you will receive instructions to reset your password", message)
 
 		// Assert mocks
 		userService.AssertExpectations(t)
