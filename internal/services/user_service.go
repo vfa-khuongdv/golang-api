@@ -1,203 +1,161 @@
 package services
 
 import (
+	"time"
+
 	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
+	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
-type IUserService interface {
-	GetUser(id uint) (*models.User, error)
-	GetUserByEmail(email string) (*models.User, error)
-	GetUsers(page int, limit int) (*dto.Pagination[*models.User], error)
-	CreateUser(user *models.User) error
-	UpdateUser(user *models.User) error
-	DeleteUser(id uint) error
-	GetUserByToken(token string) (*models.User, error)
-	GetProfile(id uint) (*models.User, error)
-	UpdateProfile(user *models.User) error
+type UserService interface {
+	GetProfile(userID uint) (*models.User, error)
+	UpdateProfile(userID uint, input *dto.UpdateProfileInput) error
+
+	ForgotPassword(input *dto.ForgotPasswordInput) (*models.User, error)
+	ResetPassword(input *dto.ResetPasswordInput) (*models.User, error)
+	ChangePassword(userId uint, input *dto.ChangePasswordInput) (*models.User, error)
 }
 
-type UserService struct {
-	repo repositories.IUserRepository
+type userServiceImpl struct {
+	repo          repositories.UserRepository
+	bcryptService BcryptService
 }
 
-func NewUserService(repo repositories.IUserRepository) *UserService {
-	return &UserService{
-		repo: repo,
+func NewUserService(repo repositories.UserRepository, bcryptService BcryptService) UserService {
+	return &userServiceImpl{
+		repo:          repo,
+		bcryptService: bcryptService,
 	}
 }
 
-func (service *UserService) GetUsers(page int, limit int) (*dto.Pagination[*models.User], error) {
-	users, err := service.repo.GetUsers(page, limit)
+func (service *userServiceImpl) ForgotPassword(input *dto.ForgotPasswordInput) (*models.User, error) {
+	// 1. Check email exists
+	user, err := service.repo.FindByField("email", input.Email)
 	if err != nil {
-		return nil, apperror.NewDBQueryError(err.Error())
+		return nil, apperror.NewNotFoundError("Email not found")
 	}
-	return users, nil
-}
 
-// GetUser retrieves a user by their ID from the database.
-// Parameters:
-//   - id: The unique identifier of the user to retrieve
-//
-// Returns:
-//   - *models.User: A pointer to the user record if found
-//   - error: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	user, err := service.GetUser(1) // Gets user with ID 1
-func (service *UserService) GetUser(id uint) (*models.User, error) {
-	data, err := service.repo.GetByID(id)
+	// 2. Generate token and expiry
+	token := utils.GenerateRandomString(32)
+	expiredAt := time.Now().Add(1 * time.Hour).Unix()
+
+	// 3. Update user with token and expiry
+	user.Token = &token
+	user.ExpiredAt = &expiredAt
+
+	err = service.repo.Update(user)
 	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
+		return nil, apperror.NewDBUpdateError(err.Error())
 	}
-	return data, nil
+	return user, nil
 }
 
-// GetUserByEmail retrieves a user by their email address from the database.
-// Parameters:
-//   - email: The email address of the user to retrieve
-//
-// Returns:
-//   - *models.User: A pointer to the user record if found
-//   - *appError.AppError: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	user, err := service.GetUserByEmail("john@example.com")
-func (service *UserService) GetUserByEmail(email string) (*models.User, error) {
-	data, err := service.repo.FindByField("email", email)
+func (service *userServiceImpl) ResetPassword(input *dto.ResetPasswordInput) (*models.User, error) {
+	// 1. Find user by token
+	user, err := service.repo.FindByField("token", input.Token)
 	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
+		return nil, apperror.NewNotFoundError("Invalid token")
 	}
-	return data, nil
+
+	// 2. Check if token is expired
+	if user.ExpiredAt == nil || time.Now().Unix() > *user.ExpiredAt {
+		return nil, apperror.NewTokenExpiredError("Token has expired")
+	}
+
+	// 3. Update newPassword
+	newPassword, err := service.bcryptService.HashPassword(input.NewPassword)
+	if err != nil {
+		return nil, apperror.NewPasswordHashFailedError("Failed to hash password")
+	}
+
+	user.Password = newPassword
+	user.Token = nil
+	user.ExpiredAt = nil
+
+	// 4. Save updated user
+	err = service.repo.Update(user)
+	if err != nil {
+		return nil, apperror.NewDBUpdateError(err.Error())
+	}
+	return user, nil
 }
 
-// CreateUser creates a new user in the database and assigns roles to them.
-// Parameters:
-//   - user: Pointer to models.User containing the user information to create
-//
-// Returns:
-//   - *error: nil if successful, otherwise returns the error that occurred
-func (service *UserService) CreateUser(user *models.User) error {
-	tx := service.repo.GetDB().Begin()
-	if tx.Error != nil {
-		return apperror.NewDBInsertError(tx.Error.Error())
+func (service *userServiceImpl) ChangePassword(userId uint, input *dto.ChangePasswordInput) (*models.User, error) {
+	// 1. Get user by ID
+	user, err := service.repo.GetByID(userId)
+	if err != nil {
+		return nil, apperror.NewNotFoundError("User not found")
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r)
+	// 2. Check if old password is correct
+	if isValid := service.bcryptService.CheckPasswordHash(input.OldPassword, user.Password); !isValid {
+		return nil, apperror.NewInvalidPasswordError("Old password is incorrect")
+	}
+
+	// 3. Hash new password
+	newPassword, err := service.bcryptService.HashPassword(input.NewPassword)
+	if err != nil {
+		return nil, apperror.NewPasswordHashFailedError("Failed to hash new password")
+	}
+
+	// 4. Check if new password and confirm password match
+	if input.NewPassword != input.ConfirmPassword {
+		return nil, apperror.NewPasswordMismatchError("New password and confirm password do not match")
+	}
+
+	// 5. Check old password and new password are not the same
+	if input.OldPassword == input.NewPassword {
+		return nil, apperror.NewPasswordUnchangedError("New password must be different from old password")
+	}
+
+	// 6. Update user password
+	user.Password = newPassword
+	err = service.repo.Update(user)
+	if err != nil {
+		return nil, apperror.NewDBUpdateError(err.Error())
+	}
+	return user, nil
+}
+
+func (service *userServiceImpl) GetProfile(userID uint) (*models.User, error) {
+	user, err := service.repo.GetByID(userID)
+	if err != nil {
+		return nil, apperror.NewNotFoundError("User not found")
+	}
+	return user, nil
+}
+
+func (service *userServiceImpl) UpdateProfile(userID uint, input *dto.UpdateProfileInput) error {
+	// 1. Get existing user
+	user, err := service.repo.GetByID(userID)
+	if err != nil {
+		return apperror.NewNotFoundError("User not found")
+	}
+
+	// 2. Update fields if provided
+	if input.Name != nil {
+		user.Name = *input.Name
+	}
+	if input.Address != nil {
+		user.Address = input.Address
+	}
+	if input.Gender != nil {
+		user.Gender = *input.Gender
+	}
+
+	if input.Birthday != nil {
+		birthdayDate, err := utils.ParseDateStringYYYYMMDD(*input.Birthday)
+		if err != nil {
+			return err
 		}
-	}()
-
-	_, err := service.repo.CreateWithTx(tx, user)
-	if err != nil {
-		tx.Rollback()
-		return apperror.NewDBInsertError(err.Error())
+		user.Birthday = birthdayDate
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		return apperror.NewDBInsertError(err.Error())
-	}
-
-	return nil
-}
-
-// UpdateUser updates an existing user's information in the database.
-// Parameters:
-//   - user: Pointer to models.User containing the updated user information
-//
-// Returns:
-//   - error: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	user := &models.User{
-//	    ID: 1,
-//	    Name: "Updated Name",
-//	    Email: "updated@example.com",
-//	}
-//	err := service.UpdateUser(user)
-func (service *UserService) UpdateUser(user *models.User) error {
-	err := service.repo.Update(user)
-	if err != nil {
-		return apperror.NewDBUpdateError(err.Error())
-	}
-	return nil
-}
-
-// DeleteUser removes a user from the database by their ID.
-// Parameters:
-//   - id: The unique identifier of the user to delete
-//
-// Returns:
-//   - *appError.AppError: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	err := service.DeleteUser(1) // Deletes user with ID 1
-func (service *UserService) DeleteUser(id uint) error {
-	err := service.repo.Delete(id)
-	if err != nil {
-		return apperror.NewDBDeleteError(err.Error())
-	}
-	return nil
-}
-
-// GetUserByToken retrieves a user by their authentication token from the database.
-// Parameters:
-//   - token: The authentication token string associated with the user
-//
-// Returns:
-//   - *models.User: A pointer to the user record if found
-//   - error: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	user, err := service.GetUserByToken("abc123token")
-func (service *UserService) GetUserByToken(token string) (*models.User, error) {
-	data, err := service.repo.FindByField("token", token)
-	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
-	}
-	return data, nil
-}
-
-// GetProfile retrieves a user's profile information by their ID from the database.
-// Parameters:
-//   - id: The unique identifier of the user whose profile to retrieve
-//
-// Returns:
-//   - *models.User: A pointer to the user profile record if found
-//   - error: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	profile, err := service.GetProfile(1) // Gets profile for user with ID 1
-func (service *UserService) GetProfile(id uint) (*models.User, error) {
-	data, err := service.repo.GetByID(id)
-	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
-	}
-	return data, nil
-}
-
-// UpdateProfile updates a user's profile information in the database.
-// Parameters:
-//   - user: Pointer to models.User containing the updated profile information
-//
-// Returns:
-//   - error: nil if successful, otherwise returns the error that occurred
-//
-// Example:
-//
-//	err := service.UpdateProfile(user)
-func (service *UserService) UpdateProfile(user *models.User) error {
-	err := service.repo.Update(user)
+	// 3. Save updated user
+	err = service.repo.Update(user)
 	if err != nil {
 		return apperror.NewDBUpdateError(err.Error())
 	}

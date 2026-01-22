@@ -6,7 +6,6 @@ A production-ready Go REST API for a Content Management System (CMS) with user a
 
 - **User Authentication**: JWT-based authentication with access and refresh tokens
 - **Password Management**: Secure password hashing with bcrypt, password reset via email
-- **User Management**: Create, read, update, and delete users with permission-based access control
 - **Email Service**: SMTP integration for sending password reset and other notification emails
 - **API Documentation**: OpenAPI 3.0 specification with Swagger UI
 - **Database Migrations**: Automated schema management with migration support
@@ -272,13 +271,6 @@ The server runs on port `3000` by default. All authenticated endpoints require a
 - `GET /api/v1/profile` - Get authenticated user's profile
 - `PATCH /api/v1/profile` - Update authenticated user's profile
 - `POST /api/v1/change-password` - Change authenticated user's password
-
-#### User Management (Authenticated)
-- `GET /api/v1/users` - List all users (pagination supported)
-- `POST /api/v1/users` - Create a new user
-- `GET /api/v1/users/{id}` - Get user by ID
-- `PATCH /api/v1/users/{id}` - Update user
-- `DELETE /api/v1/users/{id}` - Delete user
 
 ## Testing
 

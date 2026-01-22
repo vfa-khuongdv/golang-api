@@ -3,7 +3,6 @@ package handlers_test
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -24,422 +23,6 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 )
 
-func TestCreateUser(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	// Initialize the validator
-	utils.InitValidator()
-
-	t.Run("CreateUser - Success", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the CreateUser method
-		userService.On("CreateUser", mock.AnythingOfType("*models.User")).Return(nil)
-		bcryptService.On("HashPassword", "password").Return("$2a$10$examplehash", nil)
-
-		requestBody := map[string]any{
-			"email":    "email@example.com",
-			"password": "password",
-			"name":     "User",
-			"birthday": "2000-01-01",
-			"address":  "123 Street",
-			"gender":   1,
-		}
-		body, _ := json.Marshal(requestBody)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/users", bytes.NewBuffer(body))
-
-		// Call the CreateUser handler
-		handler.CreateUser(c)
-
-		// Assert the response
-		assert.Equal(t, http.StatusCreated, w.Code)
-		assert.JSONEq(t, `{"message":"Create user successfully"}`, w.Body.String())
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("CreateUser - Validation Error", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-
-		tests := []struct {
-			name           string
-			reqBody        string
-			expectedCode   float64
-			expectedMsg    string
-			expectedFields []apperror.FieldError
-		}{
-			{
-				name:         "MissingEmail",
-				reqBody:      `{}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "email", Message: "email is required"},
-					{Field: "password", Message: "password is required"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "EmptyEmail",
-				reqBody:      `{"email":""}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "email", Message: "email is required"},
-					{Field: "password", Message: "password is required"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "InvalidEmailFormat",
-				reqBody:      `{"email":"not-an-email"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "email", Message: "email must be a valid email address"},
-					{Field: "password", Message: "password is required"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "MissingPassword",
-				reqBody:      `{"email":"email@example.com"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "password", Message: "password is required"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "EmptyPassword",
-				reqBody:      `{"email":"email@example.com","password":""}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "password", Message: "password is required"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "ShortPassword",
-				reqBody:      `{"email":"email@example.com","password":"123"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "password", Message: "password must be at least 6 characters long or numeric"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "LongPassword",
-				reqBody:      `{"email":"email@example.com","password":"` + strings.Repeat("a", 256) + `"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "password", Message: "password must be at most 255 characters long or numeric"},
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "MissingName",
-				reqBody:      `{"email":"email@example.com","password":"password"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "NameNotBlank",
-				reqBody:      `{"email":"email@example.com","password":"password","name":"  "}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name must not be blank"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "EmptyName",
-				reqBody:      `{"email":"email@example.com","password":"password","name":""}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name is required"},
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "LongName",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "` + strings.Repeat("a", 46) + `","birthday":"2000-01-01","address":"address","gender":1}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name must be at most 45 characters long or numeric"},
-				},
-			},
-			{
-				name:         "MissingBirthday",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "birthday", Message: "birthday is required"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "InvalidBirthdayFormat",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"invalid-date"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "birthday", Message: "birthday must be a valid date (YYYY-MM-DD) and not in the future"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "FutureBirthday",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"3000-01-01"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "birthday", Message: "birthday must be a valid date (YYYY-MM-DD) and not in the future"},
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "MissingAddress",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address is required"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "AddressNotBlank",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"  "}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address must not be blank"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "EmptyAddress",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":""}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address must be at least 1 characters long or numeric"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "LongAddress",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"` + strings.Repeat("a", 256) + `"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address must be at most 255 characters long or numeric"},
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "MissingGender",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "gender", Message: "gender is required"},
-				},
-			},
-			{
-				name:         "InvalidGender",
-				reqBody:      `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address", "gender": 4}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "gender", Message: "gender must be one of [1 2 3]"},
-				},
-			},
-			{
-				name:           "StringGender",
-				reqBody:        `{"email":"email@example.com","password":"password","name": "Bob","birthday":"2000-01-01","address":"address", "gender": "not_numeric"}`,
-				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field CreateUserInput.gender of type int16",
-				expectedFields: nil, // specific error case
-			},
-		}
-
-		for _, tc := range tests {
-			t.Run(tc.name, func(t *testing.T) {
-				handler := handlers.NewUserHandler(userService, bcryptService)
-
-				// Create a test context
-				w := httptest.NewRecorder()
-				c, _ := gin.CreateTestContext(w)
-				c.Request, _ = http.NewRequest("POST", "/api/v1/user", bytes.NewBufferString(tc.reqBody))
-
-				// Call the CreateUser handler
-				handler.CreateUser(c)
-
-				// Assert the response
-				expectedBody := map[string]any{
-					"code":    tc.expectedCode,
-					"message": tc.expectedMsg,
-					"fields":  tc.expectedFields,
-				}
-				var actualBody map[string]any
-				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Equal(t, expectedBody["code"], actualBody["code"])
-				assert.Equal(t, expectedBody["message"], actualBody["message"])
-				assert.Equal(t, tc.expectedFields, utils.ToFieldErrors(actualBody["fields"]))
-
-				// Assert mocks
-				userService.AssertExpectations(t)
-				bcryptService.AssertExpectations(t)
-			})
-		}
-	})
-
-	t.Run("Create user Error", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the service methods
-		bcryptService.On("HashPassword", "password").Return("$2a$10$examplehash", nil)
-		userService.On("CreateUser", mock.AnythingOfType("*models.User")).
-			Return(apperror.NewDBInsertError("Database insert error"))
-
-		requestBody := map[string]any{
-			"email":    "email@example.com",
-			"password": "password",
-			"name":     "Bob",
-			"birthday": "2000-01-01",
-			"address":  "123 Street",
-			"gender":   1,
-			"role_ids": []uint{1, 2},
-		}
-
-		body, _ := json.Marshal(requestBody)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/user", bytes.NewBuffer(body))
-
-		// Call the handler
-		handler.CreateUser(c)
-
-		// Assert the response
-		var expectedBody = map[string]any{
-			"code":    float64(apperror.ErrDBInsert),
-			"message": "Database insert error",
-		}
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, expectedBody["code"], actualBody["code"])
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-
-	})
-
-	t.Run("Error Bcrypt Hash Password", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the service methods
-		bcryptService.On("HashPassword", "password").Return("", errors.New("bcrypt error"))
-		requestBody := map[string]any{
-			"email":    "example@gmail.com",
-			"password": "password",
-			"name":     "User",
-			"birthday": "2000-01-01",
-			"address":  "123 Street",
-			"gender":   1,
-			"role_ids": []uint{1, 2},
-		}
-		body, _ := json.Marshal(requestBody)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/user", bytes.NewBuffer(body))
-		c.Set("UserID", uint(1))
-
-		// Call the handler
-		handler.CreateUser(c)
-
-		// Assert the response
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrPasswordHashFailed),
-			"message": "Failed to hash password",
-		}
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		assert.Equal(t, expectedBody["code"], actualBody["code"])
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-
-	})
-}
-
 func TestUpdateProfile(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -448,27 +31,25 @@ func TestUpdateProfile(t *testing.T) {
 
 	t.Run("UpdateProfile - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-
-		// Assuming the cache key is constructed as "profile:<user_id>"
-
-		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(nil)
-
+		userID := uint(1)
 		requestBody := map[string]any{
 			"name":     "Updated User",
 			"birthday": "2000-01-01",
 			"address":  "456 New Street",
 			"gender":   2,
 		}
+		input := &dto.UpdateProfileInput{
+			Name:     utils.StringToPtr(requestBody["name"].(string)),
+			Birthday: utils.StringToPtr(requestBody["birthday"].(string)),
+			Address:  utils.StringToPtr(requestBody["address"].(string)),
+			Gender:   utils.IntToPtr(int16(requestBody["gender"].(int))),
+		}
+
+		// Mock the service methods
+		userService.On("UpdateProfile", userID, input).Return(nil)
 
 		body, _ := json.Marshal(requestBody)
 
@@ -487,7 +68,7 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - Validation Error", func(t *testing.T) {
@@ -600,8 +181,8 @@ func TestUpdateProfile(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -629,21 +210,21 @@ func TestUpdateProfile(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("UpdateProfile - Invalid UserID ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", nil)
-		c.Set("UserID", uint(0)) // Invalid User ID
+		c.Set("UserID", 0) // Invalid User ID
 
 		// Call the handler
 		handler.UpdateProfile(c)
@@ -661,30 +242,37 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
+		userID := uint(1)
 		requestBody := map[string]any{
 			"name":     "Updated User",
 			"birthday": "2000-01-01",
 			"address":  "456 New Street",
 			"gender":   2,
 		}
+		input := &dto.UpdateProfileInput{
+			Name:     utils.StringToPtr(requestBody["name"].(string)),
+			Birthday: utils.StringToPtr(requestBody["birthday"].(string)),
+			Address:  utils.StringToPtr(requestBody["address"].(string)),
+			Gender:   utils.IntToPtr(int16(requestBody["gender"].(int))),
+		}
 
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method
-		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("UpdateProfile", userID, input).Return(apperror.NewNotFoundError("User not found"))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBuffer(body))
-		c.Set("UserID", uint(1))
+		c.Set("UserID", userID)
 
 		// Call the handler
 		handler.UpdateProfile(c)
@@ -702,38 +290,37 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error Update User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-
+		userID := uint(1)
 		requestBody := map[string]any{
 			"name":     "Updated User",
 			"birthday": "2000-01-01",
 			"address":  "456 New Street",
 			"gender":   2,
 		}
-
+		input := &dto.UpdateProfileInput{
+			Name:     utils.StringToPtr(requestBody["name"].(string)),
+			Birthday: utils.StringToPtr(requestBody["birthday"].(string)),
+			Address:  utils.StringToPtr(requestBody["address"].(string)),
+			Gender:   utils.IntToPtr(int16(requestBody["gender"].(int))),
+		}
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(apperror.NewDBUpdateError("Update error"))
+		userService.On("UpdateProfile", userID, input).Return(apperror.NewDBUpdateError("Update error"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBuffer(body))
-		c.Set("UserID", uint(1))
+		c.Set("UserID", userID)
 
 		// Call the handler
 		handler.UpdateProfile(c)
@@ -751,53 +338,9 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
-	t.Run("Error Delete Cache", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-		requestBody := map[string]any{
-			"name":     "Updated User",
-			"birthday": "2000-01-01",
-			"address":  "456 New Street",
-			"gender":   2,
-		}
-
-		body, _ := json.Marshal(requestBody)
-		// Mock the service method
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(nil)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBuffer(body))
-		c.Set("UserID", uint(1))
-
-		// Call the handler
-		handler.UpdateProfile(c)
-
-		// Assert the response
-		expectedBody := map[string]any{
-			"message": "Update profile successfully",
-		}
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
 }
 
 func TestGetProfile(t *testing.T) {
@@ -805,8 +348,8 @@ func TestGetProfile(t *testing.T) {
 
 	t.Run("Success get profile from database", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		user := &models.User{
 			ID:        1,
@@ -845,13 +388,12 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Success get profile from redis cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-
+		mailerService := new(mocks.MockMailerService)
 		user := &models.User{
 			ID:        1,
 			Email:     "email@example.com",
@@ -863,7 +405,8 @@ func TestGetProfile(t *testing.T) {
 		// Mock the service to return the cached profile
 		userService.On("GetProfile", uint(1)).Return(user, nil)
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, mailerService)
+
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -890,18 +433,19 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error Invalid User ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
+		mailerService := new(mocks.MockMailerService)
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, mailerService)
+
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
-		c.Set("UserID", uint(0)) // Invalid User ID
+		c.Set("UserID", "invalid") // Invalid User ID
 
 		// Call the GetProfile handler
 		handler.GetProfile(c)
@@ -918,21 +462,17 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-
+		mailerService := new(mocks.MockMailerService)
 		userId := uint(1)
-		// Assuming the cache key is constructed as "profile:<user_id>"
 
-		// Mock the GetUser method to return an error
 		userService.On("GetProfile", userId).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
-		// Mock the Redis Get method to return an empty string
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -954,13 +494,12 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Success Get Profile but Error Cache", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
+		mailerService := new(mocks.MockMailerService)
 
 		// Mock the GetUser method to return a user
 		user := &models.User{
@@ -973,7 +512,7 @@ func TestGetProfile(t *testing.T) {
 		}
 		userService.On("GetProfile", uint(1)).Return(user, nil)
 
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -1002,119 +541,6 @@ func TestGetProfile(t *testing.T) {
 	})
 }
 
-func TestGetUser(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("GetUser - Success", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Gender:    1,
-			CreatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-		}
-
-		// Mock the service method
-		userService.On("GetUser", uint(1)).Return(user, nil)
-
-		// Create http request with valid UserID
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the GetUser handler
-		handler.GetUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"id":         float64(1),
-			"email":      "email@example.com",
-			"name":       "User",
-			"gender":     float64(1),
-			"created_at": "2023-10-01T00:00:00Z",
-			"updated_at": "2023-10-01T00:00:00Z",
-			"deleted_at": nil,
-		}
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("GetUser - Not found the user", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the service method
-		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
-
-		// Create http request with valid UserID
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the GetUser handler
-		handler.GetUser(c)
-
-		// Assert the response
-		actualBody := map[string]any{
-			"code":    float64(apperror.ErrNotFound),
-			"message": "User not found",
-		}
-		var responseBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
-		assert.Equal(t, http.StatusNotFound, w.Code)
-		assert.Equal(t, actualBody["code"], responseBody["code"])
-		assert.Equal(t, actualBody["message"], responseBody["message"])
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("GetUser - Invalid UserID", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Create http request with invalid UserID
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "invalid-id"}}
-
-		// Call the GetUser handler
-		handler.GetUser(c)
-
-		// Assert the response
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrParseError),
-			"message": "Invalid UserID",
-		}
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, expectedBody["code"], actualBody["code"])
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-}
-
 func TestChangePassword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -1123,8 +549,8 @@ func TestChangePassword(t *testing.T) {
 
 	t.Run("ChangePassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		user := &models.User{
 			ID:        1,
@@ -1143,10 +569,11 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the services methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(nil)
-		bcryptService.On("CheckPasswordHash", "12345678", user.Password).Return(true)
-		bcryptService.On("HashPassword", "newpassword").Return("$2a$10$hashedNewPassword", nil)
+		userService.On("ChangePassword", uint(1), mock.MatchedBy(func(input *dto.ChangePasswordInput) bool {
+			return input.OldPassword == "12345678" &&
+				input.NewPassword == "newpassword" &&
+				input.ConfirmPassword == "newpassword"
+		})).Return(user, nil)
 
 		// Create http request and context
 		w := httptest.NewRecorder()
@@ -1163,7 +590,7 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Validation Error", func(t *testing.T) {
@@ -1269,8 +696,8 @@ func TestChangePassword(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, mailerService)
 
 				// Create http request and context
 				w := httptest.NewRecorder()
@@ -1296,15 +723,15 @@ func TestChangePassword(t *testing.T) {
 
 				// Assert mock expectations
 				userService.AssertExpectations(t)
-				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("ChangePassword - NotFound User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -1313,8 +740,8 @@ func TestChangePassword(t *testing.T) {
 		}
 		body, _ := json.Marshal(requestBody)
 
-		// Mock the GetUser method to return an error
-		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		// Mock the ChangePassword method to return an error
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
 		// Create http request and context
 		w := httptest.NewRecorder()
@@ -1338,20 +765,14 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:       1,
-			Email:    "",
-			Name:     "",
-			Password: "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-		}
 		requestBody := map[string]any{
 			"old_password":     "wrongpassword",
 			"new_password":     "newpassword",
@@ -1360,8 +781,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "wrongpassword", user.Password).Return(false)
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewInvalidPasswordError("Old password is incorrect"))
 
 		// Create a new UserHandler instance
 		w := httptest.NewRecorder()
@@ -1386,20 +806,14 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - New Password and Confirm Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:       1,
-			Email:    "email@example.com",
-			Name:     "John Doe",
-			Password: "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-		}
 		requestBody := map[string]any{
 			"old_password":     "12345678",
 			"new_password":     "123456789",
@@ -1408,8 +822,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		bcryptService.On("CheckPasswordHash", requestBody["old_password"], user.Password).Return(true)
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewPasswordMismatchError("New password and confirm password do not match"))
 
 		// Create test context
 		w := httptest.NewRecorder()
@@ -1433,20 +846,13 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Failed To Update", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:       1,
-			Email:    "email@example.com",
-			Name:     "User",
-			Password: "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-		}
 		requestBody := map[string]any{
 			"old_password":     "12345678",
 			"new_password":     "newpassword",
@@ -1455,10 +861,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(apperror.NewDBUpdateError("Update error"))
-		bcryptService.On("CheckPasswordHash", "12345678", user.Password).Return(true)
-		bcryptService.On("HashPassword", "newpassword").Return("$2a$10$hashedNewPassword", nil)
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Update error"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1482,19 +885,19 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - User Not found from ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", nil)
-		c.Set("UserID", uint(0)) // Invalid User ID
+		c.Set("UserID", "invalid") // Invalid User ID
 
 		// Call the handler
 		handler.ChangePassword(c)
@@ -1505,20 +908,14 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password equal to New Password", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:       1,
-			Email:    "email@example.com",
-			Name:     "User",
-			Password: "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-		}
 		requestBody := map[string]any{
 			"old_password":     "12345678",
 			"new_password":     "12345678",
@@ -1527,8 +924,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		bcryptService.On("CheckPasswordHash", requestBody["old_password"], user.Password).Return(true)
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewPasswordMismatchError("New password must be different from old password"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1552,20 +948,14 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Hash Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:       1,
-			Email:    "email@example.com",
-			Name:     "User",
-			Password: "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-		}
 		requestBody := map[string]any{
 			"old_password":     "12345678",
 			"new_password":     "newpassword",
@@ -1574,9 +964,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		bcryptService.On("CheckPasswordHash", requestBody["old_password"], user.Password).Return(true)
-		bcryptService.On("HashPassword", "newpassword").Return("", apperror.NewInternalError("Hash password failed"))
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternal, "Hash password failed", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1600,444 +988,9 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
-}
-
-func TestUpdateUser(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	utils.InitValidator()
-
-	t.Run("UpdateUser - Success", func(t *testing.T) {
-		// Mock the dependencies
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-
-		requestBody := map[string]any{
-			"name":     "Updated User",
-			"birthday": "2000-01-01",
-			"address":  "456 New Street",
-			"gender":   1,
-		}
-		body, _ := json.Marshal(requestBody)
-
-		// Mock methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(nil)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PATCH", "/api/v1/users/id", bytes.NewBuffer(body))
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the  handler
-		handler.UpdateUser(c)
-
-		// Assert the response
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `{"message":"Update user successfully"}`, w.Body.String())
-	})
-	t.Run("UpdateUser - Validation Error", func(t *testing.T) {
-		tests := []struct {
-			name           string
-			reqBody        string
-			expectedCode   float64
-			expectedMsg    string
-			expectedFields []apperror.FieldError
-		}{
-			{
-				name:         "EmptyName",
-				reqBody:      `{"name":""}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name must be at least 1 characters long or numeric"},
-				},
-			},
-			{
-				name:         "NameNotBlank",
-				reqBody:      `{"name":"  "}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name must not be blank"},
-				},
-			},
-			{
-				name:         "LongName",
-				reqBody:      `{"name": "` + strings.Repeat("a", 46) + `"}`,
-				expectedCode: float64(4001),
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "name", Message: "name must be at most 45 characters long or numeric"},
-				},
-			},
-			{
-				name:         "InvalidBirthdayFormat",
-				reqBody:      `{"name":"User","birthday":"invalid-date"}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "birthday", Message: "birthday must be a valid date (YYYY-MM-DD) and not in the future"},
-				},
-			},
-			{
-				name:         "FutureBirthday",
-				reqBody:      `{"name":"User","birthday":"3000-01-01"}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "birthday", Message: "birthday must be a valid date (YYYY-MM-DD) and not in the future"},
-				},
-			},
-			{
-				name:         "EmptyAddress",
-				reqBody:      `{"name":"User","birthday":"2000-01-01","address":""}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address must be at least 1 characters long or numeric"},
-				},
-			},
-			{
-				name:         "LongAddress",
-				reqBody:      `{"name":"User","birthday":"2000-01-01","address":"` + strings.Repeat("a", 256) + `"}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address must be at most 255 characters long or numeric"},
-				},
-			},
-			{
-				name:         "AddressNotBlank",
-				reqBody:      `{"name":"User","birthday":"2000-01-01","address":"  "}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "address", Message: "address must not be blank"},
-				},
-			},
-			{
-				name:         "InvalidGender 4",
-				reqBody:      `{"name":"User","birthday":"2000-01-01","address":"123 Street","gender":4}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "gender", Message: "gender must be one of [1 2 3]"},
-				},
-			},
-			{
-				name:         "InvalidGender 0",
-				reqBody:      `{"name":"User","birthday":"2000-01-01","address":"123 Street","gender":0}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedFields: []apperror.FieldError{
-					{Field: "gender", Message: "gender must be one of [1 2 3]"},
-				},
-			},
-			{
-				name:           "StringGender",
-				reqBody:        `{"name":"User","birthday":"2000-01-01","address":"123 Street","gender":"male"}`,
-				expectedCode:   4001,
-				expectedMsg:    "json: cannot unmarshal string into Go struct field UpdateUserInput.gender of type int16",
-				expectedFields: nil,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				// Mock services
-				userService := new(mocks.MockUserService)
-				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
-
-				// Create a test context
-				w := httptest.NewRecorder()
-				c, _ := gin.CreateTestContext(w)
-				c.Request, _ = http.NewRequest("PATCH", "/api/v1/users/:id", bytes.NewBufferString(tt.reqBody))
-				c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-				// Call the handler
-				handler.UpdateUser(c)
-
-				// Assert the response
-				var actualBody map[string]any
-				_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-
-				assert.Equal(t, http.StatusBadRequest, w.Code)
-				assert.Equal(t, tt.expectedCode, actualBody["code"])
-				assert.Equal(t, tt.expectedMsg, actualBody["message"])
-
-				// Assert mock expectations
-				userService.AssertExpectations(t)
-				bcryptService.AssertExpectations(t)
-
-			})
-		}
-	})
-
-	t.Run("UpdateUser - Error Parse ID", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		requestBody := map[string]any{
-			"name":     "Updated User",
-			"birthday": "2000-01-01",
-			"address":  "456 New Street",
-		}
-		body, _ := json.Marshal(requestBody)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PATCH", "/api/v1/users/:id", bytes.NewBuffer(body))
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "invalid-id"}}
-
-		// Call the handler
-		handler.UpdateUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrParseError),
-			"message": "Invalid UserID",
-		}
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("UpdateUser - User Not Found", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		var requestBody = map[string]any{
-			"name":     "Updated User",
-			"birthday": "2000-01-01",
-			"address":  "456 New Street",
-			"gender":   1,
-		}
-		body, _ := json.Marshal(requestBody)
-		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PATCH", "/api/v1/users/1", bytes.NewBuffer(body))
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the handler
-		handler.UpdateUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrNotFound),
-			"message": "User not found",
-		}
-		assert.Equal(t, http.StatusNotFound, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("UpdateUser - Update User Error", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-		requestBody := map[string]any{
-			"name":     "Updated User",
-			"birthday": "2000-01-01",
-			"address":  "456 New Street",
-		}
-		body, _ := json.Marshal(requestBody)
-		// Mock methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("UpdateUser", user).Return(apperror.NewDBUpdateError("Update error"))
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PATCH", "/api/v1/users/1", bytes.NewBuffer(body))
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the handler
-		handler.UpdateUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrDBUpdate),
-			"message": "Update error",
-		}
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-}
-
-func TestDeleteUser(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("DelelteUser - Success", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("DeleteUser", uint(1)).Return(nil)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("DELETE", "/api/v1/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the handler
-		handler.DeleteUser(c)
-
-		// Assert the response
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `{"message":"Delete user successfully"}`, w.Body.String())
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("DeleteUser - Failed To Parse UserID", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("DELETE", "/api/v1/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "invalid-id"}}
-
-		// Call the handler
-		handler.DeleteUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrParseError),
-			"message": "Invalid UserID",
-		}
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("DeleteUser - User Not Found", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the service method
-		userService.On("GetUser", uint(1)).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("DELETE", "/api/v1/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the  handler
-		handler.DeleteUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrNotFound),
-			"message": "User not found",
-		}
-		assert.Equal(t, http.StatusNotFound, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("DeleteUser - Failed To Delete", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:    1,
-			Email: "email@example.com",
-			Name:  "User",
-		}
-		// Mock the service methods
-		userService.On("GetUser", uint(1)).Return(user, nil)
-		userService.On("DeleteUser", uint(1)).Return(apperror.NewDBDeleteError("Delete error"))
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("DELETE", "/api/v1/users/:id", nil)
-		c.Params = gin.Params{gin.Param{Key: "id", Value: "1"}}
-
-		// Call the handler
-		handler.DeleteUser(c)
-
-		// Assert the response
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrDBDelete),
-			"message": "Delete error",
-		}
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
 }
 
 func TestResetPassword(t *testing.T) {
@@ -2047,30 +1000,17 @@ func TestResetPassword(t *testing.T) {
 
 	t.Run("ResetPassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		expiredAt := time.Now().Add(24 * time.Hour).Unix()
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Password:  "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-			ExpiredAt: &expiredAt,
-		}
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"token":        "token",
-			"password":     "newpassword",
 			"new_password": "newpassword",
 		}
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(true)
-		bcryptService.On("HashPassword", "newpassword").Return("$2a$10$hashedNewPassword", nil)
-		userService.On("UpdateUser", user).Return(nil)
+		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2086,13 +1026,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Not found user by token", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
@@ -2102,8 +1042,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method's behavior
-		userService.On("GetUserByToken", "invalid-token").
-			Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2127,32 +1066,22 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Token Expired", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		expiredAt := time.Now().Add(-24 * time.Hour).Unix() // Token expired
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Password:  "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-			ExpiredAt: &expiredAt,
-		}
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
-			"password":     "newpassword",
 			"new_password": "newpassword",
 		}
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method
-		userService.On("GetUserByToken", "invalid-token").Return(user, nil)
+		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusBadRequest, apperror.ErrTokenExpired, "Token is expired", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2175,71 +1104,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-
-	})
-
-	t.Run("ResetPassword - Passwords Incorrect", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		expiredAt := time.Now().Add(24 * time.Hour).Unix()
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Password:  "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-			ExpiredAt: &expiredAt,
-		}
-
-		requestBody := map[string]any{
-			"token":        "token",
-			"password":     "newpassword",
-			"new_password": "newpassword",
-		}
-		body, _ := json.Marshal(requestBody)
-
-		// Mock the service methods
-		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(false)
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/reset-password", bytes.NewBuffer(body))
-
-		// Call the handler
-		handler.ResetPassword(c)
-
-		// Assert the response
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrInvalidPassword),
-			"message": "Old password is incorrect",
-		}
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, expectedBody["code"], actualBody["code"])
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Error Hashing Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		expiredAt := time.Now().Add(24 * time.Hour).Unix()
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Password:  "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-			ExpiredAt: &expiredAt,
-		}
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"token":        "token",
@@ -2249,10 +1120,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(true)
-		bcryptService.On("HashPassword", "newpassword").
-			Return("", apperror.NewInternalError("Failed to hash password"))
+		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrPasswordHashFailed, "Failed to hash password", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2275,22 +1143,13 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error failed to UpdateUser", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		expiredAt := time.Now().Add(24 * time.Hour).Unix()
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Password:  "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-			ExpiredAt: &expiredAt,
-		}
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"token":        "token",
@@ -2300,10 +1159,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(true)
-		bcryptService.On("HashPassword", "newpassword").Return("$2a$10$hashedNewPassword", nil)
-		userService.On("UpdateUser", user).Return(apperror.NewDBUpdateError("Failed to update user"))
+		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Failed to update user"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2329,7 +1185,7 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Validation Error", func(t *testing.T) {
@@ -2351,10 +1207,6 @@ func TestResetPassword(t *testing.T) {
 						Message: "token is required",
 					},
 					{
-						Field:   "password",
-						Message: "password is required",
-					},
-					{
 						Field:   "new_password",
 						Message: "new_password is required",
 					},
@@ -2366,10 +1218,6 @@ func TestResetPassword(t *testing.T) {
 				expectedCode: 4001,
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
-					{
-						Field:   "password",
-						Message: "password is required",
-					},
 					{
 						Field:   "new_password",
 						Message: "new_password is required",
@@ -2383,10 +1231,6 @@ func TestResetPassword(t *testing.T) {
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
 					{
-						Field:   "password",
-						Message: "password must be at least 6 characters long or numeric",
-					},
-					{
 						Field:   "new_password",
 						Message: "new_password is required",
 					},
@@ -2398,10 +1242,6 @@ func TestResetPassword(t *testing.T) {
 				expectedCode: 4001,
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
-					{
-						Field:   "password",
-						Message: "password must be at most 255 characters long or numeric",
-					},
 					{
 						Field:   "new_password",
 						Message: "new_password is required",
@@ -2449,8 +1289,8 @@ func TestResetPassword(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -2471,7 +1311,7 @@ func TestResetPassword(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
@@ -2485,7 +1325,6 @@ func TestForgotPassword(t *testing.T) {
 	utils.InitValidator()
 
 	t.Run("ForgotPassword - Success", func(t *testing.T) {
-		// Set up environment variables to avoid mail service crash
 		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
 		_ = os.Setenv("MAIL_PORT", "587")
 		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
@@ -2502,8 +1341,8 @@ func TestForgotPassword(t *testing.T) {
 		}()
 
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		user := &models.User{
 			ID:    1,
@@ -2517,33 +1356,27 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUserByEmail", "test@example.com").Return(user, nil)
-		userService.On("UpdateUser", mock.AnythingOfType("*models.User")).Return(nil)
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(user, nil)
+		mailerService.On("SendMailForgotPassword", user).Return(nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("POST", "/api/v1/forgot-password", bytes.NewBuffer(body))
 
-		// Call the handler - this will fail at template parsing because template path is relative
 		handler.ForgotPassword(c)
 
-		// The function should fail at template parsing step because template path is relative to working directory
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 
-		// Verify the error is related to template parsing (which is expected in test environment)
 		var responseBody map[string]any
 		_ = json.Unmarshal(w.Body.Bytes(), &responseBody)
-		// Accept either template parsing error or email sending error as both are expected in test environment
-		errorMessage := responseBody["message"].(string)
-		assert.True(t,
-			strings.Contains(errorMessage, "error parsing template") ||
-				strings.Contains(errorMessage, "error sending email"),
-			"Expected template or email error, got: %s", errorMessage)
+		message := responseBody["message"].(string)
+
+		assert.Equal(t, "Forgot password successfully", message)
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Validation Error", func(t *testing.T) {
@@ -2586,8 +1419,8 @@ func TestForgotPassword(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				bcryptService := new(mocks.MockBcryptService)
-				handler := handlers.NewUserHandler(userService, bcryptService)
+				mailerService := new(mocks.MockMailerService)
+				handler := handlers.NewUserHandler(userService, mailerService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -2612,15 +1445,15 @@ func TestForgotPassword(t *testing.T) {
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				bcryptService.AssertExpectations(t)
+				mailerService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("ForgotPassword - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"email": "notfound@example.com",
@@ -2628,7 +1461,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method to return an error
-		userService.On("GetUserByEmail", "notfound@example.com").Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2651,19 +1484,13 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Update User Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		user := &models.User{
-			ID:    1,
-			Email: "test@example.com",
-			Name:  "Test User",
-		}
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		requestBody := map[string]any{
 			"email": "test@example.com",
@@ -2671,8 +1498,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("GetUserByEmail", "test@example.com").Return(user, nil)
-		userService.On("UpdateUser", mock.AnythingOfType("*models.User")).Return(apperror.NewDBUpdateError("Update failed"))
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Update failed"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -2695,13 +1521,13 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - JSON Parse Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
 
 		// Create a test context with invalid JSON
 		w := httptest.NewRecorder()
@@ -2716,139 +1542,6 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-}
-
-func TestGetUsers(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	utils.InitValidator()
-
-	t.Run("GetUsers - Success with pagination", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Create mock user data
-		users := []*models.User{
-			{
-				ID:    1,
-				Name:  "User 1",
-				Email: "user1@example.com",
-			},
-			{
-				ID:    2,
-				Name:  "User 2",
-				Email: "user2@example.com",
-			},
-		}
-
-		// Mock the GetUsers method
-		expectedPagination := &dto.Pagination[*models.User]{
-			Page:       1,
-			Limit:      10,
-			TotalItems: 2,
-			TotalPages: 1,
-			Data:       users,
-		}
-		userService.On("GetUsers", 1, 10).Return(expectedPagination, nil)
-
-		// Create a test context with query parameters
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/users?page=1&limit=10", nil)
-
-		// Call the handler
-		handler.GetUsers(c)
-
-		// Assert the response
-		assert.Equal(t, http.StatusOK, w.Code)
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-
-		// Verify response body contains pagination data
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		require.NoError(t, err)
-		assert.NotNil(t, response["data"])
-	})
-
-	t.Run("GetUsers - Default pagination values", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the GetUsers method with default values (page=1, limit=50)
-		expectedPagination := &dto.Pagination[*models.User]{
-			Page:       1,
-			Limit:      50,
-			TotalItems: 0,
-			TotalPages: 0,
-			Data:       []*models.User{},
-		}
-		userService.On("GetUsers", 1, 50).Return(expectedPagination, nil)
-
-		// Create a test context without query parameters (should use defaults)
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/users", nil)
-
-		// Call the handler
-		handler.GetUsers(c)
-
-		// Assert the response
-		assert.Equal(t, http.StatusOK, w.Code)
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("GetUsers - Invalid page parameter", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the GetUsers method with default page=1
-		expectedPagination := &dto.Pagination[*models.User]{
-			Limit:      5,
-			TotalItems: 0,
-			TotalPages: 0,
-			Data:       []*models.User{},
-		}
-		userService.On("GetUsers", 1, 5).Return(expectedPagination, nil)
-
-		// Create a test context with invalid page parameter (should default to 1)
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/users?page=invalid&limit=5", nil)
-
-		// Call the handler
-		handler.GetUsers(c)
-
-		// Assert the response - should still be 200 with default pagination
-		assert.Equal(t, http.StatusOK, w.Code)
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-	})
-
-	t.Run("GetUsers - Service error", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		handler := handlers.NewUserHandler(userService, bcryptService)
-
-		// Mock the GetUsers method to return an error
-		userService.On("GetUsers", 1, 50).Return(nil, apperror.NewDBQueryError("database error"))
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/users", nil)
-
-		// Call the handler
-		handler.GetUsers(c)
-
-		// Assert the response - should return 500 for service error
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
 	})
 }

@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type IUserRepository interface {
+type UserRepository interface {
 	GetAll() ([]*models.User, error)
 	GetByID(id uint) (*models.User, error)
 	Create(user *models.User) (*models.User, error)
@@ -19,12 +19,12 @@ type IUserRepository interface {
 	GetDB() *gorm.DB
 }
 
-type UserRepository struct {
+type userRepositoryImpl struct {
 	db *gorm.DB
 }
 
-func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(db *gorm.DB) UserRepository {
+	return &userRepositoryImpl{db: db}
 }
 
 // GetUsers retrieves a paginated list of users from the database
@@ -38,7 +38,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 //
 // Example:
 //   - users, err := repo.GetUsers(1, 50) // Gets the first page of users
-func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination[*models.User], error) {
+func (repo *userRepositoryImpl) GetUsers(page, limit int) (*dto.Pagination[*models.User], error) {
 	var totalRows int64
 	offset := (page - 1) * limit
 
@@ -70,7 +70,7 @@ func (repo *UserRepository) GetUsers(page, limit int) (*dto.Pagination[*models.U
 // Returns:
 //   - []*models.User: Slice containing all User models in the database
 //   - error: Error if there was a database error, nil on success
-func (repo *UserRepository) GetAll() ([]*models.User, error) {
+func (repo *userRepositoryImpl) GetAll() ([]*models.User, error) {
 	var users []*models.User
 	if err := repo.db.Find(&users).Error; err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func (repo *UserRepository) GetAll() ([]*models.User, error) {
 // Returns:
 //   - *models.User: Pointer to the retrieved User model
 //   - error: Error if the user is not found or if there was a database error
-func (repo *UserRepository) GetByID(id uint) (*models.User, error) {
+func (repo *userRepositoryImpl) GetByID(id uint) (*models.User, error) {
 	var user models.User
 	if err := repo.db.First(&user, id).Error; err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (repo *UserRepository) GetByID(id uint) (*models.User, error) {
 // Returns:
 //   - *models.User: Pointer to the created User model with assigned ID
 //   - error: Error if there was a problem creating the user, nil on success
-func (repo *UserRepository) Create(user *models.User) (*models.User, error) {
+func (repo *userRepositoryImpl) Create(user *models.User) (*models.User, error) {
 	if err := repo.db.Create(user).Error; err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func (repo *UserRepository) Create(user *models.User) (*models.User, error) {
 // Returns:
 //   - *models.User: Pointer to the created User model with assigned ID
 //   - error: Error if there was a problem creating the user, nil on success
-func (repo *UserRepository) CreateWithTx(tx *gorm.DB, user *models.User) (*models.User, error) {
+func (repo *userRepositoryImpl) CreateWithTx(tx *gorm.DB, user *models.User) (*models.User, error) {
 	if err := tx.Create(user).Error; err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (repo *UserRepository) CreateWithTx(tx *gorm.DB, user *models.User) (*model
 //
 // Returns:
 //   - error: Error if there was a problem updating the user, nil on success
-func (repo *UserRepository) Update(user *models.User) error {
+func (repo *userRepositoryImpl) Update(user *models.User) error {
 	return repo.db.Save(user).Error
 }
 
@@ -138,7 +138,7 @@ func (repo *UserRepository) Update(user *models.User) error {
 //
 // Returns:
 //   - error: Error if there was a problem deleting the user, nil on success
-func (repo *UserRepository) Delete(userId uint) error {
+func (repo *userRepositoryImpl) Delete(userId uint) error {
 	var user models.User
 	return repo.db.Delete(&user, userId).Error
 }
@@ -151,7 +151,7 @@ func (repo *UserRepository) Delete(userId uint) error {
 // Returns:
 //   - *models.User: Pointer to the retrieved User model if found
 //   - error: Error if user not found or if there was a database error
-func (repo *UserRepository) FindByField(field string, value string) (*models.User, error) {
+func (repo *userRepositoryImpl) FindByField(field string, value string) (*models.User, error) {
 	// Validate field input to prevent SQL injection
 	switch field {
 	case "name":
@@ -176,6 +176,6 @@ func (repo *UserRepository) FindByField(field string, value string) (*models.Use
 //
 // Returns:
 //   - *gorm.DB: The database connection
-func (repo *UserRepository) GetDB() *gorm.DB {
+func (repo *userRepositoryImpl) GetDB() *gorm.DB {
 	return repo.db
 }

@@ -20,30 +20,30 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-// IJWTService defines JWT-related operations
-type IJWTService interface {
+// JWTService defines JWT-related operations
+type JWTService interface {
 	GenerateAccessToken(id uint) (*dto.JwtResult, error)
 	ValidateToken(tokenString string) (*CustomClaims, error)
 	ValidateTokenWithScope(tokenString string, requiredScope string) (*CustomClaims, error)
 	ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error)
 }
 
-// jwtService implements JWTService
-type jwtService struct {
+// jwtServiceImpl implements JWTService
+type jwtServiceImpl struct {
 	secret []byte
 }
 
-// NewJWTService returns a new instance of jwtService
-func NewJWTService() IJWTService {
+// NewJWTService returns a new instance of jwtServiceImpl
+func NewJWTService() JWTService {
 	secret := []byte(utils.GetEnv("JWT_KEY", "replace_your_key"))
-	return &jwtService{
+	return &jwtServiceImpl{
 		secret: secret,
 	}
 }
 
 // GenerateAccessToken creates a new access JWT token for the given user ID
 // Access tokens have 1-hour expiration and can access all authenticated endpoints
-func (s *jwtService) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
+func (s *jwtServiceImpl) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 	expiresAt := jwt.NewNumericDate(time.Now().Add(time.Hour))
 	claims := CustomClaims{
 		ID:    id,
@@ -67,7 +67,7 @@ func (s *jwtService) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 }
 
 // ValidateToken validates a JWT token string and returns the claims if valid
-func (s *jwtService) ValidateToken(tokenString string) (*CustomClaims, error) {
+func (s *jwtServiceImpl) ValidateToken(tokenString string) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return s.secret, nil
 	})
@@ -85,7 +85,7 @@ func (s *jwtService) ValidateToken(tokenString string) (*CustomClaims, error) {
 
 // ValidateTokenWithScope validates a JWT token string with a specific required scope
 // Returns error if token is invalid or scope does not match
-func (s *jwtService) ValidateTokenWithScope(tokenString string, requiredScope string) (*CustomClaims, error) {
+func (s *jwtServiceImpl) ValidateTokenWithScope(tokenString string, requiredScope string) (*CustomClaims, error) {
 	claims, err := s.ValidateToken(tokenString)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (s *jwtService) ValidateTokenWithScope(tokenString string, requiredScope st
 // ValidateTokenIgnoreExpiration validates a JWT token string but ignores expiration time
 // This is useful when you want to extract user information from expired tokens
 // Returns error if token signature is invalid, but ignores exp claim
-func (s *jwtService) ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error) {
+func (s *jwtServiceImpl) ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return s.secret, nil
 	}, jwt.WithoutClaimsValidation())
