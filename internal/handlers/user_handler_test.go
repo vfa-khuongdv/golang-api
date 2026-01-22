@@ -2121,14 +2121,12 @@ func TestResetPassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"token":        "token",
-			"password":     "newpassword",
 			"new_password": "newpassword",
 		}
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
 		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(true)
 		bcryptService.On("HashPassword", "newpassword").Return("$2a$10$hashedNewPassword", nil)
 		userService.On("UpdateUser", user).Return(nil)
 
@@ -2210,7 +2208,6 @@ func TestResetPassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
-			"password":     "newpassword",
 			"new_password": "newpassword",
 		}
 		body, _ := json.Marshal(requestBody)
@@ -2230,56 +2227,6 @@ func TestResetPassword(t *testing.T) {
 		expectedBody := map[string]any{
 			"code":    float64(apperror.ErrTokenExpired),
 			"message": "Token is expired",
-		}
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.Equal(t, expectedBody["code"], actualBody["code"])
-		assert.Equal(t, expectedBody["message"], actualBody["message"])
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		bcryptService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
-	})
-
-	t.Run("ResetPassword - Passwords Incorrect", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		bcryptService := new(mocks.MockBcryptService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, bcryptService, mailerService)
-
-		expiredAt := time.Now().Add(24 * time.Hour).Unix()
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Password:  "$2a$10$I/L5VegpCyOlJPoa1.KrmeCdezSBIandsEL5S2dd4Ap0YIWk0Iuka", // bcrypt hash of "12345678"
-			ExpiredAt: &expiredAt,
-		}
-
-		requestBody := map[string]any{
-			"token":        "token",
-			"password":     "newpassword",
-			"new_password": "newpassword",
-		}
-		body, _ := json.Marshal(requestBody)
-
-		// Mock the service methods
-		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(false)
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/reset-password", bytes.NewBuffer(body))
-
-		// Call the handler
-		handler.ResetPassword(c)
-
-		// Assert the response
-		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrInvalidPassword),
-			"message": "Old password is incorrect",
 		}
 		var actualBody map[string]any
 		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
@@ -2317,7 +2264,6 @@ func TestResetPassword(t *testing.T) {
 
 		// Mock the service methods
 		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(true)
 		bcryptService.On("HashPassword", "newpassword").
 			Return("", apperror.NewInternalError("Failed to hash password"))
 
@@ -2370,7 +2316,6 @@ func TestResetPassword(t *testing.T) {
 
 		// Mock the service methods
 		userService.On("GetUserByToken", "token").Return(user, nil)
-		bcryptService.On("CheckPasswordHash", "newpassword", user.Password).Return(true)
 		bcryptService.On("HashPassword", "newpassword").Return("$2a$10$hashedNewPassword", nil)
 		userService.On("UpdateUser", user).Return(apperror.NewDBUpdateError("Failed to update user"))
 
@@ -2421,10 +2366,6 @@ func TestResetPassword(t *testing.T) {
 						Message: "token is required",
 					},
 					{
-						Field:   "password",
-						Message: "password is required",
-					},
-					{
 						Field:   "new_password",
 						Message: "new_password is required",
 					},
@@ -2436,10 +2377,6 @@ func TestResetPassword(t *testing.T) {
 				expectedCode: 4001,
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
-					{
-						Field:   "password",
-						Message: "password is required",
-					},
 					{
 						Field:   "new_password",
 						Message: "new_password is required",
@@ -2453,10 +2390,6 @@ func TestResetPassword(t *testing.T) {
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
 					{
-						Field:   "password",
-						Message: "password must be at least 6 characters long or numeric",
-					},
-					{
 						Field:   "new_password",
 						Message: "new_password is required",
 					},
@@ -2468,10 +2401,6 @@ func TestResetPassword(t *testing.T) {
 				expectedCode: 4001,
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
-					{
-						Field:   "password",
-						Message: "password must be at most 255 characters long or numeric",
-					},
 					{
 						Field:   "new_password",
 						Message: "new_password is required",
