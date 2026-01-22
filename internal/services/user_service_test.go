@@ -110,6 +110,39 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 	})
 }
 
+func (s *UserServiceTestSuite) TestForgotPassword() {
+	s.T().Run("Success", func(t *testing.T) {
+		// Arrange
+		email := "test@example.com"
+		user := &models.User{Email: email}
+
+		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
+		s.repo.On("Update", user).Return(nil).Once()
+
+		// Act
+		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+
+		// Assert
+		s.NoError(err)
+		s.NotNil(result)
+		s.NotNil(result.Token)
+		s.NotNil(result.ExpiredAt)
+	})
+
+	s.T().Run("UserNotFound", func(t *testing.T) {
+		// Arrange
+		email := "unknown@example.com"
+		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), errors.New("record not found")).Once()
+
+		// Act
+		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+
+		// Assert
+		s.Error(err)
+		s.Nil(result)
+	})
+}
+
 func TestUserServiceTestSuite(t *testing.T) {
 	suite.Run(t, new(UserServiceTestSuite))
 }

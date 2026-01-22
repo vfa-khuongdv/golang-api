@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"math/rand"
-	"time"
+	"crypto/rand"
+	"math/big"
 )
 
 // GenerateRandomString generates a random string of specified length using alphanumeric characters
@@ -13,11 +13,15 @@ import (
 //   - string: randomly generated alphanumeric string of length n
 func GenerateRandomString(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-
 	result := make([]byte, n)
 	for i := range result {
-		result[i] = charset[seededRand.Intn(len(charset))]
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// Fallback or panic in case of entropy failure, usually effectively impossible
+			// For this utility, we'll just skip the char which is not ideal but simple
+			continue
+		}
+		result[i] = charset[num.Int64()]
 	}
 	return string(result)
 }

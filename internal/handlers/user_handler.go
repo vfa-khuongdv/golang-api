@@ -55,13 +55,15 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 	}
 
 	// Send password reset email to user
-	if err := handler.mailerService.SendMailForgotPassword(user); err != nil {
-		utils.RespondWithError(ctx, err)
-		return
+	if user != nil {
+		if err := handler.mailerService.SendMailForgotPassword(user); err != nil {
+			utils.RespondWithError(ctx, err)
+			return
+		}
+		logger.Info("Email sent successfully!")
 	}
-	logger.Info("Email sent successfully!")
 
-	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Forgot password successfully"})
+	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "If your email is in our system, you will receive instructions to reset your password"})
 }
 
 func (handler *userHandlerImpl) ResetPassword(ctx *gin.Context) {
