@@ -34,3 +34,13 @@ func StringToPtr(s string) *string {
 	}
 	return &s
 }
+
+// IntToPtr converts any type to a pointer to that type
+// Parameters:
+//   - i: the value to convert
+//
+// Returns:
+//   - *T: pointer to the value
+func IntToPtr[T any](i T) *T {
+	return &i
+}

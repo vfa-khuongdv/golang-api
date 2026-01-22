@@ -107,7 +107,7 @@ func TestUsersChangePassword(t *testing.T) {
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Equal(t, apperror.ErrPasswordMismatch, errResp.Code)
+		assert.Equal(t, apperror.ErrPasswordUnchanged, errResp.Code)
 	})
 
 	t.Run("Change Password - Password Mismatch", func(t *testing.T) {

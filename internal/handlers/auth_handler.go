@@ -25,8 +25,8 @@ func NewAuthHandler(authService services.AuthService) AuthHandler {
 }
 
 func (handler *authHandlerImpl) Login(ctx *gin.Context) {
+	// Bind and validate JSON request body
 	var credentials dto.LoginInput
-
 	if err := ctx.ShouldBindJSON(&credentials); err != nil {
 		validateErr := utils.TranslateValidationErrors(err, credentials)
 		utils.RespondWithError(
@@ -47,9 +47,8 @@ func (handler *authHandlerImpl) Login(ctx *gin.Context) {
 }
 
 func (handler *authHandlerImpl) RefreshToken(ctx *gin.Context) {
+	// Bind and validate JSON request body
 	var input dto.RefreshTokenInput
-
-	// Bind JSON request body to token struct
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validationErr := utils.TranslateValidationErrors(err, input)
 		utils.RespondWithError(

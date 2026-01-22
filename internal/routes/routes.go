@@ -33,15 +33,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
-	userService := services.NewUserService(userRepo)
 	bcryptService := services.NewBcryptService()
+	userService := services.NewUserService(userRepo, bcryptService)
 	jwtService := services.NewJWTService()
 	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
 	mailerService := services.NewMailerService()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	userHandler := handlers.NewUserHandler(userService, bcryptService, mailerService)
+	userHandler := handlers.NewUserHandler(userService, mailerService)
 
 	// Add middleware for CORS and logging
 	router.Use(
@@ -68,12 +68,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.POST("/change-password", userHandler.ChangePassword)
 			authenticated.GET("/profile", userHandler.GetProfile)
 			authenticated.PATCH("/profile", userHandler.UpdateProfile)
-
-			authenticated.GET("/users", userHandler.GetUsers)
-			authenticated.POST("/users", userHandler.CreateUser)
-			authenticated.GET("/users/:id", userHandler.GetUser)
-			authenticated.PATCH("/users/:id", userHandler.UpdateUser)
-			authenticated.DELETE("/users/:id", userHandler.DeleteUser)
 		}
 	}
 
