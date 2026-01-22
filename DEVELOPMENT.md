@@ -23,23 +23,23 @@ This project follows **Clean Architecture** principles with clear separation of 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    HTTP/REST Layer                       │
-│                    (handlers, routes)                    │
+│                    HTTP/REST Layer                      │
+│                    (handlers, routes)                   │
 └──────────────────────┬──────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────┐
-│                    Service Layer                         │
+│                    Service Layer                        │
 │              (business logic, validation)               │
 └──────────────────────┬──────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────┐
-│                  Repository Layer                        │
+│                  Repository Layer                       │
 │            (database access, queries)                   │
 └──────────────────────┬──────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────┐
-│                   Data Layer                             │
-│                    (Database)                            │
+│                   Data Layer                            │
+│                    (Database)                           │
 └─────────────────────────────────────────────────────────┘
 ```
 
