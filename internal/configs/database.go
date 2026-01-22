@@ -1,7 +1,10 @@
 package configs
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/driver/mysql"
@@ -9,25 +12,28 @@ import (
 )
 
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
+	Host            string
+	Port            string
+	User            string
+	Password        string
+	DBName          string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
 }
 
 var DB *gorm.DB
 
-// InitDB initializes a MySQL database connection using GORM
-// Parameters:
-//   - config: DatabaseConfig struct containing database connection parameters
-//
-// Returns:
-//   - *gorm.DB: Database connection instance
-//
-// Note: Also sets the global DB variable with the connection instance
+const (
+	DEFAULT_MAX_OPEN_CONNS    = 25
+	DEFAULT_MAX_IDLE_CONNS    = 10
+	DEFAULT_CONN_MAX_LIFETIME = 30 * time.Minute
+)
+
+// InitDB initializes MySQL with GORM and configures a resilient connection pool
 func InitDB(config DatabaseConfig) *gorm.DB {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC",
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC",
 		config.User,
 		config.Password,
 		config.Host,
@@ -35,12 +41,61 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 		config.DBName,
 	)
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	// Open GORM connection
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		PrepareStmt: true,
+	})
 	if err != nil {
-		logger.Fatalf("Failed to connect to the MySQL database: %+v", err)
-	} else {
-		logger.Info("MySQL database connection established successfully")
+		logger.Fatalf("Failed to connect to MySQL: %+v", err)
 	}
+
+	// Get underlying sql.DB
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Fatalf("Failed to get sql.DB: %+v", err)
+	}
+
+	// =========================
+	// Connection Pool Settings
+	// =========================
+	setDefaults(&config)
+
+	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(config.ConnMaxLifetime)
+
+	// Validate connection
+	if err := pingDB(sqlDB); err != nil {
+		logger.Fatalf("Database ping failed: %+v", err)
+	}
+
+	logger.Infof(
+		"MySQL connected | open=%d idle=%d lifetime=%s",
+		config.MaxOpenConns,
+		config.MaxIdleConns,
+		config.ConnMaxLifetime,
+	)
+
 	DB = db
 	return db
+}
+
+// setDefaults applies safe defaults if values are not provided
+func setDefaults(config *DatabaseConfig) {
+	if config.MaxOpenConns == 0 {
+		config.MaxOpenConns = DEFAULT_MAX_OPEN_CONNS
+	}
+	if config.MaxIdleConns == 0 {
+		config.MaxIdleConns = DEFAULT_MAX_IDLE_CONNS
+	}
+	if config.ConnMaxLifetime == 0 {
+		config.ConnMaxLifetime = DEFAULT_CONN_MAX_LIFETIME
+	}
+}
+
+// pingDB verifies DB connectivity with timeout
+func pingDB(db *sql.DB) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return db.PingContext(ctx)
 }
