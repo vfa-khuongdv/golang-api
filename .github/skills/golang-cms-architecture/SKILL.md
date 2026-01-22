@@ -1,6 +1,6 @@
 ---
 name: golang-cms-architecture
-description: Complete development guidelines for golang-cms, a Go-based CMS REST API with clean architecture (handlers → services → repositories → models). Use when implementing features, writing tests, or modifying the golang-cms codebase. Covers authentication, MFA, JWT tokens, testing patterns with testify, error handling, and naming conventions.
+description: Complete development guidelines for golang-cms, a Go-based CMS REST API with clean architecture (handlers → services → repositories → models). Use when implementing features, writing tests, or modifying the golang-cms codebase. Covers authentication, JWT tokens, testing patterns with testify, error handling, and naming conventions.
 license: MIT
 metadata:
   author: golang-cms
