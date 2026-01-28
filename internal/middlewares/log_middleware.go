@@ -13,6 +13,29 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
+const (
+	// maxBodySize is the maximum size of request and response body to log (64 KB)
+	maxBodySize = 1 << 16 // 64 KB
+)
+
+// sensitiveKeys are field names that contain sensitive data and should be censored in logs
+var sensitiveKeys = []string{
+	"password", "api-key", "token", "access_token", "refresh_token",
+	"ccv", "credit_card", "debit_card", "social_security_number",
+	"ssn", "bank_account", "bank_account_number",
+	"email", "phone", "address", "cvv",
+}
+
+// sensitiveHeaders are HTTP headers that contain sensitive data and should be censored in logs
+var sensitiveHeaders = []string{
+	"authorization",
+	"cookie",
+	"set-cookie",
+	"x-api-key",
+	"x-auth-token",
+	"proxy-authorization",
+}
+
 // LogResponse defines the structure for logging HTTP requests and responses
 type LogResponse struct {
 	Method     string `json:"method"`
@@ -35,31 +58,47 @@ func (w *bodyWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// filterSensitiveHeaders creates a copy of headers with sensitive values censored
+func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
+	filtered := make(map[string][]string)
+	for key, values := range headers {
+		lowerKey := strings.ToLower(key)
+		isSensitive := false
+		for _, sensitiveHeader := range sensitiveHeaders {
+			if lowerKey == sensitiveHeader {
+				isSensitive = true
+				break
+			}
+		}
+		if isSensitive {
+			filtered[key] = []string{"***CENSORED***"}
+		} else {
+			filtered[key] = values
+		}
+	}
+	return filtered
+}
+
 func LogMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		timeStart := time.Now()
 
-		// List sensitive keys to censor in logs
-		sensitiveKeys := []string{
-			"password", "api-key", "token", "access_token", "refresh_token",
-			"ccv", "credit_card", "debit_card", "social_security_number",
-			"ssn", "bank_account", "bank_account_number",
-			"email", "phone", "address", "cvv",
-		}
-
 		logEntry := LogResponse{
 			Method:  c.Request.Method,
 			URL:     c.Request.URL.String(),
-			Header:  c.Request.Header,
+			Header:  filterSensitiveHeaders(c.Request.Header),
 			Request: c.Request.URL.Query(),
 		}
 
-		// Only log request body if method is POST or PUT, and limit to 64KB
+		// Only log request body if method is POST or PUT, and limit to maxBodySize
 		if c.Request.Method == "POST" || c.Request.Method == "PUT" || c.Request.Method == "PATCH" {
-			const maxBodySize = 1 << 16 // 64 KB
 			var bodyBytes []byte
 			if c.Request.Body != nil {
-				bodyBytes, _ = io.ReadAll(io.LimitReader(c.Request.Body, maxBodySize))
+				var err error
+				bodyBytes, err = io.ReadAll(io.LimitReader(c.Request.Body, maxBodySize))
+				if err != nil {
+					logger.Error("Failed to read request body:", err)
+				}
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
 
@@ -76,7 +115,8 @@ func LogMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		responseBody := &bytes.Buffer{}
+		// Limit response body capture to maxBodySize
+		responseBody := bytes.NewBuffer(make([]byte, 0, maxBodySize))
 		c.Writer = &bodyWriter{
 			ResponseWriter: c.Writer,
 			body:           responseBody,
@@ -87,17 +127,23 @@ func LogMiddleware() gin.HandlerFunc {
 		logEntry.Latency = fmt.Sprintf("%d (ms)", time.Since(timeStart).Milliseconds())
 		logEntry.StatusCode = fmt.Sprintf("%d", c.Writer.Status())
 
+		// Limit response body to maxBodySize for logging
+		respBodyBytes := responseBody.Bytes()
+		if len(respBodyBytes) > maxBodySize {
+			respBodyBytes = respBodyBytes[:maxBodySize]
+		}
+
 		// If response is JSON, unmarshal and censor sensitive data
 		if strings.Contains(c.Writer.Header().Get("Content-Type"), "application/json") {
 			var responseBodyData any
-			if err := json.Unmarshal(responseBody.Bytes(), &responseBodyData); err == nil {
+			if err := json.Unmarshal(respBodyBytes, &responseBodyData); err == nil {
 				responseBodyData = utils.CensorSensitiveData(responseBodyData, sensitiveKeys)
 				logEntry.Response = responseBodyData
 			} else {
-				logEntry.Response = responseBody.String()
+				logEntry.Response = string(respBodyBytes)
 			}
 		} else {
-			logEntry.Response = responseBody.String()
+			logEntry.Response = string(respBodyBytes)
 		}
 
 		// Use goroutine to write log entry to avoid blocking
