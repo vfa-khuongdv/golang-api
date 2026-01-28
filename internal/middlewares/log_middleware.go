@@ -71,7 +71,7 @@ func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
 			}
 		}
 		if isSensitive {
-			filtered[key] = []string{"***CENSORED***"}
+			filtered[key] = []string{"*****"}
 		} else {
 			filtered[key] = values
 		}

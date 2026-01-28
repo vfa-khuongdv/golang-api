@@ -255,15 +255,15 @@ func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
 
 	authHeader, ok := headers["Authorization"].([]interface{})
 	assert.True(t, ok)
-	assert.Equal(t, "***CENSORED***", authHeader[0])
+	assert.Equal(t, "*****", authHeader[0])
 
 	cookieHeader, ok := headers["Cookie"].([]interface{})
 	assert.True(t, ok)
-	assert.Equal(t, "***CENSORED***", cookieHeader[0])
+	assert.Equal(t, "*****", cookieHeader[0])
 
 	apiKeyHeader, ok := headers["X-Api-Key"].([]interface{})
 	assert.True(t, ok)
-	assert.Equal(t, "***CENSORED***", apiKeyHeader[0])
+	assert.Equal(t, "*****", apiKeyHeader[0])
 
 	// Verify non-sensitive headers are not censored
 	customHeader, ok := headers["X-Custom-Header"].([]interface{})
