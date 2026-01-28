@@ -3,9 +3,16 @@ package utils
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
+)
+
+const (
+	// maxCacheEntries limits the size of sensitiveKeyCache to prevent memory leaks
+	maxCacheEntries = 100
 )
 
 // CensorSensitiveData recursively censors sensitive fields in complex data structures.
@@ -161,25 +168,56 @@ func matchedValOrZero(val reflect.Value, typ reflect.Type) reflect.Value {
 }
 
 // sensitiveKeyCache caches lowercase sensitive keys for O(1) lookup performance
-var sensitiveKeyCache map[string]map[string]bool
+// Protected by cacheMutex for thread-safe concurrent access
+var (
+	sensitiveKeyCache = make(map[string]map[string]bool)
+	cacheMutex        sync.RWMutex
+)
 
 // containsSensitiveKey checks if item matches any sensitive key (case-insensitive).
 // Uses a cached map for O(1) lookups instead of O(n) slice iteration.
+// Cache keys are sorted to avoid duplicates from different field orders.
 func containsSensitiveKey(maskFields []string, item string) bool {
 	if len(maskFields) == 0 {
 		return false
 	}
 
-	// Build cache key from maskFields for memoization
-	cacheKey := strings.Join(maskFields, ",")
-	if sensitiveKeyCache == nil {
-		sensitiveKeyCache = make(map[string]map[string]bool)
-	}
+	// Sort maskFields to create consistent cache key (avoid ["a","b"] vs ["b","a"])
+	sortedFields := make([]string, len(maskFields))
+	copy(sortedFields, maskFields)
+	sort.Strings(sortedFields)
+	cacheKey := strings.Join(sortedFields, ",")
 
-	// Check cache
+	// Try read lock first (most common case)
+	cacheMutex.RLock()
+	if cache, exists := sensitiveKeyCache[cacheKey]; exists {
+		_, found := cache[strings.ToLower(item)]
+		cacheMutex.RUnlock()
+		return found
+	}
+	cacheMutex.RUnlock()
+
+	// Cache miss - acquire write lock to build cache
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
+	// Double-check after acquiring write lock (another goroutine might have added it)
 	if cache, exists := sensitiveKeyCache[cacheKey]; exists {
 		_, found := cache[strings.ToLower(item)]
 		return found
+	}
+
+	// Implement cache size limit to prevent memory leaks
+	if len(sensitiveKeyCache) >= maxCacheEntries {
+		// Clear half of the cache (simple eviction strategy)
+		count := 0
+		for k := range sensitiveKeyCache {
+			delete(sensitiveKeyCache, k)
+			count++
+			if count >= maxCacheEntries/2 {
+				break
+			}
+		}
 	}
 
 	// Build cache for this set of maskFields
