@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// maxBodySize is the maximum size of request and response body to log (64 KB)
-	maxBodySize = 1 << 16 // 64 KB
+	// MAX_BODY_SIZE is the maximum size of request and response body to log (64 KB)
+	MAX_BODY_SIZE = 1 << 16 // 64 KB
 )
 
 // sensitiveKeys are field names that contain sensitive data and should be censored in logs
@@ -26,26 +26,14 @@ var sensitiveKeys = []string{
 	"email", "phone", "address", "cvv",
 }
 
-// sensitiveHeaders are HTTP headers that contain sensitive data and should be censored in logs
-var sensitiveHeaders = []string{
-	"authorization",
-	"cookie",
-	"set-cookie",
-	"x-api-key",
-	"x-auth-token",
-	"proxy-authorization",
-}
-
-// sensitiveHeadersMap provides O(1) lookup for sensitive headers
-var sensitiveHeadersMap = buildSensitiveHeadersMap()
-
-// buildSensitiveHeadersMap creates a map for O(1) header lookup
-func buildSensitiveHeadersMap() map[string]bool {
-	m := make(map[string]bool, len(sensitiveHeaders))
-	for _, header := range sensitiveHeaders {
-		m[header] = true
-	}
-	return m
+// sensitiveHeaders are HTTP headers that contain sensitive information
+var sensitiveHeaders = map[string]bool{
+	"authorization":       true,
+	"cookie":              true,
+	"set-cookie":          true,
+	"x-api-key":           true,
+	"x-auth-token":        true,
+	"proxy-authorization": true,
 }
 
 // LogResponse defines the structure for logging HTTP requests and responses
@@ -75,7 +63,7 @@ func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
 	filtered := make(map[string][]string, len(headers))
 	for key, values := range headers {
 		lowerKey := strings.ToLower(key)
-		if sensitiveHeadersMap[lowerKey] {
+		if sensitiveHeaders[lowerKey] {
 			filtered[key] = []string{"*****"}
 		} else {
 			filtered[key] = values
@@ -100,7 +88,7 @@ func LogMiddleware() gin.HandlerFunc {
 			var bodyBytes []byte
 			if c.Request.Body != nil {
 				var err error
-				bodyBytes, err = io.ReadAll(io.LimitReader(c.Request.Body, maxBodySize))
+				bodyBytes, err = io.ReadAll(io.LimitReader(c.Request.Body, MAX_BODY_SIZE))
 				if err != nil {
 					logger.Error("Failed to read request body:", err)
 				}
@@ -120,8 +108,8 @@ func LogMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		// Limit response body capture to maxBodySize
-		responseBody := bytes.NewBuffer(make([]byte, 0, maxBodySize))
+		// Limit response body capture to MAX_BODY_SIZE
+		responseBody := bytes.NewBuffer(make([]byte, 0, MAX_BODY_SIZE))
 		c.Writer = &bodyWriter{
 			ResponseWriter: c.Writer,
 			body:           responseBody,
@@ -132,10 +120,10 @@ func LogMiddleware() gin.HandlerFunc {
 		logEntry.Latency = fmt.Sprintf("%d (ms)", time.Since(timeStart).Milliseconds())
 		logEntry.StatusCode = fmt.Sprintf("%d", c.Writer.Status())
 
-		// Limit response body to maxBodySize for logging
+		// Limit response body to MAX_BODY_SIZE for logging
 		respBodyBytes := responseBody.Bytes()
-		if len(respBodyBytes) > maxBodySize {
-			respBodyBytes = respBodyBytes[:maxBodySize]
+		if len(respBodyBytes) > MAX_BODY_SIZE {
+			respBodyBytes = respBodyBytes[:MAX_BODY_SIZE]
 		}
 
 		// If response is JSON, unmarshal and censor sensitive data
