@@ -36,6 +36,18 @@ var sensitiveHeaders = []string{
 	"proxy-authorization",
 }
 
+// sensitiveHeadersMap provides O(1) lookup for sensitive headers
+var sensitiveHeadersMap = buildSensitiveHeadersMap()
+
+// buildSensitiveHeadersMap creates a map for O(1) header lookup
+func buildSensitiveHeadersMap() map[string]bool {
+	m := make(map[string]bool, len(sensitiveHeaders))
+	for _, header := range sensitiveHeaders {
+		m[header] = true
+	}
+	return m
+}
+
 // LogResponse defines the structure for logging HTTP requests and responses
 type LogResponse struct {
 	Method     string `json:"method"`
@@ -60,17 +72,10 @@ func (w *bodyWriter) Write(b []byte) (int, error) {
 
 // filterSensitiveHeaders creates a copy of headers with sensitive values censored
 func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
-	filtered := make(map[string][]string)
+	filtered := make(map[string][]string, len(headers))
 	for key, values := range headers {
 		lowerKey := strings.ToLower(key)
-		isSensitive := false
-		for _, sensitiveHeader := range sensitiveHeaders {
-			if lowerKey == sensitiveHeader {
-				isSensitive = true
-				break
-			}
-		}
-		if isSensitive {
+		if sensitiveHeadersMap[lowerKey] {
 			filtered[key] = []string{"*****"}
 		} else {
 			filtered[key] = values
