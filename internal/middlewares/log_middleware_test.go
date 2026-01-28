@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,9 +15,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// syncBuffer is a thread-safe wrapper for bytes.Buffer
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (sb *syncBuffer) Write(p []byte) (n int, err error) {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.buf.Write(p)
+}
+
+func (sb *syncBuffer) Bytes() []byte {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	return sb.buf.Bytes()
+}
+
 func TestLogMiddleware(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil) // Reset after test
@@ -97,8 +116,8 @@ func TestLogMiddleware(t *testing.T) {
 }
 
 func TestLogMiddleware_GetRequest(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -134,8 +153,8 @@ func TestLogMiddleware_GetRequest(t *testing.T) {
 }
 
 func TestLogMiddleware_LargeBody(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -175,8 +194,8 @@ func TestLogMiddleware_LargeBody(t *testing.T) {
 	assert.True(t, len(reqStr) <= (1<<16))
 }
 func TestLogMiddleware_LargeResponseBody(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -214,8 +233,8 @@ func TestLogMiddleware_LargeResponseBody(t *testing.T) {
 }
 
 func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -272,8 +291,8 @@ func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
 }
 
 func TestLogMiddleware_MalformedJSON(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -314,8 +333,8 @@ func TestLogMiddleware_MalformedJSON(t *testing.T) {
 }
 
 func TestLogMiddleware_NonJSONContentType(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -352,8 +371,8 @@ func TestLogMiddleware_NonJSONContentType(t *testing.T) {
 }
 
 func TestLogMiddleware_Concurrent(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
@@ -408,7 +427,7 @@ func TestLogMiddleware_PUTandPATCH(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
+			var buf syncBuffer
 			logrus.SetOutput(&buf)
 			logrus.SetFormatter(&logrus.JSONFormatter{})
 			defer logrus.SetOutput(nil)
@@ -454,8 +473,8 @@ func TestLogMiddleware_PUTandPATCH(t *testing.T) {
 }
 
 func TestLogMiddleware_EmptyBody(t *testing.T) {
-	// Setup log capture
-	var buf bytes.Buffer
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
 	logrus.SetOutput(&buf)
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(nil)
