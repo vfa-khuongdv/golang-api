@@ -174,3 +174,320 @@ func TestLogMiddleware_LargeBody(t *testing.T) {
 	assert.True(t, ok)
 	assert.True(t, len(reqStr) <= (1<<16))
 }
+func TestLogMiddleware_LargeResponseBody(t *testing.T) {
+	// Setup log capture
+	var buf bytes.Buffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.GET("/large-response", func(c *gin.Context) {
+		// Return a response larger than 64KB
+		largeData := strings.Repeat("x", (1<<16)+1000)
+		c.String(http.StatusOK, largeData)
+	})
+
+	req, _ := http.NewRequest("GET", "/large-response", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+
+	var logEntry struct {
+		Message string `json:"msg"`
+	}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	var logResponse LogResponse
+	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
+	assert.NoError(t, err)
+
+	// Verify response was truncated to maxBodySize (64KB)
+	respStr, ok := logResponse.Response.(string)
+	assert.True(t, ok)
+	assert.LessOrEqual(t, len(respStr), 1<<16, "Response should be truncated to 64KB")
+}
+
+func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
+	// Setup log capture
+	var buf bytes.Buffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.GET("/protected", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "success"})
+	})
+
+	req, _ := http.NewRequest("GET", "/protected", nil)
+	req.Header.Set("Authorization", "Bearer secret-token-123")
+	req.Header.Set("Cookie", "session_id=abc123")
+	req.Header.Set("X-API-Key", "api-key-xyz")
+	req.Header.Set("X-Custom-Header", "safe-value")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+
+	var logEntry struct {
+		Message string `json:"msg"`
+	}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	var logResponse LogResponse
+	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
+	assert.NoError(t, err)
+
+	// Verify sensitive headers are censored
+	headers, ok := logResponse.Header.(map[string]interface{})
+	assert.True(t, ok)
+
+	authHeader, ok := headers["Authorization"].([]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "***CENSORED***", authHeader[0])
+
+	cookieHeader, ok := headers["Cookie"].([]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "***CENSORED***", cookieHeader[0])
+
+	apiKeyHeader, ok := headers["X-Api-Key"].([]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "***CENSORED***", apiKeyHeader[0])
+
+	// Verify non-sensitive headers are not censored
+	customHeader, ok := headers["X-Custom-Header"].([]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "safe-value", customHeader[0])
+}
+
+func TestLogMiddleware_MalformedJSON(t *testing.T) {
+	// Setup log capture
+	var buf bytes.Buffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/malformed", func(c *gin.Context) {
+		// Return malformed JSON in response
+		c.Header("Content-Type", "application/json")
+		c.String(http.StatusOK, "{invalid json:")
+	})
+
+	req, _ := http.NewRequest("POST", "/malformed", strings.NewReader("{invalid json:}"))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+
+	var logEntry struct {
+		Message string `json:"msg"`
+	}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	var logResponse LogResponse
+	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
+	assert.NoError(t, err)
+
+	// Verify malformed JSON is logged as string, not causing crash
+	assert.Equal(t, "POST", logResponse.Method)
+	assert.Equal(t, "/malformed", logResponse.URL)
+	assert.NotEmpty(t, logResponse.Request)
+	assert.NotEmpty(t, logResponse.Response)
+}
+
+func TestLogMiddleware_NonJSONContentType(t *testing.T) {
+	// Setup log capture
+	var buf bytes.Buffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/text", func(c *gin.Context) {
+		c.String(http.StatusOK, "plain text response")
+	})
+
+	req, _ := http.NewRequest("POST", "/text", strings.NewReader("plain text request"))
+	req.Header.Set("Content-Type", "text/plain")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+
+	var logEntry struct {
+		Message string `json:"msg"`
+	}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	var logResponse LogResponse
+	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
+	assert.NoError(t, err)
+
+	// Verify non-JSON content is logged as string
+	assert.Equal(t, "plain text request", logResponse.Request)
+	assert.Equal(t, "plain text response", logResponse.Response)
+}
+
+func TestLogMiddleware_Concurrent(t *testing.T) {
+	// Setup log capture
+	var buf bytes.Buffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/concurrent", func(c *gin.Context) {
+		var req map[string]interface{}
+		c.ShouldBindJSON(&req)
+		c.JSON(http.StatusOK, gin.H{"id": req["id"]})
+	})
+
+	// Send multiple concurrent requests
+	done := make(chan bool, 10)
+	for i := 0; i < 10; i++ {
+		go func(id int) {
+			reqBody := map[string]interface{}{"id": id, "password": "secret"}
+			bodyBytes, _ := json.Marshal(reqBody)
+			req, _ := http.NewRequest("POST", "/concurrent", bytes.NewBuffer(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer token-"+string(rune(id)))
+
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			done <- true
+		}(i)
+	}
+
+	// Wait for all requests to complete
+	for i := 0; i < 10; i++ {
+		<-done
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify no crashes and logs were produced
+	// The exact number of log entries may vary due to concurrent writes
+	// but we verify no panic occurred
+	assert.NotEmpty(t, buf.Bytes())
+}
+
+func TestLogMiddleware_PUTandPATCH(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+	}{
+		{"PUT request", "PUT"},
+		{"PATCH request", "PATCH"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			logrus.SetOutput(&buf)
+			logrus.SetFormatter(&logrus.JSONFormatter{})
+			defer logrus.SetOutput(nil)
+
+			gin.SetMode(gin.TestMode)
+			r := gin.New()
+			r.Use(LogMiddleware())
+
+			r.Handle(tt.method, "/resource", func(c *gin.Context) {
+				var req map[string]interface{}
+				c.ShouldBindJSON(&req)
+				c.JSON(http.StatusOK, gin.H{"updated": true})
+			})
+
+			reqBody := map[string]interface{}{"password": "secret123"}
+			bodyBytes, _ := json.Marshal(reqBody)
+			req, _ := http.NewRequest(tt.method, "/resource", bytes.NewBuffer(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			time.Sleep(50 * time.Millisecond)
+
+			var logEntry struct {
+				Message string `json:"msg"`
+			}
+			err := json.Unmarshal(buf.Bytes(), &logEntry)
+			assert.NoError(t, err)
+
+			var logResponse LogResponse
+			err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.method, logResponse.Method)
+
+			// Verify password was censored
+			reqMap, ok := logResponse.Request.(map[string]interface{})
+			assert.True(t, ok)
+			assert.Contains(t, reqMap["password"], "*")
+		})
+	}
+}
+
+func TestLogMiddleware_EmptyBody(t *testing.T) {
+	// Setup log capture
+	var buf bytes.Buffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/empty", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	})
+
+	req, _ := http.NewRequest("POST", "/empty", nil)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+
+	var logEntry struct {
+		Message string `json:"msg"`
+	}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	var logResponse LogResponse
+	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "POST", logResponse.Method)
+	assert.Equal(t, "/empty", logResponse.URL)
+	// Empty body should not cause errors
+	assert.NotNil(t, logResponse.Request)
+}
