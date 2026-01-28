@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	// maxCacheEntries limits the size of sensitiveKeyCache to prevent memory leaks
-	maxCacheEntries = 100
+	// MAX_CACHE_ENTRIES limits the size of sensitiveKeyCache to prevent memory leaks
+	MAX_CACHE_ENTRIES = 100
 )
 
 // CensorSensitiveData recursively censors sensitive fields in complex data structures.
@@ -208,13 +208,13 @@ func containsSensitiveKey(maskFields []string, item string) bool {
 	}
 
 	// Implement cache size limit to prevent memory leaks
-	if len(sensitiveKeyCache) >= maxCacheEntries {
+	if len(sensitiveKeyCache) >= MAX_CACHE_ENTRIES {
 		// Clear half of the cache (simple eviction strategy)
 		count := 0
 		for k := range sensitiveKeyCache {
 			delete(sensitiveKeyCache, k)
 			count++
-			if count >= maxCacheEntries/2 {
+			if count >= MAX_CACHE_ENTRIES/2 {
 				break
 			}
 		}
