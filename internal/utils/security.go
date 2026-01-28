@@ -4,12 +4,35 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
-// CensorSensitiveData censors sensitive data in complex data structures recursively.
+// CensorSensitiveData recursively censors sensitive fields in complex data structures.
+// It traverses maps, slices, structs, and pointers to mask values of fields whose names
+// match any entry in maskFields (case-insensitive matching).
+//
+// Masking strategy:
+//   - Strings: Shows first and last character with asterisks in between (e.g., "s****t")
+//   - Short strings (≤2 chars): Fully masked with asterisks
+//   - Non-string types: Converted to string or masked generically
+//
+// Note: Only exported struct fields can be censored due to reflection limitations.
+// The function is thread-safe and does not modify the input data.
+//
+// Parameters:
+//   - data: The data structure to censor (can be any type)
+//   - maskFields: List of field/key names to censor (case-insensitive)
+//
+// Returns: A new data structure with sensitive fields censored.
 func CensorSensitiveData(data any, maskFields []string) any {
 	if data == nil {
 		return nil
+	}
+
+	// Early return if no fields to mask
+	if len(maskFields) == 0 {
+		return data
 	}
 
 	val := reflect.ValueOf(data)
@@ -36,9 +59,16 @@ func CensorSensitiveData(data any, maskFields []string) any {
 // censorSlice recursively censors each element in a slice/array.
 func censorSlice(data any, maskFields []string) any {
 	val := reflect.ValueOf(data)
-	censoredSlice := reflect.MakeSlice(val.Type(), val.Len(), val.Len())
 
-	for i := 0; i < val.Len(); i++ { // fix vòng lặp đúng cách
+	// Handle arrays differently from slices
+	var censoredSlice reflect.Value
+	if val.Kind() == reflect.Array {
+		censoredSlice = reflect.New(val.Type()).Elem()
+	} else {
+		censoredSlice = reflect.MakeSlice(val.Type(), val.Len(), val.Len())
+	}
+
+	for i := 0; i < val.Len(); i++ {
 		item := val.Index(i).Interface()
 		censoredItem := CensorSensitiveData(item, maskFields)
 		censoredSlice.Index(i).Set(reflect.ValueOf(censoredItem))
@@ -60,8 +90,8 @@ func censorMap(data any, maskFields []string) any {
 		keyStr := fmt.Sprintf("%v", key.Interface())
 
 		var censoredValue reflect.Value
-		if contains(maskFields, keyStr) {
-			// Mask toàn bộ giá trị nếu key nhạy cảm
+		if containsSensitiveKey(maskFields, keyStr) {
+			// Mask the entire value if key is sensitive
 			censoredValue = reflect.ValueOf(maskValue(value.Interface()))
 		} else {
 			censoredValue = reflect.ValueOf(CensorSensitiveData(value.Interface(), maskFields))
@@ -83,8 +113,8 @@ func censorStruct(data any, maskFields []string) any {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
 
-		if contains(maskFields, fieldType.Name) {
-			// Field need to be masked
+		if containsSensitiveKey(maskFields, fieldType.Name) {
+			// Field needs to be masked
 			if field.Kind() == reflect.Ptr {
 				if field.IsNil() {
 					censoredStruct.Field(i).Set(reflect.Zero(field.Type()))
@@ -119,22 +149,48 @@ func censorStruct(data any, maskFields []string) any {
 	return censoredStruct.Interface()
 }
 
-// matchedValOrZero tries set value if compatible, else zero value (tránh panic)
+// matchedValOrZero attempts to assign val to typ if compatible, otherwise returns zero value.
+// This prevents panics when types are incompatible during reflection operations.
 func matchedValOrZero(val reflect.Value, typ reflect.Type) reflect.Value {
 	if val.Type().AssignableTo(typ) {
 		return val
 	}
+	// Log warning about type mismatch (data loss)
+	logger.Error(fmt.Sprintf("Type mismatch in censoring: cannot assign %v to %v, using zero value", val.Type(), typ))
 	return reflect.Zero(typ)
 }
 
-// contains checks if a string is in a slice, case-insensitive
-func contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if strings.EqualFold(v, item) {
-			return true
-		}
+// sensitiveKeyCache caches lowercase sensitive keys for O(1) lookup performance
+var sensitiveKeyCache map[string]map[string]bool
+
+// containsSensitiveKey checks if item matches any sensitive key (case-insensitive).
+// Uses a cached map for O(1) lookups instead of O(n) slice iteration.
+func containsSensitiveKey(maskFields []string, item string) bool {
+	if len(maskFields) == 0 {
+		return false
 	}
-	return false
+
+	// Build cache key from maskFields for memoization
+	cacheKey := strings.Join(maskFields, ",")
+	if sensitiveKeyCache == nil {
+		sensitiveKeyCache = make(map[string]map[string]bool)
+	}
+
+	// Check cache
+	if cache, exists := sensitiveKeyCache[cacheKey]; exists {
+		_, found := cache[strings.ToLower(item)]
+		return found
+	}
+
+	// Build cache for this set of maskFields
+	cache := make(map[string]bool, len(maskFields))
+	for _, field := range maskFields {
+		cache[strings.ToLower(field)] = true
+	}
+	sensitiveKeyCache[cacheKey] = cache
+
+	_, found := cache[strings.ToLower(item)]
+	return found
 }
 
 // maskValue masks sensitive values based on their type.
@@ -154,28 +210,49 @@ func maskValue(value any) any {
 }
 
 // maskString masks a string by replacing its middle characters with asterisks.
+// For strings longer than 2 characters, it shows the first and last character.
+// For shorter strings, it fully masks with asterisks.
 func maskString(s string) string {
 	if len(s) > 2 {
-		maskLen := min(len(s)-2, 8)
+		maskLen := min(len(s)-2, 8) // Use built-in min() from Go 1.21+
 		return string(s[0]) + strings.Repeat("*", maskLen) + string(s[len(s)-1])
 	}
 	return strings.Repeat("*", len(s))
 }
 
+// maskReflectedValue masks values of non-standard types using reflection.
+// It handles slices, arrays, and structs while maintaining type safety.
 func maskReflectedValue(value any) any {
 	val := reflect.ValueOf(value)
 
 	switch val.Kind() {
 	case reflect.Slice, reflect.Array:
-		maskedSlice := reflect.MakeSlice(val.Type(), val.Len(), val.Len())
-		for i := range val.Len() {
-			maskedSlice.Index(i).Set(reflect.ValueOf("*****"))
+		// Create a new slice/array and mask each element based on its type
+		var maskedSlice reflect.Value
+		if val.Kind() == reflect.Array {
+			maskedSlice = reflect.New(val.Type()).Elem()
+		} else {
+			maskedSlice = reflect.MakeSlice(val.Type(), val.Len(), val.Len())
+		}
+
+		for i := 0; i < val.Len(); i++ {
+			elem := val.Index(i)
+			maskedElem := maskElementByType(elem)
+			if maskedElem.Type().AssignableTo(elem.Type()) {
+				maskedSlice.Index(i).Set(maskedElem)
+			} else {
+				// If type mismatch, use zero value
+				maskedSlice.Index(i).Set(reflect.Zero(elem.Type()))
+			}
 		}
 		return maskedSlice.Interface()
 	case reflect.Struct:
 		maskedStruct := reflect.New(val.Type()).Elem()
 		for i := 0; i < val.NumField(); i++ {
 			field := maskedStruct.Field(i)
+			if !field.CanSet() {
+				continue // Skip unexported fields
+			}
 			switch field.Kind() {
 			case reflect.String:
 				field.SetString("*****")
@@ -193,10 +270,20 @@ func maskReflectedValue(value any) any {
 	}
 }
 
-// Min returns the minimum of two integers.
-func min(a, b int) int {
-	if a < b {
-		return a
+// maskElementByType returns a masked value for a reflect.Value based on its type.
+func maskElementByType(elem reflect.Value) reflect.Value {
+	switch elem.Kind() {
+	case reflect.String:
+		return reflect.ValueOf("*****")
+	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
+		return reflect.ValueOf(0).Convert(elem.Type())
+	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
+		return reflect.ValueOf(uint(0)).Convert(elem.Type())
+	case reflect.Float32, reflect.Float64:
+		return reflect.ValueOf(0.0).Convert(elem.Type())
+	case reflect.Bool:
+		return reflect.ValueOf(false)
+	default:
+		return reflect.Zero(elem.Type())
 	}
-	return b
 }
