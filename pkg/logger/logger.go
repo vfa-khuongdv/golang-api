@@ -14,6 +14,62 @@ func Init() {
 
 }
 
+// WithRequestID creates a new log entry with requestID field
+// Use this for logging within a request context to trace logs
+func WithRequestID(requestID string) *log.Entry {
+	return log.WithField("request_id", requestID)
+}
+
+// InfoWithRequestID logs information level messages with requestID
+func InfoWithRequestID(requestID string, args ...interface{}) {
+	WithRequestID(requestID).Info(args...)
+}
+
+// InfofWithRequestID logs formatted information level messages with requestID
+func InfofWithRequestID(requestID string, format string, args ...interface{}) {
+	WithRequestID(requestID).Infof(format, args...)
+}
+
+// DebugWithRequestID logs debug level messages with requestID
+func DebugWithRequestID(requestID string, args ...interface{}) {
+	WithRequestID(requestID).Debug(args...)
+}
+
+// DebugfWithRequestID logs formatted debug level messages with requestID
+func DebugfWithRequestID(requestID string, format string, args ...interface{}) {
+	WithRequestID(requestID).Debugf(format, args...)
+}
+
+// ErrorWithRequestID logs error level messages with requestID
+func ErrorWithRequestID(requestID string, args ...interface{}) {
+	WithRequestID(requestID).Error(args...)
+}
+
+// ErrorfWithRequestID logs formatted error level messages with requestID
+func ErrorfWithRequestID(requestID string, format string, args ...interface{}) {
+	WithRequestID(requestID).Errorf(format, args...)
+}
+
+// WarnWithRequestID logs warning level messages with requestID
+func WarnWithRequestID(requestID string, args ...interface{}) {
+	WithRequestID(requestID).Warn(args...)
+}
+
+// WarnfWithRequestID logs formatted warning level messages with requestID
+func WarnfWithRequestID(requestID string, format string, args ...interface{}) {
+	WithRequestID(requestID).Warnf(format, args...)
+}
+
+// FatalWithRequestID logs fatal level messages with requestID and then exits
+func FatalWithRequestID(requestID string, args ...interface{}) {
+	WithRequestID(requestID).Fatal(args...)
+}
+
+// FatalfWithRequestID logs formatted fatal level messages with requestID and then exits
+func FatalfWithRequestID(requestID string, format string, args ...interface{}) {
+	WithRequestID(requestID).Fatalf(format, args...)
+}
+
 // Info logs information level messages
 // Takes variadic arguments and logs them at INFO level
 func Info(args ...interface{}) {

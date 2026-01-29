@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/vfa-khuongdv/golang-cms/internal/dto"
+	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
@@ -38,6 +39,8 @@ func NewUserHandler(
 }
 
 func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
+	requestID := middlewares.GetRequestID(ctx)
+
 	// Bind and validate JSON request body
 	var input dto.ForgotPasswordInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
@@ -46,10 +49,13 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
+	logger.InfofWithRequestID(requestID, "Processing forgot password request for email: %s", input.Email)
+
 	// Handle forgot password logic
 	user, err := handler.userService.ForgotPassword(&input)
 
 	if err != nil {
+		logger.ErrorfWithRequestID(requestID, "Forgot password failed for email %s: %v", input.Email, err)
 		utils.RespondWithError(ctx, err)
 		return
 	}
@@ -57,10 +63,11 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 	// Send password reset email to user
 	if user != nil {
 		if err := handler.mailerService.SendMailForgotPassword(user); err != nil {
+			logger.ErrorfWithRequestID(requestID, "Failed to send password reset email to %s: %v", user.Email, err)
 			utils.RespondWithError(ctx, err)
 			return
 		}
-		logger.Info("Email sent successfully!")
+		logger.InfofWithRequestID(requestID, "Password reset email sent successfully to %s", user.Email)
 	}
 
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "If your email is in our system, you will receive instructions to reset your password"})

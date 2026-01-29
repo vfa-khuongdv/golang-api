@@ -38,6 +38,7 @@ var sensitiveHeaders = map[string]bool{
 
 // LogResponse defines the structure for logging HTTP requests and responses
 type LogResponse struct {
+	RequestID  string `json:"request_id,omitempty"`
 	Method     string `json:"method"`
 	URL        string `json:"url"`
 	Header     any    `json:"header"`
@@ -77,10 +78,11 @@ func LogMiddleware() gin.HandlerFunc {
 		timeStart := time.Now()
 
 		logEntry := LogResponse{
-			Method:  c.Request.Method,
-			URL:     c.Request.URL.String(),
-			Header:  filterSensitiveHeaders(c.Request.Header),
-			Request: c.Request.URL.Query(),
+			RequestID: GetRequestID(c),
+			Method:    c.Request.Method,
+			URL:       c.Request.URL.String(),
+			Header:    filterSensitiveHeaders(c.Request.Header),
+			Request:   c.Request.URL.Query(),
 		}
 
 		// Only log request body if method is POST or PUT, and limit to maxBodySize
@@ -90,7 +92,7 @@ func LogMiddleware() gin.HandlerFunc {
 				var err error
 				bodyBytes, err = io.ReadAll(io.LimitReader(c.Request.Body, MAX_BODY_SIZE))
 				if err != nil {
-					logger.Error("Failed to read request body:", err)
+					logger.ErrorWithRequestID(logEntry.RequestID, "Failed to read request body:", err)
 				}
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
@@ -143,10 +145,10 @@ func LogMiddleware() gin.HandlerFunc {
 		go func(entry LogResponse) {
 			jsonData, err := json.Marshal(entry)
 			if err != nil {
-				logger.Error("Failed to marshal log entry:", err)
+				logger.ErrorWithRequestID(entry.RequestID, "Failed to marshal log entry:", err)
 				return
 			}
-			logger.Info(string(jsonData))
+			logger.InfoWithRequestID(entry.RequestID, string(jsonData))
 		}(logEntry)
 	}
 }

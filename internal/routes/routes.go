@@ -45,6 +45,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	// Add middleware
 	router.Use(
+		middlewares.RequestIDMiddleware(),
 		middlewares.CORSMiddleware(),
 		middlewares.LogMiddleware(),
 		gin.Recovery(),
