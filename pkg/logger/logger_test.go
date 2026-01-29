@@ -130,4 +130,144 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, "this is a warning", entry.Message)
 		})
 	})
+
+	t.Run("WithRequestID", func(t *testing.T) {
+		hook := test.NewGlobal()
+		logrus.SetLevel(logrus.InfoLevel)
+		defer hook.Reset()
+
+		requestID := "test-request-id-123"
+		entry := logger.WithRequestID(requestID)
+
+		assert.NotNil(t, entry)
+		assert.Equal(t, requestID, entry.Data["request_id"])
+	})
+
+	t.Run("Info level logs with RequestID", func(t *testing.T) {
+		t.Run("InfoWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-123"
+			logger.InfoWithRequestID(requestID, "hello world")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.InfoLevel, entry.Level)
+			assert.Equal(t, "hello world", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+
+		t.Run("InfofWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-456"
+			logger.InfofWithRequestID(requestID, "hello %s", "world")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.InfoLevel, entry.Level)
+			assert.Equal(t, "hello world", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+	})
+
+	t.Run("Debug level logs with RequestID", func(t *testing.T) {
+		t.Run("DebugWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.DebugLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-789"
+			logger.DebugWithRequestID(requestID, "debug msg")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.DebugLevel, entry.Level)
+			assert.Equal(t, "debug msg", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+
+		t.Run("DebugfWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.DebugLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-101"
+			logger.DebugfWithRequestID(requestID, "debug %s", "msg")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.DebugLevel, entry.Level)
+			assert.Equal(t, "debug msg", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+	})
+
+	t.Run("Error level logs with RequestID", func(t *testing.T) {
+		t.Run("ErrorWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.ErrorLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-102"
+			logger.ErrorWithRequestID(requestID, "error: not found")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+			assert.Equal(t, "error: not found", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+
+		t.Run("ErrorfWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.ErrorLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-103"
+			logger.ErrorfWithRequestID(requestID, "error: %s", "not found")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+			assert.Equal(t, "error: not found", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+	})
+
+	t.Run("Warning level logs with RequestID", func(t *testing.T) {
+		t.Run("WarnWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.WarnLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-104"
+			logger.WarnWithRequestID(requestID, "this is a warning")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.WarnLevel, entry.Level)
+			assert.Equal(t, "this is a warning", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+
+		t.Run("WarnfWithRequestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.WarnLevel)
+			defer hook.Reset()
+
+			requestID := "test-request-id-105"
+			logger.WarnfWithRequestID(requestID, "this is a %s", "warning")
+
+			assert.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.WarnLevel, entry.Level)
+			assert.Equal(t, "this is a warning", entry.Message)
+			assert.Equal(t, requestID, entry.Data["request_id"])
+		})
+	})
 }

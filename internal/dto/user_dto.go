@@ -1,8 +1,8 @@
 package dto
 
 type CreateUserInput struct {
-	Email    string  `json:"email" binding:"required,email"`
-	Password string  `json:"password" binding:"required,min=6,max=255"`
+	Email    string  `json:"email" binding:"required,email"`                     // Email must be valid format
+	Password string  `json:"password" binding:"required,min=6,max=255"`          // Password must be between 6-255 chars
 	Name     string  `json:"name" binding:"required,min=1,max=45,not_blank"`     // Name must be between 1-45 chars and not blank
 	Birthday *string `json:"birthday" binding:"required,valid_birthday"`         // Assumes birthday is valid format: YYYY-MM-DD
 	Address  *string `json:"address" binding:"required,min=1,max=255,not_blank"` // Address must be between 1-255 chars and not blank
@@ -10,18 +10,18 @@ type CreateUserInput struct {
 }
 
 type ForgotPasswordInput struct {
-	Email string `json:"email" binding:"required,email"`
+	Email string `json:"email" binding:"required,email"` // Email must be valid format
 }
 
 type ResetPasswordInput struct {
-	Token       string `json:"token" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required,min=6,max=255"`
+	Token       string `json:"token" binding:"required"`                      // Token is required
+	NewPassword string `json:"new_password" binding:"required,min=6,max=255"` // New password must be between 6-255 chars
 }
 
 type ChangePasswordInput struct {
-	OldPassword     string `json:"old_password" binding:"required,min=6,max=255"`
-	NewPassword     string `json:"new_password" binding:"required,min=6,max=255"`
-	ConfirmPassword string `json:"confirm_password" binding:"required,min=6,max=255"`
+	OldPassword     string `json:"old_password" binding:"required,min=6,max=255"`     // Old password must be between 6-255 chars
+	NewPassword     string `json:"new_password" binding:"required,min=6,max=255"`     // New password must be between 6-255 chars
+	ConfirmPassword string `json:"confirm_password" binding:"required,min=6,max=255"` // Confirm password must be between 6-255 chars
 }
 
 type UpdateUserInput struct {
