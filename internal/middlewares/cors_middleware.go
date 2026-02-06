@@ -9,12 +9,12 @@ import (
 
 // CORSMiddleware handles Cross-Origin Resource Sharing (CORS)
 // Security: Configure CORS_ALLOWED_ORIGINS environment variable with specific
-// origins (e.g., "http://localhost:3000,https://example.com"). Never use "*"
+// origins (e.g., "http://localhost:5173,https://example.com"). Never use "*"
 // in production with credentials enabled.
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigins := utils.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
+		allowedOrigins := utils.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 
 		// Check if origin is allowed and set appropriate headers
 		if isOriginAllowed(origin, allowedOrigins) {
