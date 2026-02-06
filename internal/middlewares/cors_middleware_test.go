@@ -212,7 +212,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req.Header.Set("Origin", "http://localhost:3000")
+		req.Header.Set("Origin", "http://localhost:5173")
 		resp := httptest.NewRecorder()
 
 		// Act
@@ -220,7 +220,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, http.StatusOK, resp.Code)
-		assert.Equal(t, "http://localhost:3000", resp.Header().Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "http://localhost:5173", resp.Header().Get("Access-Control-Allow-Origin"))
 		assert.Equal(t, "Origin", resp.Header().Get("Vary"))
 	})
 

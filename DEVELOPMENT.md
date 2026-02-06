@@ -768,7 +768,7 @@ MAIL_PASSWORD=app_password
 MAIL_FROM=noreply@example.com
 
 # Frontend
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:5173
 ```
 
 ---
