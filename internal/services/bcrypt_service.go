@@ -22,7 +22,7 @@ func NewBcryptService() BcryptService {
 func (s *bcryptServiceImpl) HashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", apperror.NewInternalError(err.Error())
+		return "", apperror.NewInternalServerError(err.Error())
 	}
 	return string(hashedPassword), nil
 }
@@ -39,7 +39,7 @@ func (s *bcryptServiceImpl) CheckPasswordHash(password, hashPassword string) boo
 func (s *bcryptServiceImpl) HashPasswordWithCost(password string, cost int) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {
-		return "", apperror.NewInternalError(err.Error())
+		return "", apperror.NewInternalServerError(err.Error())
 	}
 	return string(hashedPassword), nil
 }

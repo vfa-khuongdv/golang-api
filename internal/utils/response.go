@@ -44,7 +44,7 @@ func RespondWithError(ctx *gin.Context, err error) {
 	ctx.AbortWithStatusJSON(
 		http.StatusInternalServerError,
 		gin.H{
-			"code":    apperror.ErrInternal,
+			"code":    apperror.ErrInternalServer,
 			"message": err.Error(),
 		},
 	)

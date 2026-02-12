@@ -13,7 +13,7 @@ func TestAppError_Error(t *testing.T) {
 		// Arrange
 		appErr := apperror.New(
 			http.StatusInternalServerError,
-			apperror.ErrInternal,
+			apperror.ErrInternalServer,
 			"internal error",
 		)
 		expected := "code: 1000, message: internal error"
@@ -118,13 +118,13 @@ func TestAppErrorWithUnderlyingError(t *testing.T) {
 	// Act
 	appErr := apperror.Wrap(
 		http.StatusInternalServerError,
-		apperror.ErrInternal,
-		"internal error",
+		apperror.ErrInternalServer,
+		"internal server error",
 		underlying,
 	)
 
 	// Assert
-	expected := "code: 1000, message: internal error, error: " + underlying.Error()
+	expected := "code: 1000, message: internal server error, error: " + underlying.Error()
 	assert.Equal(t, expected, appErr.Error())
 	assert.Equal(t, http.StatusInternalServerError, appErr.HttpStatusCode)
 }

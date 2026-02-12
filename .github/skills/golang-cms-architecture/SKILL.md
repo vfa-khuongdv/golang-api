@@ -150,10 +150,11 @@ return nil, apperror.NewNotFoundError("User not found")
 return nil, apperror.NewUnauthorizedError("Invalid credentials")
 
 // Conflict errors (HTTP 409)
-return nil, apperror.NewBadRequestError("Email already exists")
+return nil, apperror.NewConflictError("Email already exists")
 
 // Server errors (HTTP 500)
-return nil, apperror.NewInternalError("Failed to create user: %w", err)
+return nil, apperror.NewInternalServerError("Failed to create user: %w", err)
+
 ```
 
 **HTTP Status Mapping:**

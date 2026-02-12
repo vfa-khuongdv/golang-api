@@ -964,7 +964,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternal, "Hash password failed", nil))
+		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Hash password failed", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -977,7 +977,7 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert the response
 		expectedBody := map[string]any{
-			"code":    float64(apperror.ErrInternal),
+			"code":    float64(apperror.ErrInternalServer),
 			"message": "Hash password failed",
 		}
 		var actualBody map[string]any
