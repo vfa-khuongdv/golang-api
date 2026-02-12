@@ -150,21 +150,29 @@ return nil, apperror.NewNotFoundError("User not found")
 return nil, apperror.NewUnauthorizedError("Invalid credentials")
 
 // Conflict errors (HTTP 409)
-return nil, apperror.NewConflictError("Email already exists")
+return nil, apperror.NewBadRequestError("Email already exists")
 
-// Server errors (HTTP 500) - wrap with context
-return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternal, "Failed to create user", originalErr)
+// Server errors (HTTP 500)
+return nil, apperror.NewInternalError("Failed to create user: %w", err)
 ```
 
 **HTTP Status Mapping:**
-- 400: Validation errors
+- 400: Validation or Bad Request errors
 - 401: Authentication errors
 - 403: Forbidden/Authorization errors
 - 404: Not found errors
-- 409: Conflict errors
 - 500: Server errors
 
 Never ignore errors silently. Always handle explicitly.
+
+## Response API
+- User utils.ResponseWithOK, ResponseWithError for consistent API responses
+- Example:
+
+```go
+utils.ResponseWithOK(c, http.StatusCreated, "User created successfully", user)
+utils.ResponseWithError(c, err)
+```
 
 ## Testing Standards
 
