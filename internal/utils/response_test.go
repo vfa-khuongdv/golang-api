@@ -49,7 +49,7 @@ func TestRespondWith(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)
 
-		genericErr := apperror.NewInternalError("generic error message")
+		genericErr := apperror.NewInternalServerError("generic error message")
 
 		utils.RespondWithError(ctx, genericErr)
 

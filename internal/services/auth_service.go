@@ -61,7 +61,7 @@ func (service *authServiceImpl) Login(email, password string, ctx *gin.Context) 
 	// Generate access token
 	accessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
-		return nil, apperror.NewInternalError(err.Error())
+		return nil, apperror.NewInternalServerError(err.Error())
 	}
 
 	// Create new refresh token
@@ -129,7 +129,7 @@ func (service *authServiceImpl) RefreshToken(refreshToken, accessToken string, c
 	// Step 6: Generate new access token
 	newAccessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
-		return nil, apperror.NewInternalError(err.Error())
+		return nil, apperror.NewInternalServerError(err.Error())
 	}
 
 	// Step 7: Build response (refresh token already updated in Step 1)

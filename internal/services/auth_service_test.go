@@ -97,7 +97,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
 			},
 			expectErr: true,
-			errCode:   apperror.ErrInternal,
+			errCode:   apperror.ErrInternalServer,
 		},
 	}
 
@@ -194,7 +194,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
 			},
 			expectErr: true,
-			errCode:   apperror.ErrInternal,
+			errCode:   apperror.ErrInternalServer,
 		},
 		{
 			name: "InvalidAccessToken",

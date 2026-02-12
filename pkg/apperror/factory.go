@@ -3,13 +3,14 @@ package apperror
 import "net/http"
 
 // === Generic errors ===
-func NewInternalError(message string) *AppError {
+func NewInternalServerError(message string) *AppError {
 	return &AppError{
 		HttpStatusCode: http.StatusInternalServerError,
-		Code:           ErrInternal,
+		Code:           ErrInternalServer,
 		Message:        message,
 	}
 }
+
 func NewNotFoundError(message string) *AppError {
 	return &AppError{
 		HttpStatusCode: http.StatusNotFound,
@@ -17,6 +18,7 @@ func NewNotFoundError(message string) *AppError {
 		Message:        message,
 	}
 }
+
 func NewBadRequestError(message string) *AppError {
 	return &AppError{
 		HttpStatusCode: http.StatusBadRequest,
@@ -24,6 +26,7 @@ func NewBadRequestError(message string) *AppError {
 		Message:        message,
 	}
 }
+
 func NewUnauthorizedError(message string) *AppError {
 	return &AppError{
 		HttpStatusCode: http.StatusUnauthorized,
@@ -31,10 +34,19 @@ func NewUnauthorizedError(message string) *AppError {
 		Message:        message,
 	}
 }
+
 func NewForbiddenError(message string) *AppError {
 	return &AppError{
 		HttpStatusCode: http.StatusForbidden,
 		Code:           ErrForbidden,
+		Message:        message,
+	}
+}
+
+func NewConflictError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusConflict,
+		Code:           ErrConflict,
 		Message:        message,
 	}
 }

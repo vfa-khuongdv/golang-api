@@ -2,11 +2,12 @@ package apperror
 
 const (
 	// General errors
-	ErrInternal     = 1000 // Internal server error
-	ErrNotFound     = 1001 // Resource not found
-	ErrBadRequest   = 1002 // Invalid or bad request
-	ErrUnauthorized = 3000 // Unauthorized access
-	ErrForbidden    = 3001 // Forbidden access
+	ErrInternalServer = 1000 // Internal server error
+	ErrNotFound       = 1001 // Resource not found
+	ErrBadRequest     = 1002 // Invalid or bad request
+	ErrUnauthorized   = 1003 // Unauthorized access
+	ErrForbidden      = 1004 // Forbidden access
+	ErrConflict       = 1005 // Conflict error
 
 	// Database errors
 	ErrDBConnection = 2000 // Failed to connect to DB
@@ -16,11 +17,11 @@ const (
 	ErrDBDelete     = 2004 // DB delete error
 
 	// Authentication errors
-	ErrTokenExpired       = 3002 // Token has expired
-	ErrInvalidPassword    = 3003 // Invalid password
-	ErrPasswordHashFailed = 3004 // Failed to hash password
-	ErrPasswordMismatch   = 3005 // Password mismatch
-	ErrPasswordUnchanged  = 3006 // Old and new password are the same
+	ErrTokenExpired       = 3001 // Token has expired
+	ErrInvalidPassword    = 3002 // Invalid password
+	ErrPasswordHashFailed = 3003 // Failed to hash password
+	ErrPasswordMismatch   = 3004 // Password mismatch
+	ErrPasswordUnchanged  = 3005 // Old and new password are the same
 
 	// Common
 	ErrParseError       = 4000 // Parsing or field error

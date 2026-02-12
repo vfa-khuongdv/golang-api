@@ -55,7 +55,7 @@ func TestAuthForgotPassword(t *testing.T) {
 			var errResp ErrorResponse
 			err := json.Unmarshal(w.Body.Bytes(), &errResp)
 			require.NoError(t, err)
-			assert.Equal(t, apperror.ErrInternal, errResp.Code)
+			assert.Equal(t, apperror.ErrInternalServer, errResp.Code)
 		} else {
 			// If SMTP is configured, should succeed
 			assert.Equal(t, http.StatusOK, w.Code)

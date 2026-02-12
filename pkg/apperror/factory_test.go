@@ -13,11 +13,12 @@ func TestErrorConstructors(t *testing.T) {
 		wantHTTP int
 	}{
 		// Generic errors
-		{"InternalError", NewInternalError, ErrInternal, http.StatusInternalServerError},
+		{"InternalServerError", NewInternalServerError, ErrInternalServer, http.StatusInternalServerError},
 		{"NotFoundError", NewNotFoundError, ErrNotFound, http.StatusNotFound},
 		{"BadRequestError", NewBadRequestError, ErrBadRequest, http.StatusBadRequest},
 		{"UnauthorizedError", NewUnauthorizedError, ErrUnauthorized, http.StatusUnauthorized},
 		{"ForbiddenError", NewForbiddenError, ErrForbidden, http.StatusForbidden},
+		{"ConflictError", NewConflictError, ErrConflict, http.StatusConflict},
 
 		// Database errors
 		{"DBConnectionError", NewDBConnectionError, ErrDBConnection, http.StatusInternalServerError},
