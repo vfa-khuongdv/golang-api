@@ -132,13 +132,13 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 	s.T().Run("UserNotFound", func(t *testing.T) {
 		// Arrange
 		email := "unknown@example.com"
-		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), errors.New("record not found")).Once()
+		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound).Once()
 
 		// Act
 		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
 
 		// Assert
-		s.Error(err)
+		s.NoError(err)
 		s.Nil(result)
 	})
 }
