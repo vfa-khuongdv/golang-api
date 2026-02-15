@@ -41,7 +41,7 @@ func TestRespondWith(t *testing.T) {
 		utils.RespondWithError(ctx, internalErr)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
-		expectedJSON := `{"code":1000,"message":"Internal server error occurred"}`
+		expectedJSON := `{"code":1000,"message":"Internal server error"}`
 		assert.JSONEq(t, expectedJSON, w.Body.String())
 	})
 

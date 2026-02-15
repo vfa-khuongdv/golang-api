@@ -74,12 +74,12 @@ func TestAuthForgotPassword(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		assert.NotEqual(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
 
-		var errResp ErrorResponse
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp map[string]string
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Equal(t, apperror.ErrNotFound, errResp.Code)
+		assert.Equal(t, "If your email is in our system, you will receive instructions to reset your password", resp["message"])
 	})
 
 	t.Run("Forgot Password - Invalid Email Format", func(t *testing.T) {

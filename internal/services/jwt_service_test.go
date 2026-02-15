@@ -12,6 +12,8 @@ import (
 )
 
 func TestJWTService(t *testing.T) {
+	t.Setenv("JWT_KEY", "unit-test-secret-key")
+
 	t.Run("GenerateAccessToken", func(t *testing.T) {
 		svc := services.NewJWTService()
 

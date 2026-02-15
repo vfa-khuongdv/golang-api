@@ -150,6 +150,7 @@ func TestAuthMiddleware(t *testing.T) {
 // TestAuthMiddleware_DirectCall tests the actual AuthMiddleware function directly
 func TestAuthMiddleware_DirectCall(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	t.Setenv("JWT_KEY", "middleware-test-secret-key")
 
 	tests := []struct {
 		name               string
@@ -208,6 +209,7 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 // TestAuthMiddleware_WithRealJWT tests with real JWT tokens to verify the complete flow
 func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	t.Setenv("JWT_KEY", "middleware-test-secret-key")
 
 	// Create a real JWT service to generate tokens
 	jwtService := services.NewJWTService()

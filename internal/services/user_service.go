@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/dto"
@@ -8,6 +9,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"gorm.io/gorm"
 )
 
 type UserService interface {
@@ -35,7 +37,11 @@ func (service *userServiceImpl) ForgotPassword(input *dto.ForgotPasswordInput) (
 	// 1. Check email exists
 	user, err := service.repo.FindByField("email", input.Email)
 	if err != nil {
-		return nil, apperror.NewNotFoundError("Email not found")
+		// Return a neutral response for unknown emails to prevent account enumeration.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, apperror.NewDBQueryError("Failed to process forgot password request")
 	}
 
 	// 2. Generate token and expiry

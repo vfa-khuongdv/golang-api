@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
 // RespondWithError sends a JSON error response with the given status code and error
@@ -45,9 +46,10 @@ func RespondWithError(ctx *gin.Context, err error) {
 		http.StatusInternalServerError,
 		gin.H{
 			"code":    apperror.ErrInternalServer,
-			"message": err.Error(),
+			"message": "Internal server error",
 		},
 	)
+	logger.Error("Unhandled error response: ", err)
 }
 
 // RespondWithOK sends a JSON response with the given status code and body

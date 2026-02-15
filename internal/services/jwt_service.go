@@ -1,6 +1,7 @@
 package services
 
 import (
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -35,9 +36,12 @@ type jwtServiceImpl struct {
 
 // NewJWTService returns a new instance of jwtServiceImpl
 func NewJWTService() JWTService {
-	secret := []byte(utils.GetEnv("JWT_KEY", "replace_your_key"))
+	secret := strings.TrimSpace(utils.GetEnv("JWT_KEY", ""))
+	if secret == "" {
+		panic("JWT_KEY environment variable is required")
+	}
 	return &jwtServiceImpl{
-		secret: secret,
+		secret: []byte(secret),
 	}
 }
 
