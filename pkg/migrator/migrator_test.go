@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -287,4 +288,48 @@ func TestNewMigrator_SuccessCase(t *testing.T) {
 		t.Logf("DSN %s failed: %v", dsn, err)
 	}
 
+}
+
+func TestNewMigrator_HookedPaths(t *testing.T) {
+	originalOpen := openSQLConnection
+	originalBuild := buildMySQLDriver
+	originalCreate := createMigrateInstance
+	t.Cleanup(func() {
+		openSQLConnection = originalOpen
+		buildMySQLDriver = originalBuild
+		createMigrateInstance = originalCreate
+	})
+
+	t.Run("CreateInstanceError", func(t *testing.T) {
+		openSQLConnection = func(_, _ string) (*sql.DB, error) {
+			return &sql.DB{}, nil
+		}
+		buildMySQLDriver = func(_ *sql.DB) (database.Driver, error) {
+			return nil, nil
+		}
+		createMigrateInstance = func(_ string, _ database.Driver) (MigrateIface, error) {
+			return nil, errors.New("create instance failed")
+		}
+
+		m, err := NewMigrator("./migrations", "root:pass@tcp(localhost:3306)/test")
+		assert.Nil(t, m)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to initialize migrator")
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		openSQLConnection = func(_, _ string) (*sql.DB, error) {
+			return &sql.DB{}, nil
+		}
+		buildMySQLDriver = func(_ *sql.DB) (database.Driver, error) {
+			return nil, nil
+		}
+		createMigrateInstance = func(_ string, _ database.Driver) (MigrateIface, error) {
+			return &fakeMigrate{}, nil
+		}
+
+		m, err := NewMigrator("./migrations", "root:pass@tcp(localhost:3306)/test")
+		assert.NoError(t, err)
+		assert.NotNil(t, m)
+	})
 }

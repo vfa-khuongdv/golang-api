@@ -163,6 +163,29 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		s.NoError(err)
 		s.Nil(result)
 	})
+
+	s.T().Run("RepositoryQueryError", func(t *testing.T) {
+		email := "error@example.com"
+		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), errors.New("db query failed")).Once()
+
+		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+
+		s.Nil(result)
+		s.Error(err)
+	})
+
+	s.T().Run("UpdateFailure", func(t *testing.T) {
+		email := "update-fail@example.com"
+		user := &models.User{Email: email}
+
+		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
+		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
+
+		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+
+		s.Nil(result)
+		s.Error(err)
+	})
 }
 
 func (s *UserServiceTestSuite) TestResetPassword() {
@@ -365,6 +388,25 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		s.NoError(err)
 		s.NotNil(result)
 		s.True(s.bcrypt.CheckPasswordHash(input.NewPassword, result.Password))
+	})
+}
+
+func (s *UserServiceTestSuite) TestUpdateProfileErrors() {
+	s.T().Run("UserNotFound", func(t *testing.T) {
+		input := &dto.UpdateProfileInput{Name: utils.StringToPtr("John")}
+		s.repo.On("GetByID", uint(77)).Return((*models.User)(nil), errors.New("not found")).Once()
+
+		err := s.service.UpdateProfile(77, input)
+		s.Error(err)
+	})
+
+	s.T().Run("InvalidBirthdayFormat", func(t *testing.T) {
+		user := &models.User{ID: 1, Email: "a@b.com", Password: "hash"}
+		input := &dto.UpdateProfileInput{Birthday: utils.StringToPtr("invalid-date")}
+		s.repo.On("GetByID", uint(1)).Return(user, nil).Once()
+
+		err := s.service.UpdateProfile(1, input)
+		s.Error(err)
 	})
 }
 

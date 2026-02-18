@@ -3,6 +3,7 @@ package middlewares
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,16 @@ import (
 type syncBuffer struct {
 	mu  sync.Mutex
 	buf bytes.Buffer
+}
+
+type errReadCloser struct{}
+
+func (e errReadCloser) Read(_ []byte) (int, error) {
+	return 0, errors.New("read body failed")
+}
+
+func (e errReadCloser) Close() error {
+	return nil
 }
 
 func (sb *syncBuffer) Write(p []byte) (n int, err error) {
@@ -368,6 +379,62 @@ func TestLogMiddleware_NonJSONContentType(t *testing.T) {
 	// Verify non-JSON content is logged as string
 	assert.Equal(t, "plain text request", logResponse.Request)
 	assert.Equal(t, "plain text response", logResponse.Response)
+}
+
+func TestLogMiddleware_RequestBodyReadError(t *testing.T) {
+	var buf syncBuffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/read-error", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	})
+
+	req, _ := http.NewRequest("POST", "/read-error", nil)
+	req.Body = errReadCloser{}
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotEmpty(t, buf.Bytes())
+}
+
+func TestLogMiddleware_MarshalLogEntryError(t *testing.T) {
+	var buf syncBuffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	originalMarshal := marshalLogEntry
+	marshalLogEntry = func(_ any) ([]byte, error) {
+		return nil, errors.New("marshal failed")
+	}
+	defer func() {
+		marshalLogEntry = originalMarshal
+	}()
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+	r.GET("/marshal-error", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	req, _ := http.NewRequest("GET", "/marshal-error", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotEmpty(t, buf.Bytes())
 }
 
 func TestLogMiddleware_Concurrent(t *testing.T) {
