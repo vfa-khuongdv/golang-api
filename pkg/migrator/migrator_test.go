@@ -21,8 +21,8 @@ type fakeMigrate struct {
 	closed      bool
 }
 
-func (f *fakeMigrate) Up() error { f.upCalled = true; return f.returnErr }
-func (f *fakeMigrate) Down() error { f.downCalled = true; return f.returnErr }
+func (f *fakeMigrate) Up() error         { f.upCalled = true; return f.returnErr }
+func (f *fakeMigrate) Down() error       { f.downCalled = true; return f.returnErr }
 func (f *fakeMigrate) Steps(n int) error { f.stepsCalled = n; return f.returnErr }
 func (f *fakeMigrate) Version() (uint, bool, error) {
 	if f.versionErr != nil {
