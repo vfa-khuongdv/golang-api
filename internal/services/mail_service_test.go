@@ -297,3 +297,7 @@ func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 		assert.Contains(t, err.Error(), "error sending email")
 	})
 }
+
+func TestMailerServiceTestSuite(t *testing.T) {
+	suite.Run(t, new(mailerServiceTestSuite))
+}
