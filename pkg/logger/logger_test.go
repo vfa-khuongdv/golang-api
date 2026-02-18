@@ -270,4 +270,36 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, requestID, entry.Data["request_id"])
 		})
 	})
+
+	t.Run("Fatal logs", func(t *testing.T) {
+		originalExitFunc := logrus.StandardLogger().ExitFunc
+		logrus.StandardLogger().ExitFunc = func(_ int) { panic("fatal-exit") }
+		t.Cleanup(func() {
+			logrus.StandardLogger().ExitFunc = originalExitFunc
+		})
+
+		t.Run("Fatal", func(t *testing.T) {
+			assert.PanicsWithValue(t, "fatal-exit", func() {
+				logger.Fatal("fatal message")
+			})
+		})
+
+		t.Run("Fatalf", func(t *testing.T) {
+			assert.PanicsWithValue(t, "fatal-exit", func() {
+				logger.Fatalf("fatal %s", "message")
+			})
+		})
+
+		t.Run("FatalWithRequestID", func(t *testing.T) {
+			assert.PanicsWithValue(t, "fatal-exit", func() {
+				logger.FatalWithRequestID("request-id-1", "fatal message")
+			})
+		})
+
+		t.Run("FatalfWithRequestID", func(t *testing.T) {
+			assert.PanicsWithValue(t, "fatal-exit", func() {
+				logger.FatalfWithRequestID("request-id-2", "fatal %s", "message")
+			})
+		})
+	})
 }
