@@ -34,6 +34,15 @@ type jwtServiceImpl struct {
 	secret []byte
 }
 
+var (
+	signJWTToken = func(token *jwt.Token, secret []byte) (string, error) {
+		return token.SignedString(secret)
+	}
+	parseJWTWithClaims = func(tokenString string, claims jwt.Claims, keyFunc jwt.Keyfunc, options ...jwt.ParserOption) (*jwt.Token, error) {
+		return jwt.ParseWithClaims(tokenString, claims, keyFunc, options...)
+	}
+)
+
 // NewJWTService returns a new instance of jwtServiceImpl
 func NewJWTService() JWTService {
 	secret := strings.TrimSpace(utils.GetEnv("JWT_KEY", ""))
@@ -59,7 +68,7 @@ func (s *jwtServiceImpl) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString(s.secret)
+	signedToken, err := signJWTToken(token, s.secret)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +81,7 @@ func (s *jwtServiceImpl) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 
 // ValidateToken validates a JWT token string and returns the claims if valid
 func (s *jwtServiceImpl) ValidateToken(tokenString string) (*CustomClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := parseJWTWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return s.secret, nil
 	})
 
@@ -106,7 +115,7 @@ func (s *jwtServiceImpl) ValidateTokenWithScope(tokenString string, requiredScop
 // This is useful when you want to extract user information from expired tokens
 // Returns error if token signature is invalid, but ignores exp claim
 func (s *jwtServiceImpl) ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
+	token, err := parseJWTWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return s.secret, nil
 	}, jwt.WithoutClaimsValidation())
 
