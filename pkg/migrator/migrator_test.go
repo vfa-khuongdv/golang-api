@@ -333,3 +333,11 @@ func TestNewMigrator_HookedPaths(t *testing.T) {
 		assert.NotNil(t, m)
 	})
 }
+
+func TestOpenSQLConnection_DefaultFunc(t *testing.T) {
+	db, err := openSQLConnection("mysql", "invalid-dsn")
+	if db != nil {
+		_ = db.Close()
+	}
+	assert.Error(t, err)
+}

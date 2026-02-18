@@ -46,6 +46,26 @@ func TestContainsSensitiveKey_InternalBranches(t *testing.T) {
 		cacheMutex.RUnlock()
 		assert.LessOrEqual(t, cacheLen, (MAX_CACHE_ENTRIES/2)+1)
 	})
+
+	t.Run("DoubleCheckBranchAfterWriteLock", func(t *testing.T) {
+		resetSensitiveKeyCache()
+		originalHook := onCacheWriteLock
+		t.Cleanup(func() {
+			onCacheWriteLock = originalHook
+		})
+
+		maskFields := []string{"password", "token"}
+		onCacheWriteLock = func() {
+			cacheKey := "password,token"
+			sensitiveKeyCache[cacheKey] = map[string]bool{"password": true, "token": true}
+			onCacheWriteLock = func() {}
+		}
+
+		found := containsSensitiveKey(maskFields, "password")
+		assert.True(t, found)
+		assert.True(t, containsSensitiveKey(maskFields, "token"))
+		resetSensitiveKeyCache()
+	})
 }
 
 func TestMaskValue_InternalBranches(t *testing.T) {

@@ -60,11 +60,13 @@ func TestPingDB(t *testing.T) {
 
 func TestInitDB_InternalBranches(t *testing.T) {
 	originalOpen := openGormConnection
+	originalGetSQLDB := getSQLDBConnection
 	originalFatalf := logFatalf
 	originalInfof := logInfof
 	originalPing := pingDBFn
 	t.Cleanup(func() {
 		openGormConnection = originalOpen
+		getSQLDBConnection = originalGetSQLDB
 		logFatalf = originalFatalf
 		logInfof = originalInfof
 		pingDBFn = originalPing
@@ -79,6 +81,8 @@ func TestInitDB_InternalBranches(t *testing.T) {
 	}
 
 	t.Run("OpenConnectionFailure", func(t *testing.T) {
+		getSQLDBConnection = originalGetSQLDB
+		pingDBFn = originalPing
 		openGormConnection = func(_ string) (*gorm.DB, error) {
 			return nil, errors.New("open failed")
 		}
@@ -91,6 +95,26 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		})
 	})
 
+	t.Run("GetSQLDBFailure", func(t *testing.T) {
+		pingDBFn = originalPing
+		gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+		require.NoError(t, err)
+
+		openGormConnection = func(_ string) (*gorm.DB, error) {
+			return gdb, nil
+		}
+		getSQLDBConnection = func(_ *gorm.DB) (*sql.DB, error) {
+			return nil, errors.New("db conversion failed")
+		}
+		logFatalf = func(_ string, _ ...interface{}) {
+			panic("fatal-db")
+		}
+
+		assert.PanicsWithValue(t, "fatal-db", func() {
+			_ = InitDB(config)
+		})
+	})
+
 	t.Run("PingFailure", func(t *testing.T) {
 		gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 		require.NoError(t, err)
@@ -98,6 +122,7 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		openGormConnection = func(_ string) (*gorm.DB, error) {
 			return gdb, nil
 		}
+		getSQLDBConnection = originalGetSQLDB
 		pingDBFn = func(_ *sql.DB) error {
 			return errors.New("ping failed")
 		}
@@ -118,6 +143,9 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		openGormConnection = func(_ string) (*gorm.DB, error) {
 			return gdb, nil
 		}
+		getSQLDBConnection = func(db *gorm.DB) (*sql.DB, error) {
+			return db.DB()
+		}
 		pingDBFn = func(_ *sql.DB) error {
 			return nil
 		}
@@ -133,5 +161,20 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		assert.Equal(t, gdb, result)
 		assert.Equal(t, gdb, DB)
 		assert.True(t, infoCalled)
+	})
+
+	t.Run("OpenGormConnectionDefaultFunc", func(t *testing.T) {
+		db, err := originalOpen("invalid-dsn")
+		assert.NotNil(t, db)
+		_ = err
+	})
+
+	t.Run("GetSQLDBConnectionDefaultFunc", func(t *testing.T) {
+		gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+		require.NoError(t, err)
+
+		sqlDB, err := originalGetSQLDB(gdb)
+		require.NoError(t, err)
+		assert.NotNil(t, sqlDB)
 	})
 }

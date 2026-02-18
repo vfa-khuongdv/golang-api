@@ -31,6 +31,9 @@ var (
 			PrepareStmt: false,
 		})
 	}
+	getSQLDBConnection = func(db *gorm.DB) (*sql.DB, error) {
+		return db.DB()
+	}
 	logFatalf = logger.Fatalf
 	logInfof  = logger.Infof
 	pingDBFn  = pingDB
@@ -67,7 +70,7 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 	}
 
 	// Get underlying sql.DB
-	sqlDB, err := db.DB()
+	sqlDB, err := getSQLDBConnection(db)
 	if err != nil {
 		logFatalf("Failed to get sql.DB: %+v", err)
 	}

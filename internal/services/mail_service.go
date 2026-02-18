@@ -17,6 +17,13 @@ type MailerService interface {
 
 type mailerServiceImpl struct{}
 
+var (
+	newEmailSender = func(config mailer.GomailSenderConfig) mailer.EmailSender {
+		return mailer.NewGomailSender(config)
+	}
+	parseTemplateFile = template.ParseFiles
+)
+
 func NewMailerService() MailerService {
 	return &mailerServiceImpl{}
 }
@@ -44,7 +51,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		From:     utils.GetEnv("MAIL_FROM", ""),
 	}
 
-	mailer := mailer.NewGomailSender(mailer.GomailSenderConfig{
+	sender := newEmailSender(mailer.GomailSenderConfig{
 		From:     config.From,
 		Host:     config.Host,
 		Port:     config.Port,
@@ -53,7 +60,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 	})
 
 	// Parse the email template file
-	tmpl, err := template.ParseFiles("pkg/mailer/templates/forgot_template.html")
+	tmpl, err := parseTemplateFile("pkg/mailer/templates/forgot_template.html")
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
@@ -73,7 +80,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		return apperror.NewInternalServerError(fmt.Sprintf("error executing template: %+v", err))
 	}
 	// Send password reset email to user
-	if err := mailer.Send([]string{user.Email}, "Reset your password", "", htmlBody.String()); err != nil {
+	if err := sender.Send([]string{user.Email}, "Reset your password", "", htmlBody.String()); err != nil {
 		return apperror.NewInternalServerError(fmt.Sprintf("error sending email: %+v", err))
 	}
 	return nil

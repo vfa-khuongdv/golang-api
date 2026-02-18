@@ -172,6 +172,7 @@ func matchedValOrZero(val reflect.Value, typ reflect.Type) reflect.Value {
 var (
 	sensitiveKeyCache = make(map[string]map[string]bool)
 	cacheMutex        sync.RWMutex
+	onCacheWriteLock  = func() {}
 )
 
 // containsSensitiveKey checks if item matches any sensitive key (case-insensitive).
@@ -200,6 +201,7 @@ func containsSensitiveKey(maskFields []string, item string) bool {
 	// Cache miss - acquire write lock to build cache
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
+	onCacheWriteLock()
 
 	// Double-check after acquiring write lock (another goroutine might have added it)
 	if cache, exists := sensitiveKeyCache[cacheKey]; exists {
