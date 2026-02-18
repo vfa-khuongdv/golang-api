@@ -58,6 +58,21 @@ func TestRespondWith(t *testing.T) {
 		assert.JSONEq(t, expectedJSON, w.Body.String())
 	})
 
+	t.Run("RespondWithError_ValidationError", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+
+		validationErr := apperror.NewValidationError("invalid data", []apperror.FieldError{
+			{Field: "email", Message: "email is required"},
+		})
+
+		utils.RespondWithError(ctx, validationErr)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		expectedJSON := `{"code":4001,"message":"invalid data","fields":[{"field":"email","message":"email is required"}]}`
+		assert.JSONEq(t, expectedJSON, w.Body.String())
+	})
+
 	t.Run("RespondWithOK", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)

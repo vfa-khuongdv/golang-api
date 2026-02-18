@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -376,5 +377,86 @@ func TestToFieldErrors(t *testing.T) {
 	t.Run("UnsupportedInputReturnsEmpty", func(t *testing.T) {
 		assert.Empty(t, utils.ToFieldErrors(map[string]any{"field": "Email"}))
 		assert.Empty(t, utils.ToFieldErrors("not-an-array"))
+	})
+}
+
+func TestTranslateValidationErrors_InternalBranches(t *testing.T) {
+	t.Run("NonValidationError", func(t *testing.T) {
+		result := utils.TranslateValidationErrors(errors.New("plain error"), struct{}{})
+		assert.Equal(t, apperror.ErrValidationFailed, result.Code)
+		assert.Equal(t, "plain error", result.Message)
+		assert.Empty(t, result.Fields)
+	})
+
+	t.Run("PointerObjectAndStructNameHandling", func(t *testing.T) {
+		type LoginInput struct {
+			Email string `json:"email" validate:"required,email"`
+		}
+
+		validate := validator.New()
+		input := &LoginInput{Email: "invalid"}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "email", result.Fields[0].Field)
+	})
+
+	t.Run("MissingFieldFallback", func(t *testing.T) {
+		type Source struct {
+			Email string `json:"email" validate:"required"`
+		}
+		type Different struct {
+			Name string `json:"name"`
+		}
+
+		validate := validator.New()
+		err := validate.Struct(Source{})
+		assert.Error(t, err)
+
+		result := utils.TranslateValidationErrors(err, Different{})
+		assert.Equal(t, "Source.Email", result.Fields[0].Field)
+	})
+
+	t.Run("SliceIndexTraversal", func(t *testing.T) {
+		type Child struct {
+			Email string `json:"email" validate:"required,email"`
+		}
+		type Parent struct {
+			Items []Child `json:"items" validate:"dive"`
+		}
+
+		validate := validator.New()
+		input := &Parent{
+			Items: []Child{
+				{Email: "bad-email"},
+			},
+		}
+
+		err := validate.Struct(input)
+		assert.Error(t, err)
+
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "items[0].email", result.Fields[0].Field)
+	})
+
+	t.Run("PointerFieldTraversal", func(t *testing.T) {
+		type Profile struct {
+			Email string `json:"email" validate:"required,email"`
+		}
+		type User struct {
+			Profile *Profile `json:"profile" validate:"required"`
+		}
+
+		validate := validator.New()
+		input := User{
+			Profile: &Profile{Email: "bad-email"},
+		}
+
+		err := validate.Struct(input)
+		assert.Error(t, err)
+
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "profile.email", result.Fields[0].Field)
 	})
 }

@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,5 +43,14 @@ func TestBcryptService(t *testing.T) {
 
 		_, err := service.HashPasswordWithCost(password, invalidCost)
 		assert.Error(t, err, "HashPasswordWithCost should return error for invalid cost")
+	})
+
+	t.Run("HashPasswordTooLong", func(t *testing.T) {
+		service := services.NewBcryptService()
+		tooLongPassword := strings.Repeat("a", 80)
+		assert.Greater(t, len(tooLongPassword), 72)
+
+		_, err := service.HashPassword(tooLongPassword)
+		assert.Error(t, err, "HashPassword should return error when password exceeds bcrypt length limit")
 	})
 }

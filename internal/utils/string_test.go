@@ -1,12 +1,20 @@
 package utils_test
 
 import (
+	"crypto/rand"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/utils"
 )
+
+type failingReader struct{}
+
+func (f failingReader) Read(_ []byte) (int, error) {
+	return 0, errors.New("entropy unavailable")
+}
 
 // TestGenerateRandomString checks random string generation
 func TestGenerateRandomString(t *testing.T) {
@@ -35,6 +43,17 @@ func TestGenerateRandomString(t *testing.T) {
 		for _, ch := range randomStr {
 			require.True(t, allowed[ch], "Generated string contains invalid character: %c", ch)
 		}
+	})
+
+	t.Run("handles entropy reader failure gracefully", func(t *testing.T) {
+		originalReader := rand.Reader
+		rand.Reader = failingReader{}
+		defer func() {
+			rand.Reader = originalReader
+		}()
+
+		randomStr := utils.GenerateRandomString(8)
+		require.Equal(t, 8, len(randomStr))
 	})
 }
 
