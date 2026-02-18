@@ -86,6 +86,13 @@ func TestJWTService(t *testing.T) {
 		assert.Nil(t, claims)
 	})
 
+	t.Run("ValidateTokenWithScope_InvalidToken", func(t *testing.T) {
+		svc := services.NewJWTService()
+		claims, err := svc.ValidateTokenWithScope("invalid.token.value", services.TokenScopeAccess)
+		assert.Error(t, err)
+		assert.Nil(t, claims)
+	})
+
 	t.Run("ValidateTokenIgnoreExpiration_ExpiredTokenSuccess", func(t *testing.T) {
 		svc := services.NewJWTService()
 

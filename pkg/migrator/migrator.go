@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql" // MySQL database/sql driver
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
@@ -31,6 +32,20 @@ type MySQLConfig struct {
 	DBName   string
 }
 
+var (
+	openSQLConnection = func(driverName, dsn string) (*sql.DB, error) {
+		return sql.Open(driverName, dsn)
+	}
+	buildMySQLDriver = func(db *sql.DB) (database.Driver, error) {
+		return mysql.WithInstance(db, &mysql.Config{
+			MigrationsTable: "schema_migrations",
+		})
+	}
+	createMigrateInstance = func(sourceURL string, driver database.Driver) (MigrateIface, error) {
+		return migrate.NewWithDatabaseInstance(sourceURL, "mysql", driver)
+	}
+)
+
 // NewMigrator creates a new database migrator instance.
 // It takes a migrations path and a MySQL DSN string as input.
 func NewMigrator(migrationsPath, dsn string) (*Migrator, error) {
@@ -38,23 +53,17 @@ func NewMigrator(migrationsPath, dsn string) (*Migrator, error) {
 		return nil, fmt.Errorf("MySQL DSN must not be empty")
 	}
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := openSQLConnection("mysql", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	driver, err := mysql.WithInstance(db, &mysql.Config{
-		MigrationsTable: "schema_migrations",
-	})
+	driver, err := buildMySQLDriver(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MySQL driver: %w", err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationsPath),
-		"mysql",
-		driver,
-	)
+	m, err := createMigrateInstance(fmt.Sprintf("file://%s", migrationsPath), driver)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize migrator: %w", err)
 	}

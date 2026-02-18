@@ -1544,4 +1544,38 @@ func TestForgotPassword(t *testing.T) {
 		userService.AssertExpectations(t)
 		mailerService.AssertExpectations(t)
 	})
+
+	t.Run("ForgotPassword - Mailer Error", func(t *testing.T) {
+		userService := new(mocks.MockUserService)
+		mailerService := new(mocks.MockMailerService)
+		handler := handlers.NewUserHandler(userService, mailerService)
+
+		user := &models.User{
+			ID:    1,
+			Email: "test@example.com",
+			Name:  "Test User",
+		}
+		requestBody := map[string]any{
+			"email": "test@example.com",
+		}
+		body, _ := json.Marshal(requestBody)
+
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(user, nil)
+		mailerService.On("SendMailForgotPassword", user).Return(apperror.NewInternalServerError("send mail failed"))
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/forgot-password", bytes.NewBuffer(body))
+
+		handler.ForgotPassword(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		var actualBody map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
+		assert.Equal(t, float64(apperror.ErrInternalServer), actualBody["code"])
+		assert.Equal(t, "send mail failed", actualBody["message"])
+
+		userService.AssertExpectations(t)
+		mailerService.AssertExpectations(t)
+	})
 }

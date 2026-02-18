@@ -25,6 +25,17 @@ type DatabaseConfig struct {
 
 var DB *gorm.DB
 
+var (
+	openGormConnection = func(dsn string) (*gorm.DB, error) {
+		return gorm.Open(mysql.Open(dsn), &gorm.Config{
+			PrepareStmt: false,
+		})
+	}
+	logFatalf = logger.Fatalf
+	logInfof  = logger.Infof
+	pingDBFn  = pingDB
+)
+
 // Default connection pool settings
 // Note: When hight traffic is expected, consider increasing these values
 // Example:
@@ -50,17 +61,15 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 	)
 
 	// Open GORM connection
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		PrepareStmt: false,
-	})
+	db, err := openGormConnection(dsn)
 	if err != nil {
-		logger.Fatalf("Failed to connect to MySQL: %+v", err)
+		logFatalf("Failed to connect to MySQL: %+v", err)
 	}
 
 	// Get underlying sql.DB
 	sqlDB, err := db.DB()
 	if err != nil {
-		logger.Fatalf("Failed to get sql.DB: %+v", err)
+		logFatalf("Failed to get sql.DB: %+v", err)
 	}
 
 	// =========================
@@ -74,11 +83,11 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 	sqlDB.SetConnMaxIdleTime(config.ConnMaxIdleTime)
 
 	// Validate connection
-	if err := pingDB(sqlDB); err != nil {
-		logger.Fatalf("Database ping failed: %+v", err)
+	if err := pingDBFn(sqlDB); err != nil {
+		logFatalf("Database ping failed: %+v", err)
 	}
 
-	logger.Infof(
+	logInfof(
 		"MySQL connected | open=%d idle=%d lifetime=%s idleTime=%s",
 		config.MaxOpenConns,
 		config.MaxIdleConns,

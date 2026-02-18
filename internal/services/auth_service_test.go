@@ -99,6 +99,20 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			expectErr: true,
 			errCode:   apperror.ErrInternalServer,
 		},
+		{
+			name: "RefreshTokenCreateError",
+			setupMocks: func() {
+				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
+				s.repo.On("FindByField", "email", email).Return(user, nil)
+				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
+				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+					Token:     "mocked-access-token",
+					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+				}, nil)
+				s.refreshTokenService.On("Create", user, ipAddress).Return((*dto.JwtResult)(nil), errors.New("refresh create failed"))
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -216,6 +230,19 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
 				mockRes := &services.RefreshTokenResult{UserId: refreshUserID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: accessUserID, Scope: services.TokenScopeAccess}
+
+				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
+			},
+			expectErr: true,
+			errCode:   apperror.ErrUnauthorized,
+		},
+		{
+			name: "InvalidAccessTokenScope",
+			setupMocks: func() {
+				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
+				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
+				claims := &services.CustomClaims{ID: userID, Scope: "other-scope"}
 
 				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)

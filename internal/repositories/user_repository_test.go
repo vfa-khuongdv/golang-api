@@ -315,6 +315,27 @@ func TestUserRepository(t *testing.T) {
 		tx.Rollback()
 	})
 
+	t.Run("CreateWithTx - Success", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+
+		user := &models.User{
+			Email:    "tx-success@example.com",
+			Name:     "tx-user",
+			Password: "pass",
+			Gender:   1,
+		}
+
+		createdUser, err := repo.CreateWithTx(tx, user)
+		require.NoError(t, err)
+		require.NotNil(t, createdUser)
+		assert.NotZero(t, createdUser.ID)
+	})
+
 	t.Run("GetDB - Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
@@ -381,6 +402,24 @@ func TestUserRepository(t *testing.T) {
 		assert.Equal(t, 2, pagination.Page)
 		assert.Equal(t, 2, pagination.Limit)
 		assert.Len(t, pagination.Data, 2)
+	})
+
+	t.Run("GetUsers - Query Error On Find", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+
+		_ = db.Callback().Query().Before("gorm:query").Register("force_find_error_only", func(tx *gorm.DB) {
+			if tx.Statement != nil {
+				_, hasOrderBy := tx.Statement.Clauses["ORDER BY"]
+				if hasOrderBy {
+				_ = tx.AddError(assert.AnError)
+				}
+			}
+		})
+		defer db.Callback().Query().Remove("force_find_error_only")
+
+		_, err := repo.GetUsers(1, 10)
+		assert.Error(t, err)
 	})
 
 	t.Run("GetUsers - Last Page Success", func(t *testing.T) {

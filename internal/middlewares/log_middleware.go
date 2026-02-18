@@ -36,6 +36,8 @@ var sensitiveHeaders = map[string]bool{
 	"proxy-authorization": true,
 }
 
+var marshalLogEntry = json.Marshal
+
 // LogResponse defines the structure for logging HTTP requests and responses
 type LogResponse struct {
 	RequestID  string `json:"request_id,omitempty"`
@@ -141,12 +143,12 @@ func LogMiddleware() gin.HandlerFunc {
 			logEntry.Response = string(respBodyBytes)
 		}
 
-		// Use goroutine to write log entry to avoid blocking
-		go func(entry LogResponse) {
-			jsonData, err := json.Marshal(entry)
-			if err != nil {
-				logger.ErrorWithRequestID(entry.RequestID, "Failed to marshal log entry:", err)
-				return
+			// Use goroutine to write log entry to avoid blocking
+			go func(entry LogResponse) {
+				jsonData, err := marshalLogEntry(entry)
+				if err != nil {
+					logger.ErrorWithRequestID(entry.RequestID, "Failed to marshal log entry:", err)
+					return
 			}
 			logger.InfoWithRequestID(entry.RequestID, string(jsonData))
 		}(logEntry)
