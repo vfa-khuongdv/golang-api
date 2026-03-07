@@ -49,14 +49,12 @@ This project targets Go 1.22+ (minimum supported version).
 
 **Handlers** (internal/handlers/):
 - Parse HTTP requests
+- Validate request data
 - Call services
 - Return HTTP responses
-- Minimal business logic
-- Handle request validation format (not business validation)
 
 **Services** (internal/services/):
 - Business logic
-- Input validation
 - Orchestrate repositories
 - Return errors via apperror package
 
