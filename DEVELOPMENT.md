@@ -105,7 +105,7 @@ project/
 
 #### **Services (internal/services/)**
 - Contain business logic
-- Validate data
+- Validate input data
 - Orchestrate between repositories
 - Handle errors appropriately
 - Return clean data to handlers
@@ -115,15 +115,13 @@ project/
 - Call appropriate services
 - Return HTTP responses
 - Handle response formatting
-- Minimal business logic
 
 #### **Middlewares (internal/middlewares/)**
 - Authentication/authorization
 - Request logging
 - CORS handling
 - Error handling
-- Input validation
-
+- Rate limiting
 ---
 
 ## Naming Conventions
