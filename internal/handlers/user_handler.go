@@ -52,22 +52,12 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 	logger.InfofWithRequestID(requestID, "Processing forgot password request for email: %s", input.Email)
 
 	// Handle forgot password logic
-	user, err := handler.userService.ForgotPassword(&input)
+	err := handler.userService.ForgotPassword(&input)
 
 	if err != nil {
 		logger.ErrorfWithRequestID(requestID, "Forgot password failed for email %s: %v", input.Email, err)
 		utils.RespondWithError(ctx, err)
 		return
-	}
-
-	// Send password reset email to user
-	if user != nil {
-		if err := handler.mailerService.SendMailForgotPassword(user); err != nil {
-			logger.ErrorfWithRequestID(requestID, "Failed to send password reset email to %s: %v", user.Email, err)
-			utils.RespondWithError(ctx, err)
-			return
-		}
-		logger.InfofWithRequestID(requestID, "Password reset email sent successfully to %s", user.Email)
 	}
 
 	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "If your email is in our system, you will receive instructions to reset your password"})

@@ -40,6 +40,7 @@ type UserServiceTestSuite struct {
 	suite.Suite
 	db      *gorm.DB
 	repo    *mocks.MockUserRepository
+	mailer  *mocks.MockMailerService
 	service services.UserService
 	bcrypt  services.BcryptService
 }
@@ -53,13 +54,15 @@ func (s *UserServiceTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.db = db
 	s.repo = new(mocks.MockUserRepository)
+	s.mailer = new(mocks.MockMailerService)
 	s.bcrypt = services.NewBcryptService()
-	s.service = services.NewUserService(s.repo, s.bcrypt)
+	s.service = services.NewUserService(s.repo, s.bcrypt, s.mailer)
 
 }
 
 func (s *UserServiceTestSuite) TearDownTest() {
 	s.repo.AssertExpectations(s.T())
+	s.mailer.AssertExpectations(s.T())
 }
 
 func (s *UserServiceTestSuite) TestGetProfile() {
@@ -142,13 +145,14 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		s.repo.On("Update", user).Return(nil).Once()
 
 		// Act
-		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		s.mailer.On("SendMailForgotPassword", user).Return(nil).Once()
+
+		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
 
 		// Assert
 		s.NoError(err)
-		s.NotNil(result)
-		s.NotNil(result.Token)
-		s.NotNil(result.ExpiredAt)
+		s.NotNil(user.Token)
+		s.NotNil(user.ExpiredAt)
 	})
 
 	s.T().Run("UserNotFound", func(t *testing.T) {
@@ -157,20 +161,18 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound).Once()
 
 		// Act
-		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
 
 		// Assert
 		s.NoError(err)
-		s.Nil(result)
 	})
 
 	s.T().Run("RepositoryQueryError", func(t *testing.T) {
 		email := "error@example.com"
 		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), errors.New("db query failed")).Once()
 
-		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
 
-		s.Nil(result)
 		s.Error(err)
 	})
 
@@ -181,9 +183,21 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
 		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
 
-		result, err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
 
-		s.Nil(result)
+		s.Error(err)
+	})
+
+	s.T().Run("SendMailFailure", func(t *testing.T) {
+		email := "mail-fail@example.com"
+		user := &models.User{Email: email}
+
+		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
+		s.repo.On("Update", user).Return(nil).Once()
+		s.mailer.On("SendMailForgotPassword", user).Return(errors.New("send mail failed")).Once()
+
+		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+
 		s.Error(err)
 	})
 }
@@ -228,7 +242,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: &notExpired}
 
 		mockBcrypt := &mockBcryptService{hashErr: errors.New("hash failed"), checkValid: true}
-		localService := services.NewUserService(s.repo, mockBcrypt)
+		localService := services.NewUserService(s.repo, mockBcrypt, s.mailer)
 
 		s.repo.On("FindByField", "token", input.Token).Return(user, nil).Once()
 
@@ -343,7 +357,7 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			ConfirmPassword: "new-password",
 		}
 		mockBcrypt := &mockBcryptService{hashErr: errors.New("hash failed"), checkValid: true}
-		localService := services.NewUserService(s.repo, mockBcrypt)
+		localService := services.NewUserService(s.repo, mockBcrypt, s.mailer)
 		user := &models.User{ID: 1, Password: "existing-hash"}
 		s.repo.On("GetByID", uint(4)).Return(user, nil).Once()
 

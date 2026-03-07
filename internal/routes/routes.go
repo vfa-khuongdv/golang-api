@@ -34,10 +34,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
 	bcryptService := services.NewBcryptService()
-	userService := services.NewUserService(userRepo, bcryptService)
+	mailerService := services.NewMailerService()
+	userService := services.NewUserService(userRepo, bcryptService, mailerService)
 	jwtService := services.NewJWTService()
 	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
-	mailerService := services.NewMailerService()
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)

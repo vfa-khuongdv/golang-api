@@ -20,9 +20,9 @@ func (m *MockUserService) UpdateProfile(userID uint, input *dto.UpdateProfileInp
 	return args.Error(0)
 }
 
-func (m *MockUserService) ForgotPassword(input *dto.ForgotPasswordInput) (*models.User, error) {
+func (m *MockUserService) ForgotPassword(input *dto.ForgotPasswordInput) error {
 	args := m.Called(input)
-	return args.Get(0).(*models.User), args.Error(1)
+	return args.Error(0)
 }
 
 func (m *MockUserService) ResetPassword(input *dto.ResetPasswordInput) (*models.User, error) {

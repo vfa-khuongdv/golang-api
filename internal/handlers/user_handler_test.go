@@ -1344,20 +1344,13 @@ func TestForgotPassword(t *testing.T) {
 		mailerService := new(mocks.MockMailerService)
 		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:    1,
-			Email: "test@example.com",
-			Name:  "Test User",
-		}
-
 		requestBody := map[string]any{
 			"email": "test@example.com",
 		}
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(user, nil)
-		mailerService.On("SendMailForgotPassword", user).Return(nil)
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1461,7 +1454,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method to return an error
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewNotFoundError("User not found"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1498,7 +1491,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Update failed"))
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewDBUpdateError("Update failed"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1545,23 +1538,17 @@ func TestForgotPassword(t *testing.T) {
 		mailerService.AssertExpectations(t)
 	})
 
-	t.Run("ForgotPassword - Mailer Error", func(t *testing.T) {
+	t.Run("ForgotPassword - Service Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		mailerService := new(mocks.MockMailerService)
 		handler := handlers.NewUserHandler(userService, mailerService)
 
-		user := &models.User{
-			ID:    1,
-			Email: "test@example.com",
-			Name:  "Test User",
-		}
 		requestBody := map[string]any{
 			"email": "test@example.com",
 		}
 		body, _ := json.Marshal(requestBody)
 
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(user, nil)
-		mailerService.On("SendMailForgotPassword", user).Return(apperror.NewInternalServerError("send mail failed"))
+		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewInternalServerError("send mail failed"))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)

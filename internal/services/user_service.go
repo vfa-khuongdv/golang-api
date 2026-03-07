@@ -16,7 +16,7 @@ type UserService interface {
 	GetProfile(userID uint) (*models.User, error)
 	UpdateProfile(userID uint, input *dto.UpdateProfileInput) error
 
-	ForgotPassword(input *dto.ForgotPasswordInput) (*models.User, error)
+	ForgotPassword(input *dto.ForgotPasswordInput) error
 	ResetPassword(input *dto.ResetPasswordInput) (*models.User, error)
 	ChangePassword(userId uint, input *dto.ChangePasswordInput) (*models.User, error)
 }
@@ -24,24 +24,26 @@ type UserService interface {
 type userServiceImpl struct {
 	repo          repositories.UserRepository
 	bcryptService BcryptService
+	mailerService MailerService
 }
 
-func NewUserService(repo repositories.UserRepository, bcryptService BcryptService) UserService {
+func NewUserService(repo repositories.UserRepository, bcryptService BcryptService, mailerService MailerService) UserService {
 	return &userServiceImpl{
 		repo:          repo,
 		bcryptService: bcryptService,
+		mailerService: mailerService,
 	}
 }
 
-func (service *userServiceImpl) ForgotPassword(input *dto.ForgotPasswordInput) (*models.User, error) {
+func (service *userServiceImpl) ForgotPassword(input *dto.ForgotPasswordInput) error {
 	// 1. Check email exists
 	user, err := service.repo.FindByField("email", input.Email)
 	if err != nil {
 		// Return a neutral response for unknown emails to prevent account enumeration.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil
 		}
-		return nil, apperror.NewDBQueryError("Failed to process forgot password request")
+		return apperror.NewDBQueryError("Failed to process forgot password request")
 	}
 
 	// 2. Generate token and expiry
@@ -54,9 +56,14 @@ func (service *userServiceImpl) ForgotPassword(input *dto.ForgotPasswordInput) (
 
 	err = service.repo.Update(user)
 	if err != nil {
-		return nil, apperror.NewDBUpdateError(err.Error())
+		return apperror.NewDBUpdateError(err.Error())
 	}
-	return user, nil
+
+	if err := service.mailerService.SendMailForgotPassword(user); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (service *userServiceImpl) ResetPassword(input *dto.ResetPasswordInput) (*models.User, error) {
