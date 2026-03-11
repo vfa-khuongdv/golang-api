@@ -48,7 +48,6 @@ The project follows a clean architecture and is organized into the following dir
 ├── go.sum                            # Go module checksums
 ├── internal                          # Core application logic
 │   ├── configs                       # Configuration files for database, environment variables, JWT, etc.
-│   ├── constants                     # Constants and error handling
 │   ├── database                      # Database migrations and seeding
 │   ├── dto                           # Data transfer objects for request and response
 │   ├── handlers                      # HTTP request handlers
@@ -57,7 +56,10 @@ The project follows a clean architecture and is organized into the following dir
 │   ├── repositories                  # Repositories for database access
 │   ├── routes                        # Routes and routing logic
 │   ├── services                      # Business logic for authentication, user, etc.
-│   └── utils                         # Utility functions (e.g., for encryption, validation)
+│   └── shared                        # Shared utilities and helpers used across multiple layers
+│       └── constants                  # Application constants
+│       └── dto                       # Shared data transfer objects
+│       └── utils                      # Utility functions for shared use
 ├── pkg                               # External packages
 │   ├── apperror                      # Custom application errors
 │   ├── logger                        # Logger utility

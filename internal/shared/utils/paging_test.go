@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"github.com/vfa-khuongdv/golang-cms/internal/constants"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/constants"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 )
 
 // helper to create a test context with query parameters

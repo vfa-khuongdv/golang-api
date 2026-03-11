@@ -2,8 +2,8 @@ package mocks
 
 import (
 	"github.com/stretchr/testify/mock"
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 )
 
 // MockJWTService is a mock implementation of services.JWTService

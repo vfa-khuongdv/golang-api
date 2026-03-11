@@ -1,9 +1,9 @@
 package repositories
 
 import (
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"gorm.io/gorm"
 )
 

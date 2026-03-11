@@ -21,26 +21,35 @@ This project targets Go 1.22+ (minimum supported version).
 ## Project Structure
 
 ```
-├── cmd/
-│   ├── server/main.go          # Application entry point
-│   └── seeder/seeder.go        # Database seeding utility
-├── internal/
-│   ├── handlers/               # HTTP handlers (Gin)
-│   ├── services/               # Business logic layer
-│   ├── repositories/           # Data access layer (GORM)
-│   ├── models/                 # Domain models
-│   ├── middlewares/            # HTTP middlewares (auth, CORS, logging)
-│   ├── configs/                # Configuration and environment loading
-│   ├── constants/              # Application constants
-│   ├── routes/                 # Route definitions
-│   ├── utils/                  # Utility functions
-│   └── database/               # Migrations and seeders
-├── pkg/
-│   ├── apperror/               # Error codes and error types
-│   ├── logger/                 # Logging utility
-│   ├── mailer/                 # Email/SMTP service
-│   └── migrator/               # Database migration runner
-└── tests/mocks/                # Mock implementations for testing
+├── cmd/                          # Command-line applications
+│   ├── server/                   # Main application entry point
+│   │   └── main.go
+│   └── seeder/                   # Database seeder
+│       └── seeder.go
+├── internal/                     # Private application code
+│   ├── configs/                  # Configuration management
+│   ├── database/                 # Database setup
+│   │   ├── migrations/           # Migration files
+│   │   └── seeders/              # Seeder implementations
+│   ├── handlers/                 # HTTP handlers/controllers
+│   ├── middlewares/              # HTTP middlewares
+│   ├── models/                   # Data models
+│   ├── repositories/             # Data access layer
+│   ├── routes/                   # Route definitions
+│   ├── services/                 # Business logic layer
+│   └── shared/                   # Shared utilities and helpers
+│       └── constants/            # Application constants
+│       └── dto/                  # Data transfer objects for shared use
+│       └── utils/                # Utility functions  for shared use
+├── pkg/                          # Public packages
+│   ├── apperror/                 # Custom error handling
+│   ├── logger/                   # Logging utilities
+│   ├── mailer/                   # Email sending utilities
+│   └── migrator/                 # Database migration utilities
+├── tests/                        # Test utilities and mocks
+│   └── mocks/                    # Mock implementations
+├── docs/                         # Documentation and API specs
+└── Makefile                      # Build and development commands
 ```
 
 ## Core Architecture Principles

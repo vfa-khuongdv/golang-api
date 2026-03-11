@@ -11,8 +11,8 @@ COVERAGE_HTML := coverage.html
 
 # Core modules for coverage reporting (excluding cmd, models, routes, seeders, mocks)
 # These modules represent the business logic that should be tested
-CORE_MODULES := ./internal/configs ./internal/handlers ./internal/middlewares \
-                ./internal/repositories ./internal/services ./internal/utils ./pkg/...
+CORE_MODULES := ./internal/shared/... ./internal/handlers ./internal/middlewares \
+                ./internal/repositories ./internal/services ./pkg/...
 
 # Database variables (can be overridden by env vars)
 DB_HOST ?= 127.0.0.1
