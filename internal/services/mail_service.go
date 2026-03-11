@@ -6,7 +6,7 @@ import (
 	"html/template"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/mailer"
 )

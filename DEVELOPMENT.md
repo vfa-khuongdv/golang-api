@@ -65,18 +65,19 @@ project/
 │       └── seeder.go
 ├── internal/                     # Private application code
 │   ├── configs/                  # Configuration management
-│   ├── constants/                # Application constants
 │   ├── database/                 # Database setup
 │   │   ├── migrations/           # Migration files
 │   │   └── seeders/              # Seeder implementations
-│   ├── dto/                      # Data transfer objects for request and response
 │   ├── handlers/                 # HTTP handlers/controllers
 │   ├── middlewares/              # HTTP middlewares
 │   ├── models/                   # Data models
 │   ├── repositories/             # Data access layer
 │   ├── routes/                   # Route definitions
 │   ├── services/                 # Business logic layer
-│   └── utils/                    # Utility functions
+│   └── shared/                   # Shared utilities and helpers
+│       └── constants/            # Application constants
+│       └── dto/                  # Data transfer objects for shared use
+│       └── utils/                # Utility functions  for shared use
 ├── pkg/                          # Public packages
 │   ├── apperror/                 # Custom error handling
 │   ├── logger/                   # Logging utilities

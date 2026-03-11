@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -412,7 +412,7 @@ func TestUserRepository(t *testing.T) {
 			if tx.Statement != nil {
 				_, hasOrderBy := tx.Statement.Clauses["ORDER BY"]
 				if hasOrderBy {
-				_ = tx.AddError(assert.AnError)
+					_ = tx.AddError(assert.AnError)
 				}
 			}
 		})

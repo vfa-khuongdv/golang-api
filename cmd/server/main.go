@@ -5,7 +5,7 @@ import (
 
 	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/internal/routes"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"github.com/vfa-khuongdv/golang-cms/pkg/migrator"
 	"gorm.io/gorm"
@@ -24,7 +24,7 @@ func initializeDatabase() *gorm.DB {
 
 func runMigrations() {
 	sqlConfig := migrator.MySQLConfig{
-		Host:     utils.GetEnv("DB_HOST", "127.0.0.	1"),
+		Host:     utils.GetEnv("DB_HOST", "127.0.0.1"),
 		Port:     utils.GetEnv("DB_PORT", "3306"),
 		User:     utils.GetEnv("DB_USERNAME", ""),
 		Password: utils.GetEnv("DB_PASSWORD", ""),

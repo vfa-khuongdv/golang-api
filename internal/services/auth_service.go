@@ -2,8 +2,8 @@ package services
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

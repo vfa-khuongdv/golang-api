@@ -6,7 +6,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"gorm.io/gorm"
 )
 

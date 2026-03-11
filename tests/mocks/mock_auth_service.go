@@ -3,7 +3,7 @@ package mocks
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 )
 
 type MockAuthService struct {

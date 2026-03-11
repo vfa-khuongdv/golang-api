@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vfa-khuongdv/golang-cms/internal/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 

@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/vfa-khuongdv/golang-cms/internal/constants"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/constants"
 )
 
 func CalculateTotalPages(totalRows int64, limit int) int {
