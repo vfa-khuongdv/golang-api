@@ -40,7 +40,9 @@ var (
 )
 
 // Default connection pool settings
-// Note: When hight traffic is expected, consider increasing these values
+// Note:
+// - Current configuration is suitable for moderate workloads (e.g., up to 200 concurrent connections)
+// - So when ccu increases, consider adjusting MaxOpenConns and MaxIdleConns accordingly
 // Example:
 // - For 1000 concurrent connections, set MaxOpenConns to 500 and MaxIdleConns to 100
 // - Monitor database performance and adjust accordingly
