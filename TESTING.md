@@ -120,6 +120,8 @@ assert.Implements(t, (*Reader)(nil), obj)   // Implements interface
 ### Test Structure (AAA Pattern)
 
 ```go
+package services_test
+
 func TestUserService(t *testing.T) {
     // Setup phase - creates all necessary objects
     mockRepo := new(mocks.MockUserRepository)
@@ -150,6 +152,8 @@ func TestUserService(t *testing.T) {
 ### Handler Testing
 
 ```go
+package handlers_test
+
 func TestUserHandler(t *testing.T) {
     gin.SetMode(gin.TestMode)
 
@@ -202,6 +206,8 @@ func TestUserHandler(t *testing.T) {
 ### Repository Testing
 
 ```go
+package repositories_test
+
 func TestUserRepository(t *testing.T) {
     t.Run("Create", func(t *testing.T) {
         // Setup in-memory database
@@ -257,6 +263,8 @@ func TestUserRepository(t *testing.T) {
 ### Service Testing
 
 ```go
+package services_test
+
 func TestAuthService(t *testing.T) {
     t.Run("Login - Success", func(t *testing.T) {
         // Arrange
@@ -327,6 +335,8 @@ func TestAuthService(t *testing.T) {
 ### Database Integration Tests
 
 ```go
+package services_test
+
 func TestUserServiceIntegration(t *testing.T) {
     // Setup real database (in-memory for tests)
     db := setupTestDB()
@@ -362,6 +372,8 @@ func TestUserServiceIntegration(t *testing.T) {
 ### Multiple Service Integration
 
 ```go
+package services_test
+
 func TestAuthServiceIntegration(t *testing.T) {
     db := setupTestDB()
     defer teardownTestDB(db)
@@ -464,6 +476,8 @@ mockRepo.On("Delete", mock.Anything).Return(nil)            // Called any number
 ### Complete Mock Example
 
 ```go
+package services_test
+
 func TestPaymentService(t *testing.T) {
     t.Run("ProcessPayment - Success", func(t *testing.T) {
         // Create mocks
