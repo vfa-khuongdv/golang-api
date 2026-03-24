@@ -257,6 +257,8 @@ db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 ### Handler Testing
 
 ```go
+package handlers_test
+
 func TestUserHandler(t *testing.T) {
     gin.SetMode(gin.TestMode)
     
