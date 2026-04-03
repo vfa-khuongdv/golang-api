@@ -49,7 +49,11 @@ func RespondWithError(ctx *gin.Context, err error) {
 			"message": "Internal server error",
 		},
 	)
-	logger.Error("Unhandled error response: ", err)
+	if ctx.Request != nil {
+		logger.WithContext(ctx.Request.Context()).Errorf("Unhandled error response: %v", err)
+	} else {
+		logger.Errorf("Unhandled error response: %v", err)
+	}
 }
 
 // RespondWithOK sends a JSON response with the given status code and body
