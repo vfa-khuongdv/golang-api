@@ -44,6 +44,8 @@ func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models
 		return nil, apperror.NewDBInsertError("Failed to create refresh token")
 	}
 
+	logger.WithContext(ctx).Infof("Created refresh token for user ID %d", user.ID)
+
 	return &dto.JwtResult{
 		Token:     tokenString,
 		ExpiresAt: expiredAt,

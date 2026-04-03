@@ -86,31 +86,19 @@ func TestLogMiddleware(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Parse log output
-	var logEntry struct {
-		Level   string `json:"level"`
-		Message string `json:"msg"`
-	}
-
-	// The logger.Info logs the JSON string as the message, so we need to parse the message itself
-	// However, looking at log_middleware.go:
-	// logger.Info(string(jsonData))
-	// This means the "msg" field of the logrus JSON output will contain the JSON string of LogResponse.
+	var logEntry map[string]interface{}
 
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
-	assert.Equal(t, "info", logEntry.Level)
+	assert.Equal(t, "info", logEntry["level"])
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
-	// Verify fields
-	assert.Equal(t, "POST", logResponse.Method)
-	assert.Equal(t, "/test", logResponse.URL)
-	assert.Equal(t, "200", logResponse.StatusCode)
+	// Verify fields are directly in the log entry
+	assert.Equal(t, "POST", logEntry["method"])
+	assert.Equal(t, "/test", logEntry["url"])
+	assert.Equal(t, "200", logEntry["status_code"])
 
 	// Verify Request Body Censoring
-	reqMap, ok := logResponse.Request.(map[string]interface{})
+	reqMap, ok := logEntry["request"].(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, "user1", reqMap["username"])
 	assert.NotEqual(t, "secret_password", reqMap["password"])
@@ -119,7 +107,7 @@ func TestLogMiddleware(t *testing.T) {
 	assert.Contains(t, reqMap["email"], "*")
 
 	// Verify Response Body Censoring
-	respMap, ok := logResponse.Response.(map[string]interface{})
+	respMap, ok := logEntry["response"].(map[string]interface{})
 	assert.True(t, ok)
 	assert.Equal(t, "success", respMap["message"])
 	assert.NotEqual(t, "response_token_123", respMap["token"])
@@ -147,20 +135,14 @@ func TestLogMiddleware_GetRequest(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "GET", logResponse.Method)
-	assert.Equal(t, "/ping", logResponse.URL)
-	assert.Equal(t, "200", logResponse.StatusCode)
-	assert.Equal(t, "pong", logResponse.Response)
+	assert.Equal(t, "GET", logEntry["method"])
+	assert.Equal(t, "/ping", logEntry["url"])
+	assert.Equal(t, "200", logEntry["status_code"])
+	assert.Equal(t, "pong", logEntry["response"])
 }
 
 func TestLogMiddleware_LargeBody(t *testing.T) {
@@ -186,21 +168,15 @@ func TestLogMiddleware_LargeBody(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
-	assert.NoError(t, err)
-
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
 	assert.NoError(t, err)
 
 	// The middleware reads up to 64KB.
 	// Since it's not JSON, it logs as string.
 	// We verify that it captured something and didn't crash.
-	assert.NotEmpty(t, logResponse.Request)
-	reqStr, ok := logResponse.Request.(string)
+	assert.NotEmpty(t, logEntry["request"])
+	reqStr, ok := logEntry["request"].(string)
 	assert.True(t, ok)
 	assert.True(t, len(reqStr) <= (1<<16))
 }
@@ -227,18 +203,12 @@ func TestLogMiddleware_LargeResponseBody(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
 	// Verify response was truncated to maxBodySize (64KB)
-	respStr, ok := logResponse.Response.(string)
+	respStr, ok := logEntry["response"].(string)
 	assert.True(t, ok)
 	assert.LessOrEqual(t, len(respStr), 1<<16, "Response should be truncated to 64KB")
 }
@@ -269,18 +239,12 @@ func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
-	// Verify sensitive headers are censored
-	headers, ok := logResponse.Header.(map[string]interface{})
+	// Verify sensitive headers are censored (headers are now a direct field)
+	headers, ok := logEntry["header"].(map[string]interface{})
 	assert.True(t, ok)
 
 	authHeader, ok := headers["Authorization"].([]interface{})
@@ -326,21 +290,15 @@ func TestLogMiddleware_MalformedJSON(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
 	// Verify malformed JSON is logged as string, not causing crash
-	assert.Equal(t, "POST", logResponse.Method)
-	assert.Equal(t, "/malformed", logResponse.URL)
-	assert.NotEmpty(t, logResponse.Request)
-	assert.NotEmpty(t, logResponse.Response)
+	assert.Equal(t, "POST", logEntry["method"])
+	assert.Equal(t, "/malformed", logEntry["url"])
+	assert.NotEmpty(t, logEntry["request"])
+	assert.NotEmpty(t, logEntry["response"])
 }
 
 func TestLogMiddleware_NonJSONContentType(t *testing.T) {
@@ -366,19 +324,13 @@ func TestLogMiddleware_NonJSONContentType(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
 	// Verify non-JSON content is logged as string
-	assert.Equal(t, "plain text request", logResponse.Request)
-	assert.Equal(t, "plain text response", logResponse.Response)
+	assert.Equal(t, "plain text request", logEntry["request"])
+	assert.Equal(t, "plain text response", logEntry["response"])
 }
 
 func TestLogMiddleware_RequestBodyReadError(t *testing.T) {
@@ -519,20 +471,14 @@ func TestLogMiddleware_PUTandPATCH(t *testing.T) {
 
 			time.Sleep(50 * time.Millisecond)
 
-			var logEntry struct {
-				Message string `json:"msg"`
-			}
+			var logEntry map[string]interface{}
 			err := json.Unmarshal(buf.Bytes(), &logEntry)
 			assert.NoError(t, err)
 
-			var logResponse LogResponse
-			err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-			assert.NoError(t, err)
-
-			assert.Equal(t, tt.method, logResponse.Method)
+			assert.Equal(t, tt.method, logEntry["method"])
 
 			// Verify password was censored
-			reqMap, ok := logResponse.Request.(map[string]interface{})
+			reqMap, ok := logEntry["request"].(map[string]interface{})
 			assert.True(t, ok)
 			assert.Contains(t, reqMap["password"], "*")
 		})
@@ -562,18 +508,12 @@ func TestLogMiddleware_EmptyBody(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	var logEntry struct {
-		Message string `json:"msg"`
-	}
+	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	var logResponse LogResponse
-	err = json.Unmarshal([]byte(logEntry.Message), &logResponse)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "POST", logResponse.Method)
-	assert.Equal(t, "/empty", logResponse.URL)
+	assert.Equal(t, "POST", logEntry["method"])
+	assert.Equal(t, "/empty", logEntry["url"])
 	// Empty body should not cause errors
-	assert.NotNil(t, logResponse.Request)
+	assert.NotNil(t, logEntry["request"])
 }
