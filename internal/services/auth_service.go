@@ -5,6 +5,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
 // AuthService defines the interface for authentication operations
@@ -48,31 +49,36 @@ func NewAuthService(repo repositories.UserRepository, refreshTokenService Refres
 //   - *dto.LoginResponse: Contains access token and refresh token if successful
 //   - error: Returns error if login fails (user not found, invalid password, token generation fails)
 func (service *authServiceImpl) Login(email, password string, ctx *gin.Context) (*dto.LoginResponse, error) {
+	logger.Infof("Login attempt for email: %s", email)
+
 	user, err := service.repo.FindByField("email", email)
 	if err != nil {
+		logger.Warnf("Login failed - user not found: %s", email)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
-	// Validate password
 	if isValid := service.bcryptService.CheckPasswordHash(password, user.Password); !isValid {
+		logger.Warnf("Login failed - invalid password for email: %s", email)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
-	// Generate access token
 	accessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
+		logger.Errorf("Failed to generate access token for user ID %d: %v", user.ID, err)
 		return nil, apperror.NewInternalServerError(err.Error())
 	}
 
-	// Create new refresh token
 	ipAddress := ctx.ClientIP()
 	refreshToken, errToken := service.refreshTokenService.Create(user, ipAddress)
 
 	if errToken != nil {
+		logger.Errorf("Failed to create refresh token for user ID %d: %v", user.ID, errToken)
 		return nil, errToken
 	}
 
-	res := &dto.LoginResponse{
+	logger.Infof("Login successful for user ID %d", user.ID)
+
+	return &dto.LoginResponse{
 		AccessToken: dto.JwtResult{
 			Token:     accessToken.Token,
 			ExpiresAt: accessToken.ExpiresAt,
@@ -81,9 +87,7 @@ func (service *authServiceImpl) Login(email, password string, ctx *gin.Context) 
 			Token:     refreshToken.Token,
 			ExpiresAt: refreshToken.ExpiresAt,
 		},
-	}
-
-	return res, nil
+	}, nil
 }
 
 // RefreshToken generates new access and refresh tokens using refresh_token and validates with access_token
@@ -96,44 +100,47 @@ func (service *authServiceImpl) Login(email, password string, ctx *gin.Context) 
 //   - *dto.LoginResponse: Contains new access token and refresh token if successful
 //   - error: Returns error if token refresh fails (invalid tokens, user not found, token generation fails)
 func (service *authServiceImpl) RefreshToken(refreshToken, accessToken string, ctx *gin.Context) (*dto.LoginResponse, error) {
+	logger.Info("Token refresh attempt")
+
 	ipAddress := ctx.ClientIP()
 
-	// Step 1: Validate refresh token (used to identify user)
 	refreshResult, err := service.refreshTokenService.Update(refreshToken, ipAddress)
 	if err != nil {
+		logger.Warnf("Token refresh failed - invalid refresh token")
 		return nil, apperror.NewUnauthorizedError("Invalid refresh token")
 	}
 
-	// Step 2: Validate access token (verify token ownership, works even if expired)
 	claims, err := service.jwtService.ValidateTokenIgnoreExpiration(accessToken)
 	if err != nil {
+		logger.Warnf("Token refresh failed - invalid access token")
 		return nil, apperror.NewUnauthorizedError("Invalid access token")
 	}
 
-	// Step 3: Verify access token has correct scope
 	if claims.Scope != TokenScopeAccess {
+		logger.Warnf("Token refresh failed - invalid scope")
 		return nil, apperror.NewUnauthorizedError("Invalid access token scope")
 	}
 
-	// Step 4: Verify that both tokens belong to the same user
 	if claims.ID != refreshResult.UserId {
+		logger.Warnf("Token refresh failed - token mismatch")
 		return nil, apperror.NewUnauthorizedError("Token mismatch: refresh and access tokens belong to different users")
 	}
 
-	// Step 5: Get user details
 	user, err := service.repo.GetByID(refreshResult.UserId)
 	if err != nil {
+		logger.Warnf("Token refresh failed - user not found: %d", refreshResult.UserId)
 		return nil, apperror.NewNotFoundError("User not found")
 	}
 
-	// Step 6: Generate new access token
 	newAccessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
+		logger.Errorf("Failed to generate new access token for user ID %d: %v", user.ID, err)
 		return nil, apperror.NewInternalServerError(err.Error())
 	}
 
-	// Step 7: Build response (refresh token already updated in Step 1)
-	response := &dto.LoginResponse{
+	logger.Infof("Token refresh successful for user ID %d", user.ID)
+
+	return &dto.LoginResponse{
 		AccessToken: dto.JwtResult{
 			Token:     newAccessToken.Token,
 			ExpiresAt: newAccessToken.ExpiresAt,
@@ -142,7 +149,5 @@ func (service *authServiceImpl) RefreshToken(refreshToken, accessToken string, c
 			Token:     refreshResult.Token.Token,
 			ExpiresAt: refreshResult.Token.ExpiresAt,
 		},
-	}
-
-	return response, nil
+	}, nil
 }

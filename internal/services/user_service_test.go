@@ -10,6 +10,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -156,14 +157,11 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 	})
 
 	s.T().Run("UserNotFound", func(t *testing.T) {
-		// Arrange
 		email := "unknown@example.com"
-		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound).Once()
+		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), apperror.New(apperror.ErrUnauthorized, 1003, "User not found")).Once()
 
-		// Act
 		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
 
-		// Assert
 		s.NoError(err)
 	})
 

@@ -9,7 +9,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
-// AuthMiddleware is a Gin middleware function that handles JWT authentication
+// AuthMiddleware creates a Gin middleware function that handles JWT authentication
 // It validates the Authorization header and extracts the JWT token
 // The middleware checks if:
 // - Authorization header exists and has "Bearer " prefix
@@ -17,8 +17,7 @@ import (
 // - Token has "access" scope
 // If validation succeeds, it sets the user ID from token claims in context
 // If validation fails, it returns 401 Unauthorized
-func AuthMiddleware() gin.HandlerFunc {
-	jwtService := services.NewJWTService()
+func AuthMiddleware(jwtService services.JWTService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 
 		authHeader := ctx.GetHeader("Authorization")

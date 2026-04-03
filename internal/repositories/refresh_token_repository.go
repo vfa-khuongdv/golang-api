@@ -1,9 +1,12 @@
 package repositories
 
 import (
+	"errors"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
 )
 
@@ -36,7 +39,11 @@ func NewRefreshTokenRepository(db *gorm.DB) RefreshTokenRepository {
 // Returns:
 //   - error: nil if successful, error otherwise
 func (repo *refreshTokenRepositoryImpl) Create(token *models.RefreshToken) error {
-	return repo.db.Create(token).Error
+	if err := repo.db.Create(token).Error; err != nil {
+		logger.Errorf("DB error: failed to create refresh token: %v", err)
+		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to create refresh token", err)
+	}
+	return nil
 }
 
 // First retrieves the first refresh token from the database by its token value
@@ -49,7 +56,11 @@ func (repo *refreshTokenRepositoryImpl) Create(token *models.RefreshToken) error
 func (repo *refreshTokenRepositoryImpl) First(token string) (*models.RefreshToken, error) {
 	var refreshToken models.RefreshToken
 	if err := repo.db.Where("refresh_token = ?", token).First(&refreshToken).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.New(apperror.ErrNotFound, 1001, "Refresh token not found")
+		}
+		logger.Errorf("DB error: failed to fetch refresh token: %v", err)
+		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch refresh token", err)
 	}
 	return &refreshToken, nil
 }
@@ -64,7 +75,11 @@ func (repo *refreshTokenRepositoryImpl) First(token string) (*models.RefreshToke
 func (repo *refreshTokenRepositoryImpl) FindByToken(token string) (*models.RefreshToken, error) {
 	var refreshToken models.RefreshToken
 	if err := repo.db.Where("refresh_token = ? and expired_at > ?", token, time.Now().Unix()).First(&refreshToken).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.New(apperror.ErrNotFound, 1001, "Refresh token not found or expired")
+		}
+		logger.Errorf("DB error: failed to fetch refresh token: %v", err)
+		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch refresh token", err)
 	}
 	return &refreshToken, nil
 }
@@ -76,9 +91,17 @@ func (repo *refreshTokenRepositoryImpl) FindByToken(token string) (*models.Refre
 // Returns:
 //   - error: nil if successful, error otherwise
 func (repo *refreshTokenRepositoryImpl) Update(token *models.RefreshToken) error {
-	return repo.db.Save(token).Error
+	if err := repo.db.Save(token).Error; err != nil {
+		logger.Errorf("DB error: failed to update refresh token: %v", err)
+		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to update refresh token", err)
+	}
+	return nil
 }
 
 func (repo *refreshTokenRepositoryImpl) UpdateWithTx(token *models.RefreshToken, tx *gorm.DB) error {
-	return tx.Save(token).Error
+	if err := tx.Save(token).Error; err != nil {
+		logger.Errorf("DB error: failed to update refresh token with tx: %v", err)
+		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to update refresh token", err)
+	}
+	return nil
 }

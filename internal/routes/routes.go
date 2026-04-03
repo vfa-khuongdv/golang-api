@@ -70,7 +70,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		}
 
 		authenticated := api.Group("/")
-		authenticated.Use(middlewares.AuthMiddleware())
+		authenticated.Use(middlewares.AuthMiddleware(jwtService))
 		{
 			authenticated.POST("/change-password", userHandler.ChangePassword)
 			authenticated.GET("/profile", userHandler.GetProfile)
