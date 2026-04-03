@@ -126,6 +126,7 @@ func TestUserService(t *testing.T) {
     // Setup phase - creates all necessary objects
     mockRepo := new(mocks.MockUserRepository)
     service := services.NewUserService(mockRepo)
+    ctx := context.Background()
 
     t.Run("CreateUser - Success", func(t *testing.T) {
         // Arrange - set up test data and expectations
@@ -133,12 +134,12 @@ func TestUserService(t *testing.T) {
             Email: "test@example.com",
             Name:  "Test User",
         }
-        mockRepo.On("Create", mock.MatchedBy(func(u *User) bool {
+        mockRepo.On("Create", ctx, mock.MatchedBy(func(u *User) bool {
             return u.Email == user.Email
         })).Return(nil).Once()
 
         // Act - execute the function being tested
-        result, err := service.CreateUser(user)
+        result, err := service.CreateUser(ctx, user)
 
         // Assert - verify the results
         require.NoError(t, err)
@@ -208,11 +209,14 @@ func TestUserHandler(t *testing.T) {
 ```go
 package repositories_test
 
+import "context"
+
 func TestUserRepository(t *testing.T) {
     t.Run("Create", func(t *testing.T) {
         // Setup in-memory database
         db := setupTestDB()
         repo := repositories.NewUserRepository(db)
+        ctx := context.Background()
 
         // Arrange
         user := &User{
@@ -221,7 +225,7 @@ func TestUserRepository(t *testing.T) {
         }
 
         // Act
-        result, err := repo.Create(user)
+        result, err := repo.Create(ctx, user)
 
         // Assert
         require.NoError(t, err)
@@ -232,13 +236,14 @@ func TestUserRepository(t *testing.T) {
     t.Run("GetByID", func(t *testing.T) {
         db := setupTestDB()
         repo := repositories.NewUserRepository(db)
+        ctx := context.Background()
 
         // Setup - create a user
         created := &User{Email: "test@example.com"}
-        db.Create(created)
+        repo.Create(ctx, created)
 
         // Act
-        result, err := repo.GetByID(created.ID)
+        result, err := repo.GetByID(ctx, created.ID)
 
         // Assert
         require.NoError(t, err)
@@ -249,9 +254,10 @@ func TestUserRepository(t *testing.T) {
     t.Run("GetByID - Not Found", func(t *testing.T) {
         db := setupTestDB()
         repo := repositories.NewUserRepository(db)
+        ctx := context.Background()
 
         // Act
-        result, err := repo.GetByID(9999)
+        result, err := repo.GetByID(ctx, 9999)
 
         // Assert
         assert.Error(t, err)
@@ -271,6 +277,7 @@ func TestAuthService(t *testing.T) {
         mockUserRepo := new(mocks.MockUserRepository)
         mockBcryptService := new(mocks.MockBcryptService)
         mockJWTService := new(mocks.MockJWTService)
+        ctx := context.Background()
 
         user := &User{
             ID:       1,
@@ -278,7 +285,7 @@ func TestAuthService(t *testing.T) {
             Password: "hashed_password",
         }
 
-        mockUserRepo.On("FindByEmail", "test@example.com").Return(user, nil)
+        mockUserRepo.On("FindByEmail", ctx, "test@example.com").Return(user, nil)
         mockBcryptService.On("CheckPasswordHash", "password", "hashed_password").
             Return(true)
         mockJWTService.On("GenerateAccessToken", uint(1)).
@@ -291,7 +298,7 @@ func TestAuthService(t *testing.T) {
         )
 
         // Act
-        result, err := service.Login("test@example.com", "password")
+        result, err := service.Login(ctx, "test@example.com", "password", "127.0.0.1")
 
         // Assert
         require.NoError(t, err)
@@ -303,6 +310,7 @@ func TestAuthService(t *testing.T) {
         mockUserRepo := new(mocks.MockUserRepository)
         mockBcryptService := new(mocks.MockBcryptService)
         mockJWTService := new(mocks.MockJWTService)
+        ctx := context.Background()
 
         user := &User{
             ID:       1,
@@ -310,7 +318,7 @@ func TestAuthService(t *testing.T) {
             Password: "hashed_password",
         }
 
-        mockUserRepo.On("FindByEmail", "test@example.com").Return(user, nil)
+        mockUserRepo.On("FindByEmail", ctx, "test@example.com").Return(user, nil)
         mockBcryptService.On("CheckPasswordHash", "wrong_password", "hashed_password").
             Return(false)
 
@@ -320,7 +328,7 @@ func TestAuthService(t *testing.T) {
             mockJWTService,
         )
 
-        result, err := service.Login("test@example.com", "wrong_password")
+        result, err := service.Login(ctx, "test@example.com", "wrong_password", "127.0.0.1")
 
         require.Error(t, err)
         assert.Nil(t, result)
