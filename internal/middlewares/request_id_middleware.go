@@ -3,6 +3,7 @@ package middlewares
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
 const (
@@ -18,22 +19,20 @@ const (
 // The request ID is:
 // - Stored in the Gin context for use by handlers
 // - Added to the response header
-// - Available for logging and tracing
+// - Injected into ctx.Request.Context() for automatic logging
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Check if client provided a request ID
 		requestID := c.GetHeader(RequestIDHeader)
 
-		// If no request ID provided, generate a new UUID
 		if requestID == "" {
 			requestID = uuid.New().String()
 		}
 
-		// Store request ID in context for handlers to access
 		c.Set(RequestIDKey, requestID)
-
-		// Add request ID to response header
 		c.Writer.Header().Set(RequestIDHeader, requestID)
+
+		req := c.Request.WithContext(logger.WithRequestIDContext(c.Request.Context(), requestID))
+		c.Request = req
 
 		c.Next()
 	}

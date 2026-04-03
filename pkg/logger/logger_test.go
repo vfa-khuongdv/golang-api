@@ -1,23 +1,24 @@
 package logger_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
 func TestLogger(t *testing.T) {
-
-	t.Run("Test Init", func(t *testing.T) {
+	t.Run("Init", func(t *testing.T) {
 		logger.Init()
 		assert.NotNil(t, logrus.StandardLogger().Formatter)
 	})
 
-	t.Run("Info level logs", func(t *testing.T) {
+	t.Run("Plain logs", func(t *testing.T) {
 		t.Run("Info", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.InfoLevel)
@@ -43,13 +44,10 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, logrus.InfoLevel, entry.Level)
 			assert.Equal(t, "hello world", entry.Message)
 		})
-	})
 
-	t.Run("Debug level logs", func(t *testing.T) {
 		t.Run("Debug", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.DebugLevel)
-
 			defer hook.Reset()
 
 			logger.Debug("debug msg")
@@ -72,9 +70,7 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, logrus.DebugLevel, entry.Level)
 			assert.Equal(t, "debug msg", entry.Message)
 		})
-	})
 
-	t.Run("Error level logs", func(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.ErrorLevel)
@@ -100,9 +96,7 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, logrus.ErrorLevel, entry.Level)
 			assert.Equal(t, "error: not found", entry.Message)
 		})
-	})
 
-	t.Run("Warning level logs", func(t *testing.T) {
 		t.Run("Warn", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.WarnLevel)
@@ -119,7 +113,6 @@ func TestLogger(t *testing.T) {
 		t.Run("Warnf", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.WarnLevel)
-
 			defer hook.Reset()
 
 			logger.Warnf("this is a %s", "warning")
@@ -131,143 +124,183 @@ func TestLogger(t *testing.T) {
 		})
 	})
 
-	t.Run("WithRequestID", func(t *testing.T) {
-		hook := test.NewGlobal()
-		logrus.SetLevel(logrus.InfoLevel)
-		defer hook.Reset()
-
-		requestID := "test-request-id-123"
-		entry := logger.WithRequestID(requestID)
-
-		assert.NotNil(t, entry)
-		assert.Equal(t, requestID, entry.Data["request_id"])
-	})
-
-	t.Run("Info level logs with RequestID", func(t *testing.T) {
-		t.Run("InfoWithRequestID", func(t *testing.T) {
+	t.Run("WithContext logs", func(t *testing.T) {
+		t.Run("Infof with requestID", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.InfoLevel)
 			defer hook.Reset()
 
-			requestID := "test-request-id-123"
-			logger.InfoWithRequestID(requestID, "hello world")
+			ctx := logger.WithRequestIDContext(context.Background(), "test-req-123")
+			logger.WithContext(ctx).Infof("hello %s", "world")
 
-			assert.Len(t, hook.Entries, 1)
+			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
 			assert.Equal(t, logrus.InfoLevel, entry.Level)
 			assert.Equal(t, "hello world", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+			assert.Equal(t, "test-req-123", entry.Data["request_id"])
 		})
 
-		t.Run("InfofWithRequestID", func(t *testing.T) {
+		t.Run("Errorf with requestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.ErrorLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "test-req-456")
+			logger.WithContext(ctx).Errorf("error: %s", "not found")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+			assert.Equal(t, "error: not found", entry.Message)
+			assert.Equal(t, "test-req-456", entry.Data["request_id"])
+		})
+
+		t.Run("Warnf with requestID", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.WarnLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "test-req-789")
+			logger.WithContext(ctx).Warnf("this is a %s", "warning")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.WarnLevel, entry.Level)
+			assert.Equal(t, "this is a warning", entry.Message)
+			assert.Equal(t, "test-req-789", entry.Data["request_id"])
+		})
+
+		t.Run("WithContext without requestID", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.InfoLevel)
 			defer hook.Reset()
 
-			requestID := "test-request-id-456"
-			logger.InfofWithRequestID(requestID, "hello %s", "world")
+			ctx := context.Background()
+			logger.WithContext(ctx).Infof("no request id")
 
-			assert.Len(t, hook.Entries, 1)
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, "", entry.Data["request_id"])
+		})
+
+		t.Run("WithField chaining", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "test-req-chain")
+			logger.WithContext(ctx).WithField("user_id", 42).Infof("user action")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, "user action", entry.Message)
+			assert.Equal(t, "test-req-chain", entry.Data["request_id"])
+			assert.Equal(t, 42, entry.Data["user_id"])
+		})
+
+		t.Run("WithFields chaining", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "test-req-fields")
+			logger.WithContext(ctx).WithFields(logrus.Fields{
+				"user_id": 99,
+				"action":  "login",
+			}).Infof("multi fields")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, "multi fields", entry.Message)
+			assert.Equal(t, "test-req-fields", entry.Data["request_id"])
+			assert.Equal(t, 99, entry.Data["user_id"])
+			assert.Equal(t, "login", entry.Data["action"])
+		})
+
+		t.Run("Logger.Info", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "req-info")
+			logger.WithContext(ctx).Info("info message")
+
+			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
 			assert.Equal(t, logrus.InfoLevel, entry.Level)
-			assert.Equal(t, "hello world", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+			assert.Equal(t, "info message", entry.Message)
+			assert.Equal(t, "req-info", entry.Data["request_id"])
 		})
-	})
 
-	t.Run("Debug level logs with RequestID", func(t *testing.T) {
-		t.Run("DebugWithRequestID", func(t *testing.T) {
+		t.Run("Logger.Debug", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.DebugLevel)
 			defer hook.Reset()
 
-			requestID := "test-request-id-789"
-			logger.DebugWithRequestID(requestID, "debug msg")
+			ctx := logger.WithRequestIDContext(context.Background(), "req-debug")
+			logger.WithContext(ctx).Debug("debug message")
 
-			assert.Len(t, hook.Entries, 1)
+			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
 			assert.Equal(t, logrus.DebugLevel, entry.Level)
-			assert.Equal(t, "debug msg", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+			assert.Equal(t, "debug message", entry.Message)
+			assert.Equal(t, "req-debug", entry.Data["request_id"])
 		})
 
-		t.Run("DebugfWithRequestID", func(t *testing.T) {
+		t.Run("Logger.Debugf", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.DebugLevel)
 			defer hook.Reset()
 
-			requestID := "test-request-id-101"
-			logger.DebugfWithRequestID(requestID, "debug %s", "msg")
+			ctx := logger.WithRequestIDContext(context.Background(), "req-debugf")
+			logger.WithContext(ctx).Debugf("debug %s", "formatted")
 
-			assert.Len(t, hook.Entries, 1)
+			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
 			assert.Equal(t, logrus.DebugLevel, entry.Level)
-			assert.Equal(t, "debug msg", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+			assert.Equal(t, "debug formatted", entry.Message)
+			assert.Equal(t, "req-debugf", entry.Data["request_id"])
 		})
-	})
 
-	t.Run("Error level logs with RequestID", func(t *testing.T) {
-		t.Run("ErrorWithRequestID", func(t *testing.T) {
+		t.Run("Logger.Error", func(t *testing.T) {
 			hook := test.NewGlobal()
 			logrus.SetLevel(logrus.ErrorLevel)
 			defer hook.Reset()
 
-			requestID := "test-request-id-102"
-			logger.ErrorWithRequestID(requestID, "error: not found")
+			ctx := logger.WithRequestIDContext(context.Background(), "req-error")
+			logger.WithContext(ctx).Error("error message")
 
-			assert.Len(t, hook.Entries, 1)
+			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
 			assert.Equal(t, logrus.ErrorLevel, entry.Level)
-			assert.Equal(t, "error: not found", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+			assert.Equal(t, "error message", entry.Message)
+			assert.Equal(t, "req-error", entry.Data["request_id"])
 		})
 
-		t.Run("ErrorfWithRequestID", func(t *testing.T) {
+		t.Run("Logger.Warn", func(t *testing.T) {
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.ErrorLevel)
+			logrus.SetLevel(logrus.WarnLevel)
 			defer hook.Reset()
 
-			requestID := "test-request-id-103"
-			logger.ErrorfWithRequestID(requestID, "error: %s", "not found")
+			ctx := logger.WithRequestIDContext(context.Background(), "req-warn")
+			logger.WithContext(ctx).Warn("warn message")
 
-			assert.Len(t, hook.Entries, 1)
+			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
-			assert.Equal(t, logrus.ErrorLevel, entry.Level)
-			assert.Equal(t, "error: not found", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+			assert.Equal(t, logrus.WarnLevel, entry.Level)
+			assert.Equal(t, "warn message", entry.Message)
+			assert.Equal(t, "req-warn", entry.Data["request_id"])
 		})
 	})
 
-	t.Run("Warning level logs with RequestID", func(t *testing.T) {
-		t.Run("WarnWithRequestID", func(t *testing.T) {
-			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.WarnLevel)
-			defer hook.Reset()
-
-			requestID := "test-request-id-104"
-			logger.WarnWithRequestID(requestID, "this is a warning")
-
-			assert.Len(t, hook.Entries, 1)
-			entry := hook.LastEntry()
-			assert.Equal(t, logrus.WarnLevel, entry.Level)
-			assert.Equal(t, "this is a warning", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+	t.Run("Context helpers", func(t *testing.T) {
+		t.Run("WithRequestIDContext and RequestIDFromContext", func(t *testing.T) {
+			ctx := logger.WithRequestIDContext(context.Background(), "my-request-id")
+			assert.Equal(t, "my-request-id", logger.RequestIDFromContext(ctx))
 		})
 
-		t.Run("WarnfWithRequestID", func(t *testing.T) {
-			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.WarnLevel)
-			defer hook.Reset()
-
-			requestID := "test-request-id-105"
-			logger.WarnfWithRequestID(requestID, "this is a %s", "warning")
-
-			assert.Len(t, hook.Entries, 1)
-			entry := hook.LastEntry()
-			assert.Equal(t, logrus.WarnLevel, entry.Level)
-			assert.Equal(t, "this is a warning", entry.Message)
-			assert.Equal(t, requestID, entry.Data["request_id"])
+		t.Run("RequestIDFromContext returns empty for missing key", func(t *testing.T) {
+			assert.Equal(t, "", logger.RequestIDFromContext(context.Background()))
 		})
 	})
 
@@ -290,16 +323,38 @@ func TestLogger(t *testing.T) {
 			})
 		})
 
-		t.Run("FatalWithRequestID", func(t *testing.T) {
+		t.Run("Logger.Fatal", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.FatalLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "req-fatal")
 			assert.PanicsWithValue(t, "fatal-exit", func() {
-				logger.FatalWithRequestID("request-id-1", "fatal message")
+				logger.WithContext(ctx).Fatal("fatal from context")
 			})
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.FatalLevel, entry.Level)
+			assert.Equal(t, "fatal from context", entry.Message)
+			assert.Equal(t, "req-fatal", entry.Data["request_id"])
 		})
 
-		t.Run("FatalfWithRequestID", func(t *testing.T) {
+		t.Run("Logger.Fatalf", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.FatalLevel)
+			defer hook.Reset()
+
+			ctx := logger.WithRequestIDContext(context.Background(), "req-fatalf")
 			assert.PanicsWithValue(t, "fatal-exit", func() {
-				logger.FatalfWithRequestID("request-id-2", "fatal %s", "message")
+				logger.WithContext(ctx).Fatalf("fatal %s", "formatted")
 			})
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.FatalLevel, entry.Level)
+			assert.Equal(t, "fatal formatted", entry.Message)
+			assert.Equal(t, "req-fatalf", entry.Data["request_id"])
 		})
 	})
 }

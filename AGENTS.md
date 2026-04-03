@@ -136,6 +136,31 @@ apperror.Wrap(http.StatusInternalServerError, 500, "Failed to create user", err)
 - Use `panic()`
 - Return generic `errors.New("error")`
 
+### Logging
+
+Use `logger.WithContext(ctx)` for all request-scoped logging. This automatically includes `request_id` from context:
+
+```go
+// In handlers: inject requestID into context before calling services
+requestID := middlewares.GetRequestID(ctx)
+serviceCtx := logger.WithRequestIDContext(ctx.Request.Context(), requestID)
+handler.userService.DoSomething(serviceCtx, ...)
+
+// In services and repositories: use WithContext
+logger.WithContext(ctx).Infof("Processing user %d", userID)
+logger.WithContext(ctx).Errorf("Failed to update: %v", err)
+logger.WithContext(ctx).Warnf("Token expired for user %d", userID)
+
+// Add extra fields when needed
+logger.WithContext(ctx).WithField("user_id", userID).Infof("Profile updated")
+```
+
+For non-request-scoped logging (startup, seeders, migrations), use plain functions:
+```go
+logger.Infof("Server started on port %s", port)
+logger.Fatalf("Failed to connect to database: %v", err)
+```
+
 ### Dependency Injection
 - Depend on interfaces, not concrete types
 - Use constructor functions (e.g., `NewUserService`)

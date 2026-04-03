@@ -446,6 +446,8 @@ go run cmd/server/main.go
 - Use dependency injection for testability
 - Handle all errors explicitly
 - Use apperror package for all application errors
+- Use `logger.WithContext(ctx)` for request-scoped logging (auto-includes request_id)
+- Use plain `logger.Infof()`, `logger.Errorf()` for non-request logging (startup, seeders)
 - Write tests immediately after writing code
 - Use meaningful, descriptive names
 - Add comments explaining "why", not "what"
@@ -465,6 +467,31 @@ go run cmd/server/main.go
 - Create test files without grouped subtests
 - Bypass AuthMiddleware on protected routes
 - Have complex setup in tests
+
+## Logging
+
+Use `logger.WithContext(ctx)` for all request-scoped logging. This automatically extracts `request_id` from context:
+
+```go
+// In handlers: inject requestID into context before calling services
+requestID := middlewares.GetRequestID(ctx)
+serviceCtx := logger.WithRequestIDContext(ctx.Request.Context(), requestID)
+handler.userService.DoSomething(serviceCtx, ...)
+
+// In services and repositories: use WithContext
+logger.WithContext(ctx).Infof("Processing user %d", userID)
+logger.WithContext(ctx).Errorf("Failed to update: %v", err)
+logger.WithContext(ctx).Warnf("Token expired for user %d", userID)
+
+// Add extra fields when needed
+logger.WithContext(ctx).WithField("user_id", userID).Infof("Profile updated")
+```
+
+For non-request-scoped logging (startup, seeders, migrations), use plain functions:
+```go
+logger.Infof("Server started on port %s", port)
+logger.Fatalf("Failed to connect to database: %v", err)
+```
 
 ## Authentication & Authorization
 

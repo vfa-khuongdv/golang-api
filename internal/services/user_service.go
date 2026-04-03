@@ -42,7 +42,7 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 		if isAppErr && appErr.Code == apperror.ErrUnauthorized {
 			return nil
 		}
-		logger.Errorf("Forgot password failed for email %s: %v", input.Email, err)
+		logger.WithContext(ctx).Errorf("Forgot password failed for email %s: %v", input.Email, err)
 		return apperror.NewDBQueryError("Failed to process forgot password request")
 	}
 
@@ -54,7 +54,7 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 
 	err = service.repo.Update(ctx, user)
 	if err != nil {
-		logger.Errorf("Failed to update user with reset token: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to update user with reset token: %v", err)
 		return apperror.NewDBUpdateError("Failed to save reset token")
 	}
 
@@ -86,7 +86,7 @@ func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.Re
 
 	err = service.repo.Update(ctx, user)
 	if err != nil {
-		logger.Errorf("Failed to update user password: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to update user password: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update password")
 	}
 	return user, nil
@@ -118,7 +118,7 @@ func (service *userServiceImpl) ChangePassword(ctx context.Context, userId uint,
 	user.Password = newPassword
 	err = service.repo.Update(ctx, user)
 	if err != nil {
-		logger.Errorf("Failed to update user password: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to update user password: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update password")
 	}
 	return user, nil
@@ -158,7 +158,7 @@ func (service *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, 
 
 	err = service.repo.Update(ctx, user)
 	if err != nil {
-		logger.Errorf("Failed to update user profile: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to update user profile: %v", err)
 		return apperror.NewDBUpdateError("Failed to update profile")
 	}
 	return nil
