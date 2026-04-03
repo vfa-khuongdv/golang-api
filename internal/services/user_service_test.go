@@ -1,10 +1,12 @@
 package services_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
@@ -72,10 +74,10 @@ func (s *UserServiceTestSuite) TestGetProfile() {
 
 		userID := uint(1)
 		expectedUser := &models.User{ID: 1, Email: "email@example.com", Password: "password123"}
-		s.repo.On("GetByID", userID).Return(expectedUser, nil).Once()
+		s.repo.On("GetByID", mock.Anything, userID).Return(expectedUser, nil).Once()
 
 		// Act
-		user, err := s.service.GetProfile(userID)
+		user, err := s.service.GetProfile(context.Background(), userID)
 
 		// Assert
 		s.NoError(err)
@@ -85,10 +87,10 @@ func (s *UserServiceTestSuite) TestGetProfile() {
 	s.T().Run("Error", func(t *testing.T) {
 		// Arrange
 		userID := uint(999)
-		s.repo.On("GetByID", userID).Return(&models.User{}, errors.New("profile not found")).Once()
+		s.repo.On("GetByID", mock.Anything, userID).Return(&models.User{}, errors.New("profile not found")).Once()
 
 		// Act
-		user, err := s.service.GetProfile(userID)
+		user, err := s.service.GetProfile(context.Background(), userID)
 
 		// Assert
 		s.Error(err)
@@ -108,11 +110,11 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 			Gender:   utils.IntToPtr(int16(1)),
 		}
 
-		s.repo.On("GetByID", userID).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(nil).Once()
+		s.repo.On("GetByID", mock.Anything, userID).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
 		// Act
-		err := s.service.UpdateProfile(userID, &input)
+		err := s.service.UpdateProfile(context.Background(), userID, &input)
 
 		// Assert
 		s.NoError(err)
@@ -125,11 +127,11 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 			Name: utils.StringToPtr("John Doe"),
 		}
 
-		s.repo.On("GetByID", userID).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
+		s.repo.On("GetByID", mock.Anything, userID).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
 
 		// Act
-		err := s.service.UpdateProfile(userID, input)
+		err := s.service.UpdateProfile(context.Background(), userID, input)
 
 		// Assert
 		s.Error(err)
@@ -142,13 +144,13 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		email := "test@example.com"
 		user := &models.User{Email: email}
 
-		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(nil).Once()
+		s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
 		// Act
 		s.mailer.On("SendMailForgotPassword", user).Return(nil).Once()
 
-		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		// Assert
 		s.NoError(err)
@@ -158,18 +160,18 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 
 	s.T().Run("UserNotFound", func(t *testing.T) {
 		email := "unknown@example.com"
-		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), apperror.New(apperror.ErrUnauthorized, 1003, "User not found")).Once()
+		s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), apperror.New(apperror.ErrUnauthorized, 1003, "User not found")).Once()
 
-		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		s.NoError(err)
 	})
 
 	s.T().Run("RepositoryQueryError", func(t *testing.T) {
 		email := "error@example.com"
-		s.repo.On("FindByField", "email", email).Return((*models.User)(nil), errors.New("db query failed")).Once()
+		s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), errors.New("db query failed")).Once()
 
-		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		s.Error(err)
 	})
@@ -178,10 +180,10 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		email := "update-fail@example.com"
 		user := &models.User{Email: email}
 
-		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
+		s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
 
-		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		s.Error(err)
 	})
@@ -190,11 +192,11 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		email := "mail-fail@example.com"
 		user := &models.User{Email: email}
 
-		s.repo.On("FindByField", "email", email).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(nil).Once()
+		s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 		s.mailer.On("SendMailForgotPassword", user).Return(errors.New("send mail failed")).Once()
 
-		err := s.service.ForgotPassword(&dto.ForgotPasswordInput{Email: email})
+		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		s.Error(err)
 	})
@@ -203,9 +205,9 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 func (s *UserServiceTestSuite) TestResetPassword() {
 	s.T().Run("TokenNotFound", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "invalid-token", NewPassword: "new-password"}
-		s.repo.On("FindByField", "token", input.Token).Return(&models.User{}, errors.New("not found")).Once()
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(&models.User{}, errors.New("not found")).Once()
 
-		user, err := s.service.ResetPassword(input)
+		user, err := s.service.ResetPassword(context.Background(), input)
 
 		s.Nil(user)
 		s.Error(err)
@@ -214,9 +216,9 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 	s.T().Run("TokenExpiredWhenExpiredAtNil", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-1", NewPassword: "new-password"}
 		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: nil}
-		s.repo.On("FindByField", "token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
 
-		result, err := s.service.ResetPassword(input)
+		result, err := s.service.ResetPassword(context.Background(), input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -226,9 +228,9 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		input := &dto.ResetPasswordInput{Token: "token-2", NewPassword: "new-password"}
 		expiredAt := time.Now().Add(-1 * time.Minute).Unix()
 		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: &expiredAt}
-		s.repo.On("FindByField", "token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
 
-		result, err := s.service.ResetPassword(input)
+		result, err := s.service.ResetPassword(context.Background(), input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -242,9 +244,9 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		mockBcrypt := &mockBcryptService{hashErr: errors.New("hash failed"), checkValid: true}
 		localService := services.NewUserService(s.repo, mockBcrypt, s.mailer)
 
-		s.repo.On("FindByField", "token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
 
-		result, err := localService.ResetPassword(input)
+		result, err := localService.ResetPassword(context.Background(), input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -255,10 +257,10 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		notExpired := time.Now().Add(10 * time.Minute).Unix()
 		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: &notExpired}
 
-		s.repo.On("FindByField", "token", input.Token).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
 
-		result, err := s.service.ResetPassword(input)
+		result, err := s.service.ResetPassword(context.Background(), input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -269,10 +271,10 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		notExpired := time.Now().Add(10 * time.Minute).Unix()
 		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: &notExpired}
 
-		s.repo.On("FindByField", "token", input.Token).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(nil).Once()
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
-		result, err := s.service.ResetPassword(input)
+		result, err := s.service.ResetPassword(context.Background(), input)
 
 		s.NoError(err)
 		s.NotNil(result)
@@ -289,9 +291,9 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			NewPassword:     "new-password",
 			ConfirmPassword: "new-password",
 		}
-		s.repo.On("GetByID", uint(100)).Return(&models.User{}, errors.New("not found")).Once()
+		s.repo.On("GetByID", mock.Anything, uint(100)).Return(&models.User{}, errors.New("not found")).Once()
 
-		result, err := s.service.ChangePassword(100, input)
+		result, err := s.service.ChangePassword(context.Background(), 100, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -306,9 +308,9 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hash, err := s.bcrypt.HashPassword("correct-old")
 		s.Require().NoError(err)
 		user := &models.User{ID: 1, Password: hash}
-		s.repo.On("GetByID", uint(1)).Return(user, nil).Once()
+		s.repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 
-		result, err := s.service.ChangePassword(1, input)
+		result, err := s.service.ChangePassword(context.Background(), 1, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -323,9 +325,9 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hash, err := s.bcrypt.HashPassword(input.OldPassword)
 		s.Require().NoError(err)
 		user := &models.User{ID: 1, Password: hash}
-		s.repo.On("GetByID", uint(2)).Return(user, nil).Once()
+		s.repo.On("GetByID", mock.Anything, uint(2)).Return(user, nil).Once()
 
-		result, err := s.service.ChangePassword(2, input)
+		result, err := s.service.ChangePassword(context.Background(), 2, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -340,9 +342,9 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hash, err := s.bcrypt.HashPassword(input.OldPassword)
 		s.Require().NoError(err)
 		user := &models.User{ID: 1, Password: hash}
-		s.repo.On("GetByID", uint(3)).Return(user, nil).Once()
+		s.repo.On("GetByID", mock.Anything, uint(3)).Return(user, nil).Once()
 
-		result, err := s.service.ChangePassword(3, input)
+		result, err := s.service.ChangePassword(context.Background(), 3, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -357,9 +359,9 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		mockBcrypt := &mockBcryptService{hashErr: errors.New("hash failed"), checkValid: true}
 		localService := services.NewUserService(s.repo, mockBcrypt, s.mailer)
 		user := &models.User{ID: 1, Password: "existing-hash"}
-		s.repo.On("GetByID", uint(4)).Return(user, nil).Once()
+		s.repo.On("GetByID", mock.Anything, uint(4)).Return(user, nil).Once()
 
-		result, err := localService.ChangePassword(4, input)
+		result, err := localService.ChangePassword(context.Background(), 4, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -374,10 +376,10 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hash, err := s.bcrypt.HashPassword(input.OldPassword)
 		s.Require().NoError(err)
 		user := &models.User{ID: 1, Password: hash}
-		s.repo.On("GetByID", uint(5)).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(errors.New("update failed")).Once()
+		s.repo.On("GetByID", mock.Anything, uint(5)).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
 
-		result, err := s.service.ChangePassword(5, input)
+		result, err := s.service.ChangePassword(context.Background(), 5, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -392,10 +394,10 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hash, err := s.bcrypt.HashPassword(input.OldPassword)
 		s.Require().NoError(err)
 		user := &models.User{ID: 1, Password: hash}
-		s.repo.On("GetByID", uint(6)).Return(user, nil).Once()
-		s.repo.On("Update", user).Return(nil).Once()
+		s.repo.On("GetByID", mock.Anything, uint(6)).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
-		result, err := s.service.ChangePassword(6, input)
+		result, err := s.service.ChangePassword(context.Background(), 6, input)
 
 		s.NoError(err)
 		s.NotNil(result)
@@ -406,18 +408,18 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 func (s *UserServiceTestSuite) TestUpdateProfileErrors() {
 	s.T().Run("UserNotFound", func(t *testing.T) {
 		input := &dto.UpdateProfileInput{Name: utils.StringToPtr("John")}
-		s.repo.On("GetByID", uint(77)).Return((*models.User)(nil), errors.New("not found")).Once()
+		s.repo.On("GetByID", mock.Anything, uint(77)).Return((*models.User)(nil), errors.New("not found")).Once()
 
-		err := s.service.UpdateProfile(77, input)
+		err := s.service.UpdateProfile(context.Background(), 77, input)
 		s.Error(err)
 	})
 
 	s.T().Run("InvalidBirthdayFormat", func(t *testing.T) {
 		user := &models.User{ID: 1, Email: "a@b.com", Password: "hash"}
 		input := &dto.UpdateProfileInput{Birthday: utils.StringToPtr("invalid-date")}
-		s.repo.On("GetByID", uint(1)).Return(user, nil).Once()
+		s.repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 
-		err := s.service.UpdateProfile(1, input)
+		err := s.service.UpdateProfile(context.Background(), 1, input)
 		s.Error(err)
 	})
 }

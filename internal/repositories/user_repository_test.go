@@ -1,6 +1,7 @@
 package repositories_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,12 +36,12 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User2", Email: "email2@example.com", Password: "password2", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(user)
+			_, err := repo.Create(context.Background(), user)
 			require.NoError(t, err)
 		}
 
 		// Act
-		users, err := repo.GetAll()
+		users, err := repo.GetAll(context.Background())
 
 		// Assert
 		require.NoError(t, err)
@@ -57,7 +58,7 @@ func TestUserRepository(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		users, err := repo.GetAll()
+		users, err := repo.GetAll(context.Background())
 
 		// Assert
 		assert.Error(t, err)
@@ -74,11 +75,11 @@ func TestUserRepository(t *testing.T) {
 			Password: "password1",
 			Gender:   1,
 		}
-		createdUser, err := repo.Create(mockUser)
+		createdUser, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)
 
 		// Act
-		user, err := repo.GetByID(createdUser.ID)
+		user, err := repo.GetByID(context.Background(), createdUser.ID)
 
 		// Assert
 		require.NoError(t, err)
@@ -92,7 +93,7 @@ func TestUserRepository(t *testing.T) {
 		repo := repositories.NewUserRepository(db)
 
 		// Act
-		user, err := repo.GetByID(999)
+		user, err := repo.GetByID(context.Background(), 999)
 
 		// Assert
 		assert.Error(t, err)
@@ -111,7 +112,7 @@ func TestUserRepository(t *testing.T) {
 		}
 
 		// Act
-		createdUser, err := repo.Create(mockUser)
+		createdUser, err := repo.Create(context.Background(), mockUser)
 
 		// Assert
 		require.NoError(t, err)
@@ -134,12 +135,12 @@ func TestUserRepository(t *testing.T) {
 			Name:     "anotheruser",
 			Password: "pass",
 		}
-		createdUser, err := repo.Create(user1)
+		createdUser, err := repo.Create(context.Background(), user1)
 		require.NoError(t, err)
 		require.NotNil(t, createdUser)
 
 		// Act
-		createdUser2, err := repo.Create(user2)
+		createdUser2, err := repo.Create(context.Background(), user2)
 
 		// Assert
 		assert.Error(t, err)
@@ -156,7 +157,7 @@ func TestUserRepository(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		err = repo.Delete(999)
+		err = repo.Delete(context.Background(), 999)
 
 		// Assert
 		assert.Error(t, err)
@@ -172,11 +173,11 @@ func TestUserRepository(t *testing.T) {
 			Password: "password",
 			Gender:   1,
 		}
-		_, err := repo.Create(mockUser)
+		_, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)
 
 		// Act
-		foundUser, err := repo.FindByField("email", "email@example.com")
+		foundUser, err := repo.FindByField(context.Background(), "email", "email@example.com")
 
 		// Assert
 		require.NoError(t, err)
@@ -194,11 +195,11 @@ func TestUserRepository(t *testing.T) {
 			Password: "password",
 			Gender:   1,
 		}
-		_, err := repo.Create(mockUser)
+		_, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)
 
 		// Act
-		foundUser, err := repo.FindByField("name", "Another User")
+		foundUser, err := repo.FindByField(context.Background(), "name", "Another User")
 
 		// Assert
 		require.NoError(t, err)
@@ -217,11 +218,11 @@ func TestUserRepository(t *testing.T) {
 			Token:    utils.StringToPtr("token123"),
 			Gender:   1,
 		}
-		_, err := repo.Create(mockUser)
+		_, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)
 
 		// Act
-		foundUser, err := repo.FindByField("token", "token123")
+		foundUser, err := repo.FindByField(context.Background(), "token", "token123")
 
 		// Assert
 		require.NoError(t, err)
@@ -235,7 +236,7 @@ func TestUserRepository(t *testing.T) {
 		repo := repositories.NewUserRepository(db)
 
 		// Act
-		user, err := repo.FindByField("email", "notfound@example.com")
+		user, err := repo.FindByField(context.Background(), "email", "notfound@example.com")
 
 		// Assert
 		assert.Error(t, err)
@@ -248,7 +249,7 @@ func TestUserRepository(t *testing.T) {
 		repo := repositories.NewUserRepository(db)
 
 		// Act
-		user, err := repo.FindByField("sql;", "Invalid")
+		user, err := repo.FindByField(context.Background(), "sql;", "Invalid")
 
 		// Assert
 		assert.Error(t, err)
@@ -265,7 +266,7 @@ func TestUserRepository(t *testing.T) {
 			Password: "password",
 			Gender:   1,
 		}
-		createdUser, err := repo.Create(mockUser)
+		createdUser, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)
 
 		// Update fields
@@ -273,13 +274,13 @@ func TestUserRepository(t *testing.T) {
 		createdUser.Password = "newpassword"
 
 		// Act
-		err = repo.Update(createdUser)
+		err = repo.Update(context.Background(), createdUser)
 
 		// Assert
 		require.NoError(t, err)
 
 		// Verify update
-		updatedUser, err := repo.GetByID(createdUser.ID)
+		updatedUser, err := repo.GetByID(context.Background(), createdUser.ID)
 		require.NoError(t, err)
 		assert.Equal(t, "Updated User", updatedUser.Name)
 		assert.Equal(t, "newpassword", updatedUser.Password)
@@ -306,7 +307,7 @@ func TestUserRepository(t *testing.T) {
 		require.NoError(t, tx.Error)
 
 		// Act
-		createdUser, err := repo.CreateWithTx(tx, user2)
+		createdUser, err := repo.CreateWithTx(context.Background(), tx, user2)
 
 		// Assert
 		assert.Error(t, err)
@@ -330,21 +331,22 @@ func TestUserRepository(t *testing.T) {
 			Gender:   1,
 		}
 
-		createdUser, err := repo.CreateWithTx(tx, user)
+		createdUser, err := repo.CreateWithTx(context.Background(), tx, user)
 		require.NoError(t, err)
 		require.NotNil(t, createdUser)
 		assert.NotZero(t, createdUser.ID)
 	})
 
-	t.Run("GetDB - Success", func(t *testing.T) {
+	t.Run("BeginTx - Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
 
 		// Act
-		returnedDB := repo.GetDB()
+		returnedDB, err := repo.BeginTx(context.Background())
 
 		// Assert
+		require.NoError(t, err)
 		assert.NotNil(t, returnedDB)
 	})
 
@@ -360,12 +362,12 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User5", Email: "user5@example.com", Password: "password5", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(user)
+			_, err := repo.Create(context.Background(), user)
 			require.NoError(t, err)
 		}
 
 		// Act - First page
-		pagination, err := repo.GetUsers(1, 2)
+		pagination, err := repo.GetUsers(context.Background(), 1, 2)
 
 		// Assert
 		require.NoError(t, err)
@@ -389,12 +391,12 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User5", Email: "user5@example.com", Password: "password5", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(user)
+			_, err := repo.Create(context.Background(), user)
 			require.NoError(t, err)
 		}
 
 		// Act - Second page
-		pagination, err := repo.GetUsers(2, 2)
+		pagination, err := repo.GetUsers(context.Background(), 2, 2)
 
 		// Assert
 		require.NoError(t, err)
@@ -418,7 +420,7 @@ func TestUserRepository(t *testing.T) {
 		})
 		defer db.Callback().Query().Remove("force_find_error_only")
 
-		_, err := repo.GetUsers(1, 10)
+		_, err := repo.GetUsers(context.Background(), 1, 10)
 		assert.Error(t, err)
 	})
 
@@ -434,12 +436,12 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User5", Email: "user5@example.com", Password: "password5", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(user)
+			_, err := repo.Create(context.Background(), user)
 			require.NoError(t, err)
 		}
 
 		// Act - Last page
-		pagination, err := repo.GetUsers(3, 2)
+		pagination, err := repo.GetUsers(context.Background(), 3, 2)
 
 		// Assert
 		require.NoError(t, err)
@@ -457,12 +459,12 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User2", Email: "user2@example.com", Password: "password2", Gender: 2},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(user)
+			_, err := repo.Create(context.Background(), user)
 			require.NoError(t, err)
 		}
 
 		// Act
-		pagination, err := repo.GetUsers(5, 2)
+		pagination, err := repo.GetUsers(context.Background(), 5, 2)
 
 		// Assert
 		require.NoError(t, err)
@@ -481,12 +483,12 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User3", Email: "user3@example.com", Password: "password3", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(user)
+			_, err := repo.Create(context.Background(), user)
 			require.NoError(t, err)
 		}
 
 		// Act
-		pagination, err := repo.GetUsers(1, 10)
+		pagination, err := repo.GetUsers(context.Background(), 1, 10)
 
 		// Assert
 		require.NoError(t, err)
@@ -508,7 +510,7 @@ func TestUserRepository(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		pagination, err := repo.GetUsers(1, 10)
+		pagination, err := repo.GetUsers(context.Background(), 1, 10)
 
 		// Assert
 		assert.Error(t, err)

@@ -26,7 +26,7 @@ func TestLogin(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method
-		mockService.On("Login", "email@gmail.com", "testpassword", mock.Anything).Return(
+		mockService.On("Login", mock.Anything, "email@gmail.com", "testpassword", mock.Anything).Return(
 			&dto.LoginResponse{
 				AccessToken: dto.JwtResult{
 					Token:     "testtoken",
@@ -72,7 +72,7 @@ func TestLogin(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method
-		mockService.On("Login", "email@gmail.com", "testpassword", mock.Anything).Return(nil, apperror.NewUnauthorizedError("Invalid email or password"))
+		mockService.On("Login", mock.Anything, "email@gmail.com", "testpassword", mock.Anything).Return(nil, apperror.NewUnauthorizedError("Invalid email or password"))
 
 		requestBody := map[string]string{
 			"email":    "email@gmail.com",
@@ -232,7 +232,7 @@ func TestRefreshToken(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method
-		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
+		mockService.On("RefreshToken", mock.Anything, "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
 			&dto.LoginResponse{
 				AccessToken: dto.JwtResult{
 					Token:     "newtesttoken",
@@ -277,7 +277,7 @@ func TestRefreshToken(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method when using access token
-		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
+		mockService.On("RefreshToken", mock.Anything, "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
 			&dto.LoginResponse{
 				AccessToken: dto.JwtResult{
 					Token:     "newtesttoken",
@@ -322,7 +322,7 @@ func TestRefreshToken(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method - should prefer refresh token
-		mockService.On("RefreshToken", "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
+		mockService.On("RefreshToken", mock.Anything, "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
 			&dto.LoginResponse{
 				AccessToken: dto.JwtResult{
 					Token:     "newtesttoken",
@@ -367,7 +367,7 @@ func TestRefreshToken(t *testing.T) {
 		handler := handlers.NewAuthHandler(mockService)
 
 		// Mock the service method
-		mockService.On("RefreshToken", "invalidtoken", "validaccesstoken", mock.Anything).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
+		mockService.On("RefreshToken", mock.Anything, "invalidtoken", "validaccesstoken", mock.Anything).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 		reqBody := map[string]string{
 			"refresh_token": "invalidtoken",
 			"access_token":  "validaccesstoken",

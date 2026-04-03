@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
@@ -8,51 +9,39 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
 type RefreshTokenService interface {
-	Create(user *models.User, ipAddress string) (*dto.JwtResult, error)
-	Update(token string, ipAddress string) (*RefreshTokenResult, error)
+	Create(ctx context.Context, user *models.User, ipAddress string) (*dto.JwtResult, error)
+	Update(ctx context.Context, token string, ipAddress string) (*RefreshTokenResult, error)
 }
 
 type refreshTokenServiceImpl struct {
 	repo repositories.RefreshTokenRepository
 }
 
-// NewRefreshTokenService creates a new instance of RefreshTokenService
-// Parameters:
-//   - repo: Pointer to RefreshTokenRepository that handles refresh token database operations
-//
-// Returns:
-//   - RefreshTokenService: New instance of RefreshTokenService initialized with the provided repository
 func NewRefreshTokenService(repo repositories.RefreshTokenRepository) RefreshTokenService {
 	return &refreshTokenServiceImpl{
 		repo: repo,
 	}
 }
 
-// Create creates a new refresh token for a user
-// Parameters:
-//   - user: User model containing user information
-//   - ipAddress: IP address of the user making the request
-//
-// Returns:
-//   - *dto.JwtResult: Contains the generated token and expiration time
-//   - error: Error if token creation fails
-func (service *refreshTokenServiceImpl) Create(user *models.User, ipAddress string) (*dto.JwtResult, error) {
+func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models.User, ipAddress string) (*dto.JwtResult, error) {
 	tokenString := utils.GenerateRandomString(60)
 	expiredAt := time.Now().Add(time.Hour * 24 * 30).Unix()
 	token := models.RefreshToken{
 		RefreshToken: tokenString,
-		IpAddress:    ipAddress, // ipaddress of user
-		UsedCount:    0,         // init is zero
-		ExpiredAt:    expiredAt, // 30 days
-		UserID:       user.ID,   // userId
+		IpAddress:    ipAddress,
+		UsedCount:    0,
+		ExpiredAt:    expiredAt,
+		UserID:       user.ID,
 	}
 
-	err := service.repo.Create(&token)
+	err := service.repo.Create(ctx, &token)
 	if err != nil {
-		return nil, apperror.NewDBInsertError(err.Error())
+		logger.Errorf("Failed to create refresh token: %v", err)
+		return nil, apperror.NewDBInsertError("Failed to create refresh token")
 	}
 
 	return &dto.JwtResult{
@@ -66,24 +55,10 @@ type RefreshTokenResult struct {
 	UserId uint
 }
 
-// Update replaces an existing refresh token with a new one (token rotation)
-// Parameters:
-//   - tokenString: The existing refresh token string to be replaced
-//   - ipAddress: IP address of the user making the request
-//
-// Returns:
-//   - *RefreshTokenResult: Contains the new token information and associated user ID
-//   - *appError.AppError: Error if token creation/update fails
-//
-// The function:
-//  1. Finds the existing token record
-//  2. Generates a new random token string
-//  3. Updates the token record with new token, expiry and IP
-//  4. Returns the new token details and associated user ID
-func (service *refreshTokenServiceImpl) Update(tokenString string, ipAddress string) (*RefreshTokenResult, error) {
-	result, err := service.repo.FindByToken(tokenString)
+func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString string, ipAddress string) (*RefreshTokenResult, error) {
+	result, err := service.repo.FindByToken(ctx, tokenString)
 	if err != nil {
-		return nil, apperror.NewNotFoundError(err.Error())
+		return nil, apperror.NewNotFoundError("Refresh token not found or expired")
 	}
 
 	newToken := utils.GenerateRandomString(60)
@@ -94,8 +69,9 @@ func (service *refreshTokenServiceImpl) Update(tokenString string, ipAddress str
 	result.IpAddress = ipAddress
 	result.UsedCount += 1
 
-	if err := service.repo.Update(result); err != nil {
-		return nil, apperror.NewDBUpdateError(err.Error())
+	if err := service.repo.Update(ctx, result); err != nil {
+		logger.Errorf("Failed to update refresh token: %v", err)
+		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
 	}
 
 	return &RefreshTokenResult{
