@@ -138,13 +138,14 @@ apperror.Wrap(http.StatusInternalServerError, 500, "Failed to create user", err)
 
 ### Logging
 
-Use `logger.WithContext(ctx)` for all request-scoped logging. This automatically includes `request_id` from context:
+Use `logger.WithContext(ctx)` for all request-scoped logging. The `RequestIDMiddleware` automatically injects `request_id` into `ctx.Request.Context()`, so handlers just pass it through:
 
 ```go
-// In handlers: inject requestID into context before calling services
-requestID := middlewares.GetRequestID(ctx)
-serviceCtx := logger.WithRequestIDContext(ctx.Request.Context(), requestID)
-handler.userService.DoSomething(serviceCtx, ...)
+// In handlers: ctx.Request.Context() already has requestID from middleware
+handler.userService.DoSomething(ctx.Request.Context(), ...)
+
+// Handler-level logging
+logger.WithContext(ctx.Request.Context()).Errorf("Operation failed: %v", err)
 
 // In services and repositories: use WithContext
 logger.WithContext(ctx).Infof("Processing user %d", userID)
@@ -159,6 +160,12 @@ For non-request-scoped logging (startup, seeders, migrations), use plain functio
 ```go
 logger.Infof("Server started on port %s", port)
 logger.Fatalf("Failed to connect to database: %v", err)
+```
+
+For structured logging outside request context (middleware, utilities), use package-level `WithField`/`WithFields`:
+```go
+logger.WithField("request_id", entry.RequestID).Infof("Request completed")
+logger.WithFields(logrus.Fields{"request_id": id, "component": "auth"}).Errorf("Auth failed")
 ```
 
 ### Dependency Injection
