@@ -18,7 +18,12 @@ func InitValidator() {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		_ = v.RegisterValidation("valid_birthday", ValidateBirthday)
 		_ = v.RegisterValidation("not_blank", ValidateNotBlank)
+		_ = v.RegisterValidation("password_complexity", ValidatePasswordComplexity)
 	}
+}
+
+func init() {
+	InitValidator()
 }
 
 // Custom validation func to check no spaces at all in the string
@@ -26,6 +31,32 @@ func ValidateNotBlank(fl validator.FieldLevel) bool {
 	str := fl.Field().String()
 	trimmed := strings.TrimSpace(str)
 	return trimmed != ""
+}
+
+func ValidatePasswordComplexity(fl validator.FieldLevel) bool {
+	password := fl.Field().String()
+	if len(password) < 8 {
+		return false
+	}
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	hasSpecial := false
+
+	for _, ch := range password {
+		switch {
+		case ch >= 'A' && ch <= 'Z':
+			hasUpper = true
+		case ch >= 'a' && ch <= 'z':
+			hasLower = true
+		case ch >= '0' && ch <= '9':
+			hasDigit = true
+		case strings.Contains("!@#$%^&*()_+-=[]{}|;':\",./<>?", string(ch)):
+			hasSpecial = true
+		}
+	}
+
+	return hasUpper && hasLower && hasDigit && hasSpecial
 }
 
 // ValidateBirthday checks if the birthday is in a valid format and not a future date.
@@ -196,6 +227,8 @@ func TranslateValidationErrors(err error, obj any) *apperror.ValidationError {
 			msg = fmt.Sprintf("%s must be a valid date (YYYY-MM-DD) and not in the future", fieldName)
 		case "not_blank":
 			msg = fmt.Sprintf("%s must not be blank", fieldName)
+		case "password_complexity":
+			msg = fmt.Sprintf("%s must be at least 8 characters and contain uppercase, lowercase, digit, and special character", fieldName)
 		default:
 			msg = fmt.Sprintf("%s is invalid", fieldName)
 		}

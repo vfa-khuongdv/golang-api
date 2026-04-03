@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
@@ -12,7 +14,7 @@ import (
 
 func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Set Gin mode from environment variable
-	ginMode := utils.GetEnv("GIN_MODE", "debug")
+	ginMode := utils.GetEnv("GIN_MODE", "release")
 	gin.SetMode(ginMode)
 
 	// Initialize the new Gin router
@@ -57,11 +59,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Setup API routes
 	api := router.Group("/api/v1")
 	{
-		// Public routes
-		api.POST("/login", authHandler.Login)
-		api.POST("/refresh-token", authHandler.RefreshToken)
-		api.POST("/forgot-password", userHandler.ForgotPassword)
-		api.POST("/reset-password", userHandler.ResetPassword)
+		// Public routes with rate limiting
+		public := api.Group("/")
+		public.Use(middlewares.RateLimiter(10, time.Minute))
+		{
+			public.POST("/login", authHandler.Login)
+			public.POST("/refresh-token", authHandler.RefreshToken)
+			public.POST("/forgot-password", userHandler.ForgotPassword)
+			public.POST("/reset-password", userHandler.ResetPassword)
+		}
 
 		authenticated := api.Group("/")
 		authenticated.Use(middlewares.AuthMiddleware())

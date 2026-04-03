@@ -195,4 +195,36 @@ func TestRefreshTokenRepository(t *testing.T) {
 		assert.Equal(t, item.UsedCount, foundItem.UsedCount)
 		assert.Equal(t, item.ExpiredAt, foundItem.ExpiredAt)
 	})
+
+	t.Run("UpdateWithTx - Success", func(t *testing.T) {
+		// Arrange
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		now := time.Now().Unix() + int64(time.Hour)
+		item := &models.RefreshToken{
+			RefreshToken: "test_tx_token",
+			IpAddress:    "127.0.0.1",
+			UsedCount:    0,
+			ExpiredAt:    now,
+			UserID:       1,
+		}
+		err := repo.Create(item)
+		require.NoError(t, err)
+
+		// Act - use transaction
+		tx := db.Begin()
+		require.NotNil(t, tx)
+
+		item.UsedCount = 1
+		err = repo.UpdateWithTx(item, tx)
+
+		// Assert
+		require.NoError(t, err)
+		tx.Commit()
+
+		foundItem, err := repo.FindByToken("test_tx_token")
+		require.NoError(t, err)
+		require.NotNil(t, foundItem)
+		assert.Equal(t, int64(1), foundItem.UsedCount)
+	})
 }

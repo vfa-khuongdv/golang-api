@@ -49,6 +49,9 @@ func NewJWTService() JWTService {
 	if secret == "" {
 		panic("JWT_KEY environment variable is required")
 	}
+	if len(secret) < 32 {
+		panic("JWT_KEY must be at least 32 characters long for security")
+	}
 	return &jwtServiceImpl{
 		secret: []byte(secret),
 	}
