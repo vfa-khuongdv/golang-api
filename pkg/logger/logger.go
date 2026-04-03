@@ -47,8 +47,6 @@ func (l Logger) Error(args ...interface{})                 { l.entry.Error(args.
 func (l Logger) Errorf(format string, args ...interface{}) { l.entry.Errorf(format, args...) }
 func (l Logger) Warn(args ...interface{})                  { l.entry.Warn(args...) }
 func (l Logger) Warnf(format string, args ...interface{})  { l.entry.Warnf(format, args...) }
-func (l Logger) Fatal(args ...interface{})                 { l.entry.Fatal(args...) }
-func (l Logger) Fatalf(format string, args ...interface{}) { l.entry.Fatalf(format, args...) }
 
 // RequestIDContext helpers
 

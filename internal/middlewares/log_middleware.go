@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
@@ -145,12 +146,16 @@ func LogMiddleware() gin.HandlerFunc {
 
 		// Use goroutine to write log entry to avoid blocking
 		go func(entry LogResponse) {
-			jsonData, err := marshalLogEntry(entry)
-			if err != nil {
-				logger.WithField("request_id", entry.RequestID).Errorf("Failed to marshal log entry: %v", err)
-				return
-			}
-			logger.WithField("request_id", entry.RequestID).Info(string(jsonData))
+			logger.WithFields(log.Fields{
+				"request_id":  entry.RequestID,
+				"method":      entry.Method,
+				"url":         entry.URL,
+				"status_code": entry.StatusCode,
+				"latency":     entry.Latency,
+				"header":      entry.Header,
+				"request":     entry.Request,
+				"response":    entry.Response,
+			}).Info("HTTP request completed")
 		}(logEntry)
 	}
 }

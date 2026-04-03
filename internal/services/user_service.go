@@ -129,6 +129,7 @@ func (service *userServiceImpl) GetProfile(ctx context.Context, userID uint) (*m
 	if err != nil {
 		return nil, apperror.NewNotFoundError("User not found")
 	}
+	logger.WithContext(ctx).Infof("Retrieved profile for user ID %d", userID)
 	return user, nil
 }
 

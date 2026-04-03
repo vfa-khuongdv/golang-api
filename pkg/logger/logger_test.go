@@ -323,40 +323,6 @@ func TestLogger(t *testing.T) {
 				logger.Fatalf("fatal %s", "message")
 			})
 		})
-
-		t.Run("Logger.Fatal", func(t *testing.T) {
-			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.FatalLevel)
-			defer hook.Reset()
-
-			ctx := logger.WithRequestIDContext(context.Background(), "req-fatal")
-			assert.PanicsWithValue(t, "fatal-exit", func() {
-				logger.WithContext(ctx).Fatal("fatal from context")
-			})
-
-			require.Len(t, hook.Entries, 1)
-			entry := hook.LastEntry()
-			assert.Equal(t, logrus.FatalLevel, entry.Level)
-			assert.Equal(t, "fatal from context", entry.Message)
-			assert.Equal(t, "req-fatal", entry.Data["request_id"])
-		})
-
-		t.Run("Logger.Fatalf", func(t *testing.T) {
-			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.FatalLevel)
-			defer hook.Reset()
-
-			ctx := logger.WithRequestIDContext(context.Background(), "req-fatalf")
-			assert.PanicsWithValue(t, "fatal-exit", func() {
-				logger.WithContext(ctx).Fatalf("fatal %s", "formatted")
-			})
-
-			require.Len(t, hook.Entries, 1)
-			entry := hook.LastEntry()
-			assert.Equal(t, logrus.FatalLevel, entry.Level)
-			assert.Equal(t, "fatal formatted", entry.Message)
-			assert.Equal(t, "req-fatalf", entry.Data["request_id"])
-		})
 	})
 
 	t.Run("Package-level WithField/WithFields", func(t *testing.T) {
