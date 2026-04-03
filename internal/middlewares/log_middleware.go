@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -94,7 +95,7 @@ func LogMiddleware() gin.HandlerFunc {
 				var err error
 				bodyBytes, err = io.ReadAll(io.LimitReader(c.Request.Body, MAX_BODY_SIZE))
 				if err != nil {
-					logger.ErrorWithRequestID(logEntry.RequestID, "Failed to read request body:", err)
+					logger.WithContext(context.Background()).WithField("request_id", logEntry.RequestID).Error("Failed to read request body:", err)
 				}
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
@@ -147,10 +148,10 @@ func LogMiddleware() gin.HandlerFunc {
 		go func(entry LogResponse) {
 			jsonData, err := marshalLogEntry(entry)
 			if err != nil {
-				logger.ErrorWithRequestID(entry.RequestID, "Failed to marshal log entry:", err)
+				logger.WithContext(context.Background()).WithField("request_id", entry.RequestID).Error("Failed to marshal log entry:", err)
 				return
 			}
-			logger.InfoWithRequestID(entry.RequestID, string(jsonData))
+			logger.WithContext(context.Background()).WithField("request_id", entry.RequestID).Info(string(jsonData))
 		}(logEntry)
 	}
 }

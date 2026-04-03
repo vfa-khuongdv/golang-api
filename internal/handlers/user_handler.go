@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
@@ -36,8 +35,6 @@ func NewUserHandler(
 }
 
 func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
-	requestID := middlewares.GetRequestID(ctx)
-
 	var input dto.ForgotPasswordInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -45,12 +42,9 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	logger.InfofWithRequestID(requestID, "Processing forgot password request")
-
 	err := handler.userService.ForgotPassword(ctx.Request.Context(), &input)
-
 	if err != nil {
-		logger.ErrorfWithRequestID(requestID, "Forgot password failed for email %s: %v", input.Email, err)
+		logger.WithContext(ctx.Request.Context()).Errorf("Forgot password failed for email %s: %v", input.Email, err)
 		utils.RespondWithError(ctx, err)
 		return
 	}

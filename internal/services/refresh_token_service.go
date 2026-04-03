@@ -40,7 +40,7 @@ func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models
 
 	err := service.repo.Create(ctx, &token)
 	if err != nil {
-		logger.Errorf("Failed to create refresh token: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to create refresh token: %v", err)
 		return nil, apperror.NewDBInsertError("Failed to create refresh token")
 	}
 
@@ -70,7 +70,7 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 	result.UsedCount += 1
 
 	if err := service.repo.Update(ctx, result); err != nil {
-		logger.Errorf("Failed to update refresh token: %v", err)
+		logger.WithContext(ctx).Errorf("Failed to update refresh token: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
 	}
 

@@ -28,7 +28,7 @@ func NewRefreshTokenRepository(db *gorm.DB) RefreshTokenRepository {
 
 func (repo *refreshTokenRepositoryImpl) Create(ctx context.Context, token *models.RefreshToken) error {
 	if err := repo.db.WithContext(ctx).Create(token).Error; err != nil {
-		logger.Errorf("DB error: failed to create refresh token: %v", err)
+		logger.WithContext(ctx).Errorf("DB error: failed to create refresh token: %v", err)
 		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to create refresh token", err)
 	}
 	return nil
@@ -40,7 +40,7 @@ func (repo *refreshTokenRepositoryImpl) FindByToken(ctx context.Context, token s
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.New(apperror.ErrNotFound, 1001, "Refresh token not found or expired")
 		}
-		logger.Errorf("DB error: failed to fetch refresh token: %v", err)
+		logger.WithContext(ctx).Errorf("DB error: failed to fetch refresh token: %v", err)
 		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch refresh token", err)
 	}
 	return &refreshToken, nil
@@ -48,7 +48,7 @@ func (repo *refreshTokenRepositoryImpl) FindByToken(ctx context.Context, token s
 
 func (repo *refreshTokenRepositoryImpl) Update(ctx context.Context, token *models.RefreshToken) error {
 	if err := repo.db.WithContext(ctx).Save(token).Error; err != nil {
-		logger.Errorf("DB error: failed to update refresh token: %v", err)
+		logger.WithContext(ctx).Errorf("DB error: failed to update refresh token: %v", err)
 		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to update refresh token", err)
 	}
 	return nil
@@ -56,7 +56,7 @@ func (repo *refreshTokenRepositoryImpl) Update(ctx context.Context, token *model
 
 func (repo *refreshTokenRepositoryImpl) UpdateWithTx(ctx context.Context, token *models.RefreshToken, tx *gorm.DB) error {
 	if err := tx.WithContext(ctx).Save(token).Error; err != nil {
-		logger.Errorf("DB error: failed to update refresh token with tx: %v", err)
+		logger.WithContext(ctx).Errorf("DB error: failed to update refresh token with tx: %v", err)
 		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to update refresh token", err)
 	}
 	return nil

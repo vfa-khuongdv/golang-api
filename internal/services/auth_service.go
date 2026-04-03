@@ -31,33 +31,33 @@ func NewAuthService(repo repositories.UserRepository, refreshTokenService Refres
 }
 
 func (service *authServiceImpl) Login(ctx context.Context, email, password string, ipAddress string) (*dto.LoginResponse, error) {
-	logger.Infof("Login attempt for email: %s", email)
+	logger.WithContext(ctx).Infof("Login attempt for email: %s", email)
 
 	user, err := service.repo.FindByField(ctx, "email", email)
 	if err != nil {
-		logger.Warnf("Login failed - user not found: %s", email)
+		logger.WithContext(ctx).Warnf("Login failed - user not found: %s", email)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
 	if isValid := service.bcryptService.CheckPasswordHash(password, user.Password); !isValid {
-		logger.Warnf("Login failed - invalid password for email: %s", email)
+		logger.WithContext(ctx).Warnf("Login failed - invalid password for email: %s", email)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
 	accessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
-		logger.Errorf("Failed to generate access token for user ID %d: %v", user.ID, err)
+		logger.WithContext(ctx).Errorf("Failed to generate access token for user ID %d: %v", user.ID, err)
 		return nil, apperror.NewInternalServerError("Failed to generate access token")
 	}
 
 	refreshToken, errToken := service.refreshTokenService.Create(ctx, user, ipAddress)
 
 	if errToken != nil {
-		logger.Errorf("Failed to create refresh token for user ID %d: %v", user.ID, errToken)
+		logger.WithContext(ctx).Errorf("Failed to create refresh token for user ID %d: %v", user.ID, errToken)
 		return nil, errToken
 	}
 
-	logger.Infof("Login successful for user ID %d", user.ID)
+	logger.WithContext(ctx).Infof("Login successful for user ID %d", user.ID)
 
 	return &dto.LoginResponse{
 		AccessToken: dto.JwtResult{
@@ -72,43 +72,43 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 }
 
 func (service *authServiceImpl) RefreshToken(ctx context.Context, refreshToken, accessToken string, ipAddress string) (*dto.LoginResponse, error) {
-	logger.Info("Token refresh attempt")
+	logger.WithContext(ctx).Infof("Token refresh attempt")
 
 	refreshResult, err := service.refreshTokenService.Update(ctx, refreshToken, ipAddress)
 	if err != nil {
-		logger.Warnf("Token refresh failed - invalid refresh token")
+		logger.WithContext(ctx).Warnf("Token refresh failed - invalid refresh token")
 		return nil, apperror.NewUnauthorizedError("Invalid refresh token")
 	}
 
 	claims, err := service.jwtService.ValidateTokenIgnoreExpiration(accessToken)
 	if err != nil {
-		logger.Warnf("Token refresh failed - invalid access token")
+		logger.WithContext(ctx).Warnf("Token refresh failed - invalid access token")
 		return nil, apperror.NewUnauthorizedError("Invalid access token")
 	}
 
 	if claims.Scope != TokenScopeAccess {
-		logger.Warnf("Token refresh failed - invalid scope")
+		logger.WithContext(ctx).Warnf("Token refresh failed - invalid scope")
 		return nil, apperror.NewUnauthorizedError("Invalid access token scope")
 	}
 
 	if claims.ID != refreshResult.UserId {
-		logger.Warnf("Token refresh failed - token mismatch")
+		logger.WithContext(ctx).Warnf("Token refresh failed - token mismatch")
 		return nil, apperror.NewUnauthorizedError("Token mismatch: refresh and access tokens belong to different users")
 	}
 
 	user, err := service.repo.GetByID(ctx, refreshResult.UserId)
 	if err != nil {
-		logger.Warnf("Token refresh failed - user not found: %d", refreshResult.UserId)
+		logger.WithContext(ctx).Warnf("Token refresh failed - user not found: %d", refreshResult.UserId)
 		return nil, apperror.NewNotFoundError("User not found")
 	}
 
 	newAccessToken, err := service.jwtService.GenerateAccessToken(user.ID)
 	if err != nil {
-		logger.Errorf("Failed to generate new access token for user ID %d: %v", user.ID, err)
+		logger.WithContext(ctx).Errorf("Failed to generate new access token for user ID %d: %v", user.ID, err)
 		return nil, apperror.NewInternalServerError("Failed to generate access token")
 	}
 
-	logger.Infof("Token refresh successful for user ID %d", user.ID)
+	logger.WithContext(ctx).Infof("Token refresh successful for user ID %d", user.ID)
 
 	return &dto.LoginResponse{
 		AccessToken: dto.JwtResult{
