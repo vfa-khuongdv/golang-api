@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
@@ -9,7 +8,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
-	"gorm.io/gorm"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
 type UserService interface {
@@ -36,13 +35,13 @@ func NewUserService(repo repositories.UserRepository, bcryptService BcryptServic
 }
 
 func (service *userServiceImpl) ForgotPassword(input *dto.ForgotPasswordInput) error {
-	// 1. Check email exists
 	user, err := service.repo.FindByField("email", input.Email)
 	if err != nil {
-		// Return a neutral response for unknown emails to prevent account enumeration.
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		appErr, isAppErr := apperror.ToAppError(err)
+		if isAppErr && appErr.Code == apperror.ErrUnauthorized {
 			return nil
 		}
+		logger.Errorf("Forgot password failed for email %s: %v", input.Email, err)
 		return apperror.NewDBQueryError("Failed to process forgot password request")
 	}
 

@@ -152,6 +152,8 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-middleware-testing-32-chars")
 
+	jwtService := services.NewJWTService()
+
 	tests := []struct {
 		name               string
 		authHeader         string
@@ -181,26 +183,20 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test router with the actual middleware
 			router := gin.New()
-			router.Use(AuthMiddleware())
+			router.Use(AuthMiddleware(jwtService))
 			router.GET("/test", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{"message": "success"})
 			})
 
-			// Create a test request
 			req, _ := http.NewRequest("GET", "/test", nil)
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
 			}
 
-			// Create a response recorder
 			w := httptest.NewRecorder()
-
-			// Perform the request
 			router.ServeHTTP(w, req)
 
-			// Assert the response
 			assert.Equal(t, tt.expectedStatusCode, w.Code)
 		})
 	}
@@ -211,18 +207,15 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-middleware-testing-32-chars")
 
-	// Create a real JWT service to generate tokens
 	jwtService := services.NewJWTService()
 
-	// Generate valid access token
 	accessTokenResult, err := jwtService.GenerateAccessToken(123)
 	assert.NoError(t, err)
 	assert.NotNil(t, accessTokenResult)
 
-	// Test with valid access token
 	t.Run("Valid JWT access token", func(t *testing.T) {
 		router := gin.New()
-		router.Use(AuthMiddleware())
+		router.Use(AuthMiddleware(jwtService))
 
 		var capturedUserID interface{}
 		router.GET("/test", func(c *gin.Context) {
