@@ -61,16 +61,22 @@ This project targets Go 1.22+ (minimum supported version).
 - Validate request data
 - Call services
 - Return HTTP responses
+- Extract `context.Context` from `ctx.Request.Context()` for service calls
+- Extract client IP via `ctx.ClientIP()` for auth-related operations
 
 **Services** (internal/services/):
 - Business logic
 - Orchestrate repositories
 - Return errors via apperror package
+- All methods accept `context.Context` as the first parameter
+- Pass context through to repository calls
 
 **Repositories** (internal/repositories/):
 - Database operations using GORM
 - Return domain entities
 - Implement interfaces
+- All methods accept `context.Context` as the first parameter for query cancellation, timeouts, and tracing
+- Use `db.WithContext(ctx)` before executing GORM operations
 
 **Models** (internal/models/):
 - Domain objects
@@ -99,6 +105,53 @@ Keep interfaces small and focused (Interface Segregation Principle):
 - Prefer 1-3 methods per interface
 - Easier to mock and test
 - Follow idiomatic Go naming: `Reader`, `Writer`, `UserRepository` (no `I` prefix)
+
+### Context Propagation
+
+All repository and service methods must accept `context.Context` as the first parameter:
+
+```go
+// Repository interface
+type UserRepository interface {
+    Create(ctx context.Context, user *models.User) (*models.User, error)
+    GetByID(ctx context.Context, id uint) (*models.User, error)
+    Update(ctx context.Context, user *models.User) error
+    Delete(ctx context.Context, userId uint) error
+}
+
+// Repository implementation
+func (repo *userRepositoryImpl) GetByID(ctx context.Context, id uint) (*models.User, error) {
+    var user models.User
+    if err := repo.db.WithContext(ctx).First(&user, id).Error; err != nil {
+        // handle error
+    }
+    return &user, nil
+}
+
+// Service interface
+type UserService interface {
+    GetProfile(ctx context.Context, userId uint) (*models.User, error)
+    UpdateProfile(ctx context.Context, userId uint, input *dto.UpdateProfileInput) error
+}
+
+// Handler calling service
+func (handler *userHandlerImpl) GetProfile(ctx *gin.Context) {
+    userId, _ := utils.GetUserIDFromContext(ctx)
+    user, err := handler.userService.GetProfile(ctx.Request.Context(), userId)
+    // ...
+}
+```
+
+For auth operations that need client IP, pass it as a separate string parameter (not `*gin.Context`):
+
+```go
+type AuthService interface {
+    Login(ctx context.Context, email, password string, ipAddress string) (*dto.LoginResponse, error)
+    RefreshToken(ctx context.Context, refreshToken, accessToken string, ipAddress string) (*dto.LoginResponse, error)
+}
+```
+
+This decouples the service layer from the HTTP framework and enables proper context cancellation, timeouts, and distributed tracing.
 
 ## Naming Conventions
 
@@ -249,8 +302,11 @@ Run coverage: `go test ./... --cover`
 Use in-memory SQLite for unit tests:
 ```go
 db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-// Create test fixtures
-// Run assertions
+// All repository methods now require context.Context as first parameter
+ctx := context.Background()
+_, err := repo.Create(ctx, user)
+require.NoError(t, err)
+
 // Database is cleaned up automatically
 ```
 

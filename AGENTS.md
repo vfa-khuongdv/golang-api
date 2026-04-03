@@ -77,9 +77,9 @@ make pre-push    # Runs: fmt vet lint test
 ## Code Style Guidelines
 
 ### Architecture Layers
-- **Handlers:** Parse requests, call services, return responses
-- **Services:** Business logic, validation, orchestrate repositories
-- **Repositories:** DB operations, implement interfaces
+- **Handlers:** Parse requests, call services, return responses. Extract `context.Context` from `ctx.Request.Context()` for service calls
+- **Services:** Business logic, validation, orchestrate repositories. All methods accept `context.Context` as first parameter
+- **Repositories:** DB operations, implement interfaces. All methods accept `context.Context` as first parameter and use `db.WithContext(ctx)` before GORM operations
 - **Models:** Domain objects with GORM/JSON tags
 
 ### Naming Conventions
@@ -172,13 +172,20 @@ func NewUserService(
 Keep interfaces small (1-3 methods preferred):
 ```go
 type UserRepository interface {
-    Create(user *models.User) error
-    GetByID(id string) (*models.User, error)
-    GetByEmail(email string) (*models.User, error)
-    Update(user *models.User) error
-    Delete(id string) error
+    Create(ctx context.Context, user *models.User) (*models.User, error)
+    GetByID(ctx context.Context, id uint) (*models.User, error)
+    GetByEmail(ctx context.Context, email string) (*models.User, error)
+    Update(ctx context.Context, user *models.User) error
+    Delete(ctx context.Context, id uint) error
 }
 ```
+
+All repository and service methods must accept `context.Context` as the first parameter. This enables:
+- Query cancellation and timeouts
+- Request tracing and logging
+- Decoupling from HTTP framework (no `*gin.Context` in service/repo layers)
+
+Handlers extract context via `ctx.Request.Context()` and pass it through the call chain.
 
 ### Testing Standards
 
@@ -188,11 +195,11 @@ func TestUserService_CreateUser(t *testing.T) {
     t.Run("Success", func(t *testing.T) {
         // Arrange
         mockRepo := new(mocks.MockUserRepository)
-        mockRepo.On("Create", mock.Anything).Return(nil)
+        mockRepo.On("Create", mock.Anything, mock.Anything).Return(nil, nil)
         service := services.NewUserService(mockRepo)
 
         // Act
-        result, err := service.CreateUser(&models.User{Email: "test@example.com"})
+        result, err := service.CreateUser(context.Background(), &models.User{Email: "test@example.com"})
 
         // Assert
         require.NoError(t, err)
