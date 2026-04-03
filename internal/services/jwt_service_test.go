@@ -12,7 +12,7 @@ import (
 )
 
 func TestJWTService(t *testing.T) {
-	t.Setenv("JWT_KEY", "unit-test-secret-key")
+	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-purposes-32-chars")
 
 	t.Run("GenerateAccessToken", func(t *testing.T) {
 		svc := services.NewJWTService()
@@ -75,6 +75,13 @@ func TestJWTService(t *testing.T) {
 		})
 	})
 
+	t.Run("NewJWTService_PanicWhenSecretTooShort", func(t *testing.T) {
+		t.Setenv("JWT_KEY", "short")
+		assert.Panics(t, func() {
+			_ = services.NewJWTService()
+		})
+	})
+
 	t.Run("ValidateTokenWithScope_Mismatch", func(t *testing.T) {
 		svc := services.NewJWTService()
 
@@ -104,7 +111,7 @@ func TestJWTService(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
 			},
 		})
-		expiredToken, err := token.SignedString([]byte("unit-test-secret-key"))
+		expiredToken, err := token.SignedString([]byte("this-is-a-very-long-secret-key-for-testing-purposes-32-chars"))
 		require.NoError(t, err)
 
 		claims, err := svc.ValidateTokenIgnoreExpiration(expiredToken)

@@ -16,7 +16,7 @@ func TestJWTService_InternalBranches(t *testing.T) {
 		parseJWTWithClaims = originalParse
 	})
 
-	t.Setenv("JWT_KEY", "internal-secret")
+	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-purposes-only-32-chars")
 	svc := NewJWTService()
 
 	t.Run("GenerateAccessTokenSigningError", func(t *testing.T) {

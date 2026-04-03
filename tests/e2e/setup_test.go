@@ -24,7 +24,7 @@ func init() {
 
 // setupTestRouter initializes the router with an in-memory SQLite database
 func setupTestRouter() (*gin.Engine, *gorm.DB) {
-	_ = os.Setenv("JWT_KEY", "e2e-test-secret-key")
+	_ = os.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-e2e-testing-purposes-32-chars")
 
 	// Set Gin to Test Mode
 	gin.SetMode(gin.TestMode)

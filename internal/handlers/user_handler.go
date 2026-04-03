@@ -49,7 +49,7 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 		return
 	}
 
-	logger.InfofWithRequestID(requestID, "Processing forgot password request for email: %s", input.Email)
+	logger.InfofWithRequestID(requestID, "Processing forgot password request")
 
 	// Handle forgot password logic
 	err := handler.userService.ForgotPassword(&input)

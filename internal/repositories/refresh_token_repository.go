@@ -12,6 +12,7 @@ type RefreshTokenRepository interface {
 	Update(token *models.RefreshToken) error
 	FindByToken(token string) (*models.RefreshToken, error)
 	First(token string) (*models.RefreshToken, error)
+	UpdateWithTx(token *models.RefreshToken, tx *gorm.DB) error
 }
 
 type refreshTokenRepositoryImpl struct {
@@ -76,4 +77,8 @@ func (repo *refreshTokenRepositoryImpl) FindByToken(token string) (*models.Refre
 //   - error: nil if successful, error otherwise
 func (repo *refreshTokenRepositoryImpl) Update(token *models.RefreshToken) error {
 	return repo.db.Save(token).Error
+}
+
+func (repo *refreshTokenRepositoryImpl) UpdateWithTx(token *models.RefreshToken, tx *gorm.DB) error {
+	return tx.Save(token).Error
 }

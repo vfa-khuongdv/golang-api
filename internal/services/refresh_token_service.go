@@ -66,7 +66,7 @@ type RefreshTokenResult struct {
 	UserId uint
 }
 
-// Update replaces an existing refresh token with a new one
+// Update replaces an existing refresh token with a new one (token rotation)
 // Parameters:
 //   - tokenString: The existing refresh token string to be replaced
 //   - ipAddress: IP address of the user making the request
@@ -85,7 +85,7 @@ func (service *refreshTokenServiceImpl) Update(tokenString string, ipAddress str
 	if err != nil {
 		return nil, apperror.NewNotFoundError(err.Error())
 	}
-	// Update new token
+
 	newToken := utils.GenerateRandomString(60)
 	expiredAt := time.Now().Add(time.Hour * 24 * 30).Unix()
 

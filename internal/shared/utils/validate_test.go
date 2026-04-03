@@ -460,3 +460,40 @@ func TestTranslateValidationErrors_InternalBranches(t *testing.T) {
 		assert.Equal(t, "profile.email", result.Fields[0].Field)
 	})
 }
+
+func TestValidatePasswordComplexity(t *testing.T) {
+	validate := validator.New()
+	_ = validate.RegisterValidation("password_complexity", utils.ValidatePasswordComplexity)
+
+	tests := []struct {
+		name     string
+		password string
+		wantErr  bool
+	}{
+		{"Valid password", "Test@pass1", false},
+		{"Too short", "Test1", true},
+		{"No uppercase", "test@pass1", true},
+		{"No lowercase", "TEST@PASS1", true},
+		{"No digit", "Test@pass", true},
+		{"No special", "TestPass1", true},
+		{"Just letters", "password", true},
+		{"Just numbers", "12345678", true},
+		{"Empty", "", true},
+		{"Complex password", "MyP@ssw0rd!", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := struct {
+				Password string `validate:"password_complexity"`
+			}{Password: tt.password}
+
+			err := validate.Struct(input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
