@@ -23,7 +23,10 @@ func WithContext(ctx context.Context) Logger {
 	if id, ok := ctx.Value(RequestIDKey).(string); ok {
 		requestID = id
 	}
-	return Logger{entry: log.WithField("request_id", requestID)}
+	if requestID != "" {
+		return Logger{entry: log.WithField("request_id", requestID)}
+	}
+	return Logger{entry: log.NewEntry(log.StandardLogger())}
 }
 
 // WithField returns a new Logger with an additional field
@@ -78,3 +81,13 @@ func Warn(args ...interface{})                  { log.Warn(args...) }
 func Warnf(format string, args ...interface{})  { log.Warnf(format, args...) }
 func Fatal(args ...interface{})                 { log.Fatal(args...) }
 func Fatalf(format string, args ...interface{}) { log.Fatalf(format, args...) }
+
+// WithField returns a Logger with a single field for non-context structured logging
+func WithField(key string, value interface{}) Logger {
+	return Logger{entry: log.WithField(key, value)}
+}
+
+// WithFields returns a Logger with multiple fields for non-context structured logging
+func WithFields(fields log.Fields) Logger {
+	return Logger{entry: log.WithFields(fields)}
+}

@@ -10,7 +10,7 @@ import (
 func Run(db *gorm.DB) {
 	// SeedUsers seeds the users table
 	if err := SeedUsers(db); err != nil {
-		logger.Infof("Something else error when run seeding user: %+v", err)
+		logger.Errorf("Failed to seed users: %+v", err)
 	}
 
 }

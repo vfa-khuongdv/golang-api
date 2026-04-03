@@ -180,7 +180,8 @@ func TestLogger(t *testing.T) {
 
 			require.Len(t, hook.Entries, 1)
 			entry := hook.LastEntry()
-			assert.Equal(t, "", entry.Data["request_id"])
+			_, hasRequestID := entry.Data["request_id"]
+			assert.False(t, hasRequestID, "request_id field should not be present when empty")
 		})
 
 		t.Run("WithField chaining", func(t *testing.T) {
@@ -355,6 +356,52 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, logrus.FatalLevel, entry.Level)
 			assert.Equal(t, "fatal formatted", entry.Message)
 			assert.Equal(t, "req-fatalf", entry.Data["request_id"])
+		})
+	})
+
+	t.Run("Package-level WithField/WithFields", func(t *testing.T) {
+		t.Run("WithField", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			logger.WithField("request_id", "pkg-req-123").Infof("structured log")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, "structured log", entry.Message)
+			assert.Equal(t, "pkg-req-123", entry.Data["request_id"])
+		})
+
+		t.Run("WithFields", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			logger.WithFields(logrus.Fields{
+				"request_id": "pkg-req-456",
+				"component":  "middleware",
+			}).Infof("multi-field log")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, "multi-field log", entry.Message)
+			assert.Equal(t, "pkg-req-456", entry.Data["request_id"])
+			assert.Equal(t, "middleware", entry.Data["component"])
+		})
+
+		t.Run("WithField Errorf", func(t *testing.T) {
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.ErrorLevel)
+			defer hook.Reset()
+
+			logger.WithField("request_id", "pkg-req-789").Errorf("error: %s", "something failed")
+
+			require.Len(t, hook.Entries, 1)
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+			assert.Equal(t, "error: something failed", entry.Message)
+			assert.Equal(t, "pkg-req-789", entry.Data["request_id"])
 		})
 	})
 }

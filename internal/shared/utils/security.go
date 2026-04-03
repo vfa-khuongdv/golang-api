@@ -163,7 +163,7 @@ func matchedValOrZero(val reflect.Value, typ reflect.Type) reflect.Value {
 		return val
 	}
 	// Log warning about type mismatch (data loss)
-	logger.Error(fmt.Sprintf("Type mismatch in censoring: cannot assign %v to %v, using zero value", val.Type(), typ))
+	logger.Errorf("Type mismatch in censoring: cannot assign %v to %v, using zero value", val.Type(), typ)
 	return reflect.Zero(typ)
 }
 
