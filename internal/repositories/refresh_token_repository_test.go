@@ -1,6 +1,7 @@
 package repositories_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestRefreshTokenRepository(t *testing.T) {
 		}
 
 		// Act
-		err := repo.Create(item)
+		err := repo.Create(context.Background(), item)
 
 		// Assert
 		require.NoError(t, err)
@@ -60,16 +61,16 @@ func TestRefreshTokenRepository(t *testing.T) {
 		}
 
 		// Act
-		err1 := repo.Create(token1)
+		err1 := repo.Create(context.Background(), token1)
 		require.NoError(t, err1)
 
-		err2 := repo.Create(token2)
+		err2 := repo.Create(context.Background(), token2)
 
 		// Assert
 		assert.Error(t, err2, "Expected error due to duplicate token")
 	})
 
-	t.Run("First - Success", func(t *testing.T) {
+	t.Run("FindByToken - Success", func(t *testing.T) {
 		// Arrange
 		db := setupTestDB(t)
 		repo := repositories.NewRefreshTokenRepository(db)
@@ -77,14 +78,14 @@ func TestRefreshTokenRepository(t *testing.T) {
 			RefreshToken: "test_refresh_token_1",
 			IpAddress:    "127.0.0.1",
 			UsedCount:    0,
-			ExpiredAt:    1710000000,
+			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
-		err := repo.Create(item)
+		err := repo.Create(context.Background(), item)
 		require.NoError(t, err)
 
 		// Act
-		foundItem, err := repo.First(item.RefreshToken)
+		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
 
 		// Assert
 		require.NoError(t, err)
@@ -95,13 +96,13 @@ func TestRefreshTokenRepository(t *testing.T) {
 		assert.Equal(t, item.UsedCount, foundItem.UsedCount)
 	})
 
-	t.Run("First - Not Found", func(t *testing.T) {
+	t.Run("FindByToken - Not Found", func(t *testing.T) {
 		// Arrange
 		db := setupTestDB(t)
 		repo := repositories.NewRefreshTokenRepository(db)
 
 		// Act
-		foundItem, err := repo.First("non_existent_token")
+		foundItem, err := repo.FindByToken(context.Background(), "non_existent_token")
 
 		// Assert
 		assert.Error(t, err)
@@ -120,11 +121,11 @@ func TestRefreshTokenRepository(t *testing.T) {
 			ExpiredAt:    now,
 			UserID:       1,
 		}
-		err := repo.Create(item)
+		err := repo.Create(context.Background(), item)
 		require.NoError(t, err)
 
 		// Act
-		foundItem, err := repo.FindByToken(item.RefreshToken)
+		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
 
 		// Assert
 		require.NoError(t, err)
@@ -148,11 +149,11 @@ func TestRefreshTokenRepository(t *testing.T) {
 			ExpiredAt:    now,
 			UserID:       1,
 		}
-		err := repo.Create(item)
+		err := repo.Create(context.Background(), item)
 		require.NoError(t, err)
 
 		// Act
-		foundItem, err := repo.FindByToken(item.RefreshToken)
+		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
 
 		// Assert
 		assert.Error(t, err)
@@ -167,10 +168,10 @@ func TestRefreshTokenRepository(t *testing.T) {
 			RefreshToken: "test_original_refresh_token",
 			IpAddress:    "",
 			UsedCount:    0,
-			ExpiredAt:    1710000000,
+			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
-		err := repo.Create(item)
+		err := repo.Create(context.Background(), item)
 		require.NoError(t, err)
 
 		// Update fields
@@ -180,13 +181,13 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item.ExpiredAt = time.Now().Unix() + int64(time.Hour)
 
 		// Act
-		err = repo.Update(item)
+		err = repo.Update(context.Background(), item)
 
 		// Assert
 		require.NoError(t, err)
 
 		// Verify the update
-		foundItem, err := repo.FindByToken(item.RefreshToken)
+		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
 		require.NoError(t, err)
 		require.NotNil(t, foundItem)
 		assert.Equal(t, item.RefreshToken, foundItem.RefreshToken)
@@ -208,7 +209,7 @@ func TestRefreshTokenRepository(t *testing.T) {
 			ExpiredAt:    now,
 			UserID:       1,
 		}
-		err := repo.Create(item)
+		err := repo.Create(context.Background(), item)
 		require.NoError(t, err)
 
 		// Act - use transaction
@@ -216,13 +217,13 @@ func TestRefreshTokenRepository(t *testing.T) {
 		require.NotNil(t, tx)
 
 		item.UsedCount = 1
-		err = repo.UpdateWithTx(item, tx)
+		err = repo.UpdateWithTx(context.Background(), item, tx)
 
 		// Assert
 		require.NoError(t, err)
 		tx.Commit()
 
-		foundItem, err := repo.FindByToken("test_tx_token")
+		foundItem, err := repo.FindByToken(context.Background(), "test_tx_token")
 		require.NoError(t, err)
 		require.NotNil(t, foundItem)
 		assert.Equal(t, int64(1), foundItem.UsedCount)

@@ -13,12 +13,9 @@ import (
 )
 
 type UserHandler interface {
-	// Authentication and Password Management
 	ForgotPassword(c *gin.Context)
 	ResetPassword(c *gin.Context)
 	ChangePassword(c *gin.Context)
-
-	// Profile Management for the authenticated user
 	GetProfile(c *gin.Context)
 	UpdateProfile(c *gin.Context)
 }
@@ -41,7 +38,6 @@ func NewUserHandler(
 func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 	requestID := middlewares.GetRequestID(ctx)
 
-	// Bind and validate JSON request body
 	var input dto.ForgotPasswordInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -51,8 +47,7 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 
 	logger.InfofWithRequestID(requestID, "Processing forgot password request")
 
-	// Handle forgot password logic
-	err := handler.userService.ForgotPassword(&input)
+	err := handler.userService.ForgotPassword(ctx.Request.Context(), &input)
 
 	if err != nil {
 		logger.ErrorfWithRequestID(requestID, "Forgot password failed for email %s: %v", input.Email, err)
@@ -64,7 +59,6 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 }
 
 func (handler *userHandlerImpl) ResetPassword(ctx *gin.Context) {
-	// Bind and validate JSON request body
 	var input dto.ResetPasswordInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -72,8 +66,7 @@ func (handler *userHandlerImpl) ResetPassword(ctx *gin.Context) {
 		return
 	}
 
-	// Handle reset password logic
-	_, err := handler.userService.ResetPassword(&input)
+	_, err := handler.userService.ResetPassword(ctx.Request.Context(), &input)
 	if err != nil {
 		utils.RespondWithError(ctx, err)
 		return
@@ -90,15 +83,13 @@ func (handler *userHandlerImpl) ChangePassword(ctx *gin.Context) {
 	}
 
 	var input dto.ChangePasswordInput
-	// Bind and validate JSON request body
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
 		utils.RespondWithError(ctx, validateError)
 		return
 	}
 
-	// Handle change password logic
-	_, err = handler.userService.ChangePassword(userId, &input)
+	_, err = handler.userService.ChangePassword(ctx.Request.Context(), userId, &input)
 	if err != nil {
 		utils.RespondWithError(ctx, err)
 		return
@@ -108,18 +99,13 @@ func (handler *userHandlerImpl) ChangePassword(ctx *gin.Context) {
 }
 
 func (handler *userHandlerImpl) GetProfile(ctx *gin.Context) {
-	// Get user ID from context and validate
 	userId, err := utils.GetUserIDFromContext(ctx)
 	if err != nil {
-		utils.RespondWithError(
-			ctx,
-			apperror.NewParseError("Invalid UserID"),
-		)
+		utils.RespondWithError(ctx, apperror.NewParseError("Invalid UserID"))
 		return
 	}
 
-	// Handle get profile logic
-	dbUser, err := handler.userService.GetProfile(userId)
+	dbUser, err := handler.userService.GetProfile(ctx.Request.Context(), userId)
 	if err != nil {
 		utils.RespondWithError(ctx, err)
 		return
@@ -129,17 +115,12 @@ func (handler *userHandlerImpl) GetProfile(ctx *gin.Context) {
 }
 
 func (handler *userHandlerImpl) UpdateProfile(ctx *gin.Context) {
-	// Get user ID from context and validate
 	userId, err := utils.GetUserIDFromContext(ctx)
 	if err != nil {
-		utils.RespondWithError(
-			ctx,
-			apperror.NewParseError("Invalid UserID"),
-		)
+		utils.RespondWithError(ctx, apperror.NewParseError("Invalid UserID"))
 		return
 	}
 
-	// Bind and validate JSON request body
 	var input dto.UpdateProfileInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		validateError := utils.TranslateValidationErrors(err, input)
@@ -147,8 +128,7 @@ func (handler *userHandlerImpl) UpdateProfile(ctx *gin.Context) {
 		return
 	}
 
-	// Handle update profile logic
-	err = handler.userService.UpdateProfile(userId, &input)
+	err = handler.userService.UpdateProfile(ctx.Request.Context(), userId, &input)
 	if err != nil {
 		utils.RespondWithError(ctx, err)
 		return

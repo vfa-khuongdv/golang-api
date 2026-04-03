@@ -18,6 +18,11 @@ func (e *AppError) Error() string {
 	return fmt.Sprintf("code: %d, message: %s", e.Code, e.Message)
 }
 
+// Unwrap returns the underlying error for errors.Is/As compatibility.
+func (e *AppError) Unwrap() error {
+	return e.Err
+}
+
 // Wrap creates a new AppError with an underlying error.
 func Wrap(httpStatusCode, code int, message string, err error) *AppError {
 	return &AppError{

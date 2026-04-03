@@ -49,7 +49,7 @@ func TestUpdateProfile(t *testing.T) {
 		}
 
 		// Mock the service methods
-		userService.On("UpdateProfile", userID, input).Return(nil)
+		userService.On("UpdateProfile", mock.Anything, userID, input).Return(nil)
 
 		body, _ := json.Marshal(requestBody)
 
@@ -267,7 +267,7 @@ func TestUpdateProfile(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method
-		userService.On("UpdateProfile", userID, input).Return(apperror.NewNotFoundError("User not found"))
+		userService.On("UpdateProfile", mock.Anything, userID, input).Return(apperror.NewNotFoundError("User not found"))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -314,7 +314,7 @@ func TestUpdateProfile(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method
-		userService.On("UpdateProfile", userID, input).Return(apperror.NewDBUpdateError("Update error"))
+		userService.On("UpdateProfile", mock.Anything, userID, input).Return(apperror.NewDBUpdateError("Update error"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -360,7 +360,7 @@ func TestGetProfile(t *testing.T) {
 			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 		}
 		// Mock the service method
-		userService.On("GetProfile", uint(1)).Return(user, nil)
+		userService.On("GetProfile", mock.Anything, uint(1)).Return(user, nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -403,7 +403,7 @@ func TestGetProfile(t *testing.T) {
 			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 		}
 		// Mock the service to return the cached profile
-		userService.On("GetProfile", uint(1)).Return(user, nil)
+		userService.On("GetProfile", mock.Anything, uint(1)).Return(user, nil)
 
 		handler := handlers.NewUserHandler(userService, mailerService)
 
@@ -470,7 +470,7 @@ func TestGetProfile(t *testing.T) {
 		mailerService := new(mocks.MockMailerService)
 		userId := uint(1)
 
-		userService.On("GetProfile", userId).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("GetProfile", mock.Anything, userId).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
 		handler := handlers.NewUserHandler(userService, mailerService)
 		w := httptest.NewRecorder()
@@ -510,7 +510,7 @@ func TestGetProfile(t *testing.T) {
 			CreatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
 		}
-		userService.On("GetProfile", uint(1)).Return(user, nil)
+		userService.On("GetProfile", mock.Anything, uint(1)).Return(user, nil)
 
 		handler := handlers.NewUserHandler(userService, mailerService)
 		w := httptest.NewRecorder()
@@ -569,7 +569,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the services methods
-		userService.On("ChangePassword", uint(1), mock.MatchedBy(func(input *dto.ChangePasswordInput) bool {
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.MatchedBy(func(input *dto.ChangePasswordInput) bool {
 			return input.OldPassword == "12345678" &&
 				input.NewPassword == "newpassword" &&
 				input.ConfirmPassword == "newpassword"
@@ -741,7 +741,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the ChangePassword method to return an error
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
 		// Create http request and context
 		w := httptest.NewRecorder()
@@ -781,7 +781,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewInvalidPasswordError("Old password is incorrect"))
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewInvalidPasswordError("Old password is incorrect"))
 
 		// Create a new UserHandler instance
 		w := httptest.NewRecorder()
@@ -822,7 +822,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewPasswordMismatchError("New password and confirm password do not match"))
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewPasswordMismatchError("New password and confirm password do not match"))
 
 		// Create test context
 		w := httptest.NewRecorder()
@@ -861,7 +861,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Update error"))
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Update error"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -924,7 +924,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewPasswordMismatchError("New password must be different from old password"))
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.NewPasswordMismatchError("New password must be different from old password"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -964,7 +964,7 @@ func TestChangePassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ChangePassword", uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Hash password failed", nil))
+		userService.On("ChangePassword", mock.Anything, uint(1), mock.AnythingOfType("*dto.ChangePasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Hash password failed", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1010,7 +1010,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, nil)
+		userService.On("ResetPassword", mock.Anything, mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1042,7 +1042,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method's behavior
-		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
+		userService.On("ResetPassword", mock.Anything, mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1081,7 +1081,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method
-		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusBadRequest, apperror.ErrTokenExpired, "Token is expired", nil))
+		userService.On("ResetPassword", mock.Anything, mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusBadRequest, apperror.ErrTokenExpired, "Token is expired", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1120,7 +1120,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrPasswordHashFailed, "Failed to hash password", nil))
+		userService.On("ResetPassword", mock.Anything, mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.Wrap(http.StatusInternalServerError, apperror.ErrPasswordHashFailed, "Failed to hash password", nil))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1159,7 +1159,7 @@ func TestResetPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ResetPassword", mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Failed to update user"))
+		userService.On("ResetPassword", mock.Anything, mock.AnythingOfType("*dto.ResetPasswordInput")).Return(&models.User{}, apperror.NewDBUpdateError("Failed to update user"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1350,7 +1350,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(nil)
+		userService.On("ForgotPassword", mock.Anything, mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(nil)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1454,7 +1454,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service method to return an error
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewNotFoundError("User not found"))
+		userService.On("ForgotPassword", mock.Anything, mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewNotFoundError("User not found"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1491,7 +1491,7 @@ func TestForgotPassword(t *testing.T) {
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the service methods
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewDBUpdateError("Update failed"))
+		userService.On("ForgotPassword", mock.Anything, mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewDBUpdateError("Update failed"))
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -1548,7 +1548,7 @@ func TestForgotPassword(t *testing.T) {
 		}
 		body, _ := json.Marshal(requestBody)
 
-		userService.On("ForgotPassword", mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewInternalServerError("send mail failed"))
+		userService.On("ForgotPassword", mock.Anything, mock.AnythingOfType("*dto.ForgotPasswordInput")).Return(apperror.NewInternalServerError("send mail failed"))
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)

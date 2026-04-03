@@ -1,14 +1,13 @@
 package services_test
 
 import (
+	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
@@ -58,13 +57,13 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			name: "Success",
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
-				s.repo.On("FindByField", "email", email).Return(user, nil)
+				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
 				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "mocked-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 				}, nil)
-				s.refreshTokenService.On("Create", user, ipAddress).Return(&dto.JwtResult{
+				s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
 					Token:     "mocked-refresh-token",
 					ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 				}, nil)
@@ -73,7 +72,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		{
 			name: "UserNotFound",
 			setupMocks: func() {
-				s.repo.On("FindByField", "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
+				s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
 			},
 			expectErr: true,
 			errCode:   apperror.ErrInvalidPassword,
@@ -82,7 +81,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			name: "InvalidPassword",
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
-				s.repo.On("FindByField", "email", email).Return(user, nil)
+				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
 				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(false)
 			},
 			expectErr: true,
@@ -92,7 +91,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			name: "JwtError",
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: utils.HashPassword(password)}
-				s.repo.On("FindByField", "email", email).Return(user, nil)
+				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
 				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
 			},
@@ -103,13 +102,13 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			name: "RefreshTokenCreateError",
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
-				s.repo.On("FindByField", "email", email).Return(user, nil)
+				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
 				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "mocked-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
 				}, nil)
-				s.refreshTokenService.On("Create", user, ipAddress).Return((*dto.JwtResult)(nil), errors.New("refresh create failed"))
+				s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return((*dto.JwtResult)(nil), errors.New("refresh create failed"))
 			},
 			expectErr: true,
 		},
@@ -121,11 +120,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			s.SetupTest()
 			tt.setupMocks()
 
-			w := httptest.NewRecorder()
-			ctx, _ := gin.CreateTestContext(w)
-			ctx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
-
-			resp, err := s.service.Login(email, password, ctx)
+			resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -163,9 +158,9 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				user := &models.User{ID: userID, Email: "user@example.com"}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
-				s.repo.On("GetByID", userID).Return(user, nil)
+				s.repo.On("GetByID", mock.Anything, userID).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "new-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -175,7 +170,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 		{
 			name: "UpdateError",
 			setupMocks: func() {
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 			},
 			expectErr: true,
 			errCode:   apperror.ErrUnauthorized,
@@ -187,9 +182,9 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
-				s.repo.On("GetByID", userID).Return((*models.User)(nil), gorm.ErrRecordNotFound)
+				s.repo.On("GetByID", mock.Anything, userID).Return((*models.User)(nil), gorm.ErrRecordNotFound)
 			},
 			expectErr: true,
 			errCode:   apperror.ErrNotFound,
@@ -202,9 +197,9 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				user := &models.User{ID: userID, Email: "user@example.com"}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
-				s.repo.On("GetByID", userID).Return(user, nil)
+				s.repo.On("GetByID", mock.Anything, userID).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
 			},
 			expectErr: true,
@@ -216,7 +211,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
 				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(nil, errors.New("Invalid token signature"))
 			},
 			expectErr: true,
@@ -231,7 +226,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				mockRes := &services.RefreshTokenResult{UserId: refreshUserID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: accessUserID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 			},
 			expectErr: true,
@@ -244,7 +239,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: userID, Scope: "other-scope"}
 
-				s.refreshTokenService.On("Update", oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 			},
 			expectErr: true,
@@ -258,11 +253,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			s.SetupTest()
 			tt.setupMocks()
 
-			w := httptest.NewRecorder()
-			ctx, _ := gin.CreateTestContext(w)
-			ctx.Request = &http.Request{RemoteAddr: ipAddress + ":12345"}
-
-			result, err := s.service.RefreshToken(oldRefreshToken, oldAccessToken, ctx)
+			result, err := s.service.RefreshToken(context.Background(), oldRefreshToken, oldAccessToken, ipAddress)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -280,6 +271,5 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 
 // --------------------- RUN TEST SUITE ---------------------
 func TestAuthServiceTestSuite(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	suite.Run(t, new(AuthServiceTestSuite))
 }
