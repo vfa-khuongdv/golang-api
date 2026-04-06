@@ -304,43 +304,27 @@ Run coverage: `go test ./... --cover`
 Use in-memory SQLite for unit tests:
 ```go
 db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-// All repository methods now require context.Context as first parameter
 ctx := context.Background()
 _, err := repo.Create(ctx, user)
 require.NoError(t, err)
-
-// Database is cleaned up automatically
 ```
 
 ### Handler Testing
 
 ```go
-package handlers_test
-
 func TestUserHandler(t *testing.T) {
     gin.SetMode(gin.TestMode)
+    mockService := new(mocks.MockUserService)
+    handler := handlers.NewUserHandler(mockService)
+    w := httptest.NewRecorder()
+    c, _ := gin.CreateTestContext(w)
     
-    t.Run("CreateUser - Success", func(t *testing.T) {
-        // Arrange
-        mockService := new(mocks.MockUserService)
-        user := &User{ID: 1, Email: "test@example.com"}
-        mockService.On("CreateUser", mock.Anything).Return(user, nil)
-        
-        handler := handlers.NewUserHandler(mockService)
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        
-        body, _ := json.Marshal(map[string]any{"email": "test@example.com"})
-        c.Request, _ = http.NewRequest("POST", "/api/v1/users", bytes.NewBuffer(body))
-        c.Request.Header.Set("Content-Type", "application/json")
-        
-        // Act
-        handler.CreateUser(c)
-        
-        // Assert
-        require.Equal(t, http.StatusCreated, w.Code)
-        mockService.AssertExpectations(t)
-    })
+    body, _ := json.Marshal(map[string]any{"email": "test@example.com"})
+    c.Request, _ = http.NewRequest("POST", "/api/v1/users", bytes.NewBuffer(body))
+    c.Request.Header.Set("Content-Type", "application/json")
+    
+    handler.CreateUser(c)
+    require.Equal(t, http.StatusCreated, w.Code)
 }
 ```
 
@@ -550,12 +534,3 @@ SMTP_PASSWORD=password
 # Server
 APP_PORT=3000
 ```
-
-## Useful References
-
-See the project's `DEVELOPMENT.md` and `TESTING.md` files for detailed guidelines on:
-- Specific naming conventions
-- Code style guidelines
-- Testing patterns and examples
-- Database setup
-- Migration procedures

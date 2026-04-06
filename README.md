@@ -139,37 +139,14 @@ This will create two files:
 - XXXXXX_feedback_table.up.sql (for applying the migration)
 - XXXXXX_feedback_table.down.sql (for reverting the migration)
 
-The project includes migrations for creating the necessary tables in the MySQL database.
-To apply the migrations:
-
-```bash
-make migrate
-```
-
-Or manually:
-
-```bash
-migrate -path ./internal/database/migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/golang_db_2" up
-```
-
-To revert migrations, you can use the down command:
-
-```bash
-migrate -path ./internal/database/migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/golang_db_2" down
-```
-
-You can also revert a specific number of migrations by adding the number after the down command:
-
-```bash
-migrate -path ./internal/database/migrations -database "mysql://root:root@tcp(127.0.0.1:3306)/golang_db_2" down 1
-```
+The project uses GORM AutoMigrate which automatically creates/updates tables when the server starts. No manual migration steps are required.
 
 ### 5. Seeding the Database
 
 To seed the database with initial data (e.g., default users, roles, permissions), run:
 
 ```bash
-make start-seeder
+go run cmd/seeder/seeder.go
 ```
 
 ### 6. Running the Server
@@ -179,13 +156,12 @@ The server will be available at `http://localhost:3000` by default.
 **Option 1: Using Make (Recommended)**
 
 ```bash
-make start-server
+make dev
 ```
 
 This command will:
 1. Install required tools (if not already installed)
-2. Start Docker containers in detached mode
-3. Start the server with Air for live reloading
+2. Start the server with Air for live reloading
 
 **Option 2: Using Air Directly**
 
@@ -203,10 +179,18 @@ If you prefer to run the server directly without live-reloading:
 go run cmd/server/main.go
 ```
 
-**Option 4: Using Docker**
+**Option 4: Start Docker for MySQL first**
+
+If you need to start MySQL via Docker:
 
 ```bash
-make docker-up
+docker-compose up -d mysql
+```
+
+**Option 4: Start Docker for MySQL first**
+
+```bash
+docker-compose up -d mysql
 ```
 
 ### 7. Database Management - PHPMyAdmin
@@ -317,13 +301,7 @@ The test files are located under the `tests` directory. The tests follow the Go 
 - `make fmt`: Format code using go fmt
 - `make vet`: Run go vet static analysis
 - `make pre-push`: Run all checks (fmt, vet, lint, test) before pushing
-- `make docker-up`: Start Docker containers
-- `make wait-for-db`: Wait for MySQL to be ready
-- `make dev`: Start server with Air (requires DB to be running)
-- `make start-server`: Full dev environment setup (docker-up → wait-for-db → dev)
-- `make start-seeder`: Seed the database with initial data
-- `make migrate`: Run database migrations up
-- `make migrate-down`: Revert database migrations down
+- `make dev`: Start server with Air (requires MySQL running)
 
 ## Contribution Guidelines
 

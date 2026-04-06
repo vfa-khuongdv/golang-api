@@ -1,11 +1,9 @@
 .PHONY: help install-tools test test-e2e test-coverage watch-test \
-        build clean start-server dev docker-up wait-for-db \
-        migrate migrate-down lint fmt vet pre-push start-seeder
+        build clean dev lint fmt vet pre-push
 
 # Variables
 GO := go
 BINARY_NAME := bin/server
-MIGRATIONS_PATH := internal/database/migrations
 COVERAGE_FILE := coverage.out
 COVERAGE_HTML := coverage.html
 
@@ -13,14 +11,6 @@ COVERAGE_HTML := coverage.html
 # These modules represent the business logic that should be tested
 CORE_MODULES := ./internal/shared/... ./internal/handlers ./internal/middlewares \
                 ./internal/repositories ./internal/services ./pkg/...
-
-# Database variables (can be overridden by env vars)
-DB_HOST ?= 127.0.0.1
-DB_PORT ?= 3306
-DB_USER ?= user
-DB_PASSWORD ?= password
-DB_NAME ?= dbname
-DB_DSN := mysql://$(DB_USER):$(DB_PASSWORD)@tcp($(DB_HOST):$(DB_PORT))/$(DB_NAME)
 
 ## Help: Show this help message
 help:
@@ -43,7 +33,6 @@ install-tools:
 	@$(GO) mod tidy
 	@echo "Installing tools..."
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "Installing golangci-lint..."; $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2; }
-	@command -v migrate >/dev/null 2>&1 || { echo "Installing migrate..."; $(GO) install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest; }
 	@command -v air >/dev/null 2>&1 || { echo "Installing Air..."; $(GO) install github.com/cosmtrek/air@latest; }
 	@command -v gotestsum >/dev/null 2>&1 || { echo "Installing gotestsum..."; $(GO) install gotest.tools/gotestsum@latest; }
 	@echo "✅ Tools installed."
@@ -84,52 +73,10 @@ watch-test: install-tools
 	@echo "Watching for changes..."
 	@reflex -r '\.go$$' -s -- sh -c 'clear && gotestsum --format=short-verbose -- $(shell $(GO) list ./... | grep -v -E "/(cmd|docs|tests)")'
 
-## Docker Up: Start Docker containers
-docker-up:
-	@echo "📦 Starting Docker containers..."
-	@if docker info > /dev/null 2>&1; then \
-		docker-compose up -d || { echo '❌ Failed to start containers'; exit 1; }; \
-	else \
-		echo "❌ Docker is not running."; exit 1; \
-	fi
-
-## Wait for DB: Wait for MySQL to be ready
-wait-for-db:
-	@echo "⏱️  Waiting for MySQL..."
-	@retries=0; max_retries=30; \
-	until docker exec $$(docker ps -qf "name=mysql") mysqladmin ping -h"127.0.0.1" --silent > /dev/null 2>&1; do \
-		printf "🐢"; sleep 1; retries=$$((retries+1)); \
-		if [ $$retries -ge $$max_retries ]; then echo "\n❌ MySQL timeout."; exit 1; fi; \
-	done
-	@echo "\n✅ MySQL is ready."
-
 ## Dev: Start server with Air (requires DB)
 dev: install-tools
 	@echo "⚙️  Starting Air..."
 	@air || { echo '❌ Failed to start Air'; exit 1; }
-
-## Start Server: Full dev environment setup
-start-server: docker-up wait-for-db dev
-
-## Start Seeder: Seed the database
-start-seeder:
-	@echo "Seeding database..."
-	@$(GO) run ./cmd/seeder/seeder.go
-	@echo "✅ Seeding complete."
-
-## Migrate: Run database migrations up
-migrate: install-tools
-	@echo "🔄 Running migrations up..."
-	@if [ -f .env ]; then export $$(grep -v '^#' .env | xargs); fi; \
-	migrate -path $(MIGRATIONS_PATH) -database "mysql://$${DB_USERNAME}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_DATABASE}" up
-	@echo "✅ Migrations up complete."
-
-## Migrate Down: Revert database migrations
-migrate-down: install-tools
-	@echo "🔄 Running migrations down..."
-	@if [ -f .env ]; then export $$(grep -v '^#' .env | xargs); fi; \
-	migrate -path $(MIGRATIONS_PATH) -database "mysql://$${DB_USERNAME}:$${DB_PASSWORD}@tcp($${DB_HOST}:$${DB_PORT})/$${DB_DATABASE}" down
-	@echo "✅ Migrations down complete."
 
 ## Lint: Run linter
 lint: install-tools
