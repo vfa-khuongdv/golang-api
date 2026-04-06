@@ -9,6 +9,8 @@ metadata:
 
 # Golang CMS Architecture & Development Guide
 
+> **Additional Resources**: See `references/` folder for templates, cheatsheet, and workflow guides.
+
 ## Project Overview
 
 This project targets Go 1.22+ (minimum supported version).
@@ -54,106 +56,36 @@ This project targets Go 1.22+ (minimum supported version).
 
 ## Core Architecture Principles
 
+> See `references/cheatsheet.md` for quick reference on patterns and logging.
+
 ### Layer Responsibilities
 
-**Handlers** (internal/handlers/):
-- Parse HTTP requests
-- Validate request data
-- Call services
-- Return HTTP responses
-- Extract `context.Context` from `ctx.Request.Context()` for service calls
-- Extract client IP via `ctx.ClientIP()` for auth-related operations
+| Layer | Responsibility |
+|-------|----------------|
+| **Handlers** | Parse requests, call services, return responses |
+| **Services** | Business logic, validation, orchestrate repos |
+| **Repositories** | DB operations using GORM, implement interfaces |
+| **Models** | Domain objects with GORM/JSON tags |
 
-**Services** (internal/services/):
-- Business logic
-- Orchestrate repositories
-- Return errors via apperror package
-- All methods accept `context.Context` as the first parameter
-- Pass context through to repository calls
+All service and repository methods must accept `context.Context` as the first parameter.
 
-**Repositories** (internal/repositories/):
-- Database operations using GORM
-- Return domain entities
-- Implement interfaces
-- All methods accept `context.Context` as the first parameter for query cancellation, timeouts, and tracing
-- Use `db.WithContext(ctx)` before executing GORM operations
+### Dependency Injection
 
-**Models** (internal/models/):
-- Domain objects
-- GORM tags for database mapping
-- JSON tags in snake_case for API responses
-- Validation tags
-
-### Dependency Injection Pattern
-
-All layers depend on abstractions (interfaces), never concrete implementations:
-
+Always depend on interfaces, not concrete types:
 ```go
-// Good: Return an interface from constructors and depend on interfaces.
-type UserService interface { /* ... methods */ }
+type UserService interface { /* ... */ }
 type userServiceImpl struct { repo UserRepository }
+
 func NewUserService(repo UserRepository) UserService {
     return &userServiceImpl{repo: repo}
 }
-// Bad: Depending on concrete implementations makes code rigid.
-type badUserService struct {
-    repo *userRepositoryImpl // <-- Concrete type, hard to mock
-}
 ```
 
-Keep interfaces small and focused (Interface Segregation Principle):
-- Prefer 1-3 methods per interface
-- Easier to mock and test
-- Follow idiomatic Go naming: `Reader`, `Writer`, `UserRepository` (no `I` prefix)
+Keep interfaces small (1-3 methods).
 
 ### Context Propagation
 
-All repository and service methods must accept `context.Context` as the first parameter:
-
-```go
-// Repository interface
-type UserRepository interface {
-    Create(ctx context.Context, user *models.User) (*models.User, error)
-    GetByID(ctx context.Context, id uint) (*models.User, error)
-    Update(ctx context.Context, user *models.User) error
-    Delete(ctx context.Context, userId uint) error
-}
-
-// Repository implementation
-func (repo *userRepositoryImpl) GetByID(ctx context.Context, id uint) (*models.User, error) {
-    var user models.User
-    if err := repo.db.WithContext(ctx).First(&user, id).Error; err != nil {
-        // handle error
-    }
-    return &user, nil
-}
-
-// Service interface
-type UserService interface {
-    GetProfile(ctx context.Context, userId uint) (*models.User, error)
-    UpdateProfile(ctx context.Context, userId uint, input *dto.UpdateProfileInput) error
-}
-
-// Handler calling service - ctx.Request.Context() already has requestID from middleware
-func (handler *userHandlerImpl) GetProfile(ctx *gin.Context) {
-    userId, _ := utils.GetUserIDFromContext(ctx)
-    user, err := handler.userService.GetProfile(ctx.Request.Context(), userId)
-    // ...
-}
-```
-
-The `RequestIDMiddleware` automatically injects `request_id` into `ctx.Request.Context()`, so handlers simply pass `ctx.Request.Context()` through the call chain — no manual injection needed.
-
-For auth operations that need client IP, pass it as a separate string parameter (not `*gin.Context`):
-
-```go
-type AuthService interface {
-    Login(ctx context.Context, email, password string, ipAddress string) (*dto.LoginResponse, error)
-    RefreshToken(ctx context.Context, refreshToken, accessToken string, ipAddress string) (*dto.LoginResponse, error)
-}
-```
-
-This decouples the service layer from the HTTP framework and enables proper context cancellation, timeouts, and distributed tracing.
+Handlers pass `ctx.Request.Context()` to services. Services pass to repositories. Use `db.WithContext(ctx)` before GORM operations.
 
 ## Naming Conventions
 
@@ -239,272 +171,66 @@ utils.ResponseWithError(c, err)
 
 ## Testing Standards
 
-### Test Structure (AAA Pattern)
-
-Every test follows Arrange-Act-Assert:
-
+Follow AAA pattern with testify:
 ```go
 func TestUserService(t *testing.T) {
     t.Run("CreateUser - Success", func(t *testing.T) {
-        // ARRANGE - Setup test data and expectations
+        // ARRANGE
         mockRepo := new(mocks.MockUserRepository)
-        service := services.NewUserService(mockRepo)
-        user := &User{Email: "test@example.com", Name: "Test User"}
+        mockRepo.On("Create", mock.Anything).Return(&models.User{}, nil)
         
-        mockRepo.On("Create", mock.MatchedBy(func(u *User) bool {
-            return u.Email == user.Email
-        })).Return(nil).Once()
-
-        // ACT - Execute the function being tested
-        result, err := service.CreateUser(user)
-
-        // ASSERT - Verify the results
+        // ACT
+        result, err := services.NewUserService(mockRepo).CreateUser(ctx, input)
+        
+        // ASSERT
         require.NoError(t, err)
         assert.NotNil(t, result)
-        assert.Equal(t, user.Email, result.Email)
-        mockRepo.AssertExpectations(t)
     })
 }
 ```
 
-### Testify Packages
+**Coverage targets:** Handlers 95%, Services 85%, Repos 90%, Middlewares 85%, Utils 80%
 
-**assert** - Soft assertions (continue on failure):
-```go
-assert.Equal(t, expected, actual)
-assert.NoError(t, err)
-assert.Nil(t, value)
-assert.NotNil(t, value)
-```
-
-**require** - Hard assertions (stop on failure) for critical checks:
-```go
-require.NoError(t, err)
-require.NotNil(t, result)
-```
-
-**mock** - Object mocking for dependencies:
-```go
-mockRepo.On("Method", arg1, arg2).Return(result, nil)
-mockRepo.AssertExpectations(t)
-```
-
-### Test Coverage Requirements by Layer
-
-- **Handlers**: 95%+ coverage
-- **Services**: 85%+ coverage
-- **Repositories**: 90%+ coverage
-- **Middlewares**: 85%+ coverage
-- **Utils**: 80%+ coverage
-
-Run coverage: `go test ./... --cover`
-
-### Repository Testing
-
-Use in-memory SQLite for unit tests:
-```go
-db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-ctx := context.Background()
-_, err := repo.Create(ctx, user)
-require.NoError(t, err)
-```
-
-### Handler Testing
-
-```go
-func TestUserHandler(t *testing.T) {
-    gin.SetMode(gin.TestMode)
-    mockService := new(mocks.MockUserService)
-    handler := handlers.NewUserHandler(mockService)
-    w := httptest.NewRecorder()
-    c, _ := gin.CreateTestContext(w)
-    
-    body, _ := json.Marshal(map[string]any{"email": "test@example.com"})
-    c.Request, _ = http.NewRequest("POST", "/api/v1/users", bytes.NewBuffer(body))
-    c.Request.Header.Set("Content-Type", "application/json")
-    
-    handler.CreateUser(c)
-    require.Equal(t, http.StatusCreated, w.Code)
-}
-```
-
-### Mocking Guidelines
-
-- Mock external dependencies only (repositories, services)
-- Don't mock internal dependencies or return types
-- Always call `AssertExpectations(t)` after using a mock
-- Use `mock.MatchedBy()` for complex matching logic
-- Use `.Once()` or `.Times(n)` to specify call count expectations
-
-### Key Testing Rules
-
-✓ **DO:**
-- Use testify/assert and testify/require
-- Follow AAA pattern
-- Group related tests with `t.Run()`
-- Use `require` for critical checks, `assert` for value checks
-- Mock all external dependencies
-- Write both success and failure test cases
-- Clean up resources in teardowns
-
-✗ **DON'T:**
-- Ignore errors (never `_ = err`)
-- Write tests that depend on each other
-- Skip error handling tests
-- Test multiple things in one test
-- Use time-based assertions (flaky)
-- Mix unit and integration tests in same function
+> See `references/templates.md` for detailed test examples.
 
 ## Adding New Features
 
-Follow this step-by-step workflow:
+1. **Model** → Define domain model with GORM/JSON tags
+2. **Repository** → Define interface, implement GORM ops, write tests (90%+)
+3. **Service** → Business logic, validation, orchestrate repos, write tests (85%+)
+4. **Handler** → Parse requests, call service, return responses, write tests (95%+)
+5. **Routes** → Register handler in routes.go
+6. **Validate** → Run tests
 
-1. **Start with the model** (internal/models/)
-   - Define domain model with GORM and JSON tags
-   - Add validation tags if needed
+> See `references/workflow.md` for detailed development workflow.
 
-2. **Add repository layer** (internal/repositories/)
-   - Define interface first (UserRepository, not IUserRepository)
-   - Implement GORM operations
-   - Write unit tests with in-memory SQLite
-   - Target 90%+ coverage
-
-3. **Add service layer** (internal/services/)
-   - Implement business logic
-   - Validate inputs
-   - Orchestrate repositories
-   - Write tests with mocked repositories
-   - Target 85%+ coverage
-
-4. **Add handler layer** (internal/handlers/)
-   - Accept HTTP requests (Gin)
-   - Validate request format
-   - Call service
-   - Return HTTP responses
-   - Write handler tests
-   - Target 95%+ coverage
-
-5. **Add routes** (internal/routes/)
-   - Register handler in routes.go
-
-6. **Run all tests**
-   ```bash
-   go test ./... -v --cover
-   ```
-   All tests must pass and meet coverage targets.
-
-## Build & Validation Commands
+## Build Commands
 
 ```bash
-# Download dependencies
-go mod download
-
-# Run all tests with coverage
-go test ./... -v --cover
-
-# Run specific package tests
-go test ./internal/handlers -v
-
-# Run specific test
-go test ./internal/handlers -run TestUserHandler -v
-
-# Race condition detection
-go test ./... -race
-
-# Format check
-go fmt ./...
-
-# Vet analysis
-go vet ./...
-
-# Build server
-make build
-
-# Start development environment
-docker-compose up -d mysql
-go run cmd/seeder/seeder.go
-go run cmd/server/main.go
+make build              # Build binary
+make dev                # Start with hot reload
 ```
+
+> See `references/commands.md` for full command reference.
 
 ## Important Implementation Rules
 
-### ALWAYS DO:
-- Use dependency injection for testability
-- Handle all errors explicitly
-- Use apperror package for all application errors
-- Use `logger.WithContext(ctx)` for request-scoped logging (auto-includes request_id)
-- Use plain `logger.Infof()`, `logger.Errorf()` for non-request logging (startup, seeders)
-- Write tests immediately after writing code
-- Use meaningful, descriptive names
-- Add comments explaining "why", not "what"
-- Keep interfaces small (1-3 methods)
-- Use snake_case for JSON tags
-- Mock external dependencies
-- Follow clean code principles
+**DO:** Dependency injection, explicit errors, apperror package, context.Context, logger.WithContext(ctx), tests immediately, snake_case JSON tags
 
-### NEVER DO:
-- Ignore errors silently
-- Use global variables
-- Mix concerns between layers
-- Hardcode configuration values
-- Store passwords in plain text
-- Log sensitive information
-- Mix unit and integration tests
-- Create test files without grouped subtests
-- Bypass AuthMiddleware on protected routes
-- Have complex setup in tests
+**DON'T:** Ignore errors, global variables, mix concerns, hardcode config, plain text passwords, log sensitive info, complex test setup
 
 ## Logging
 
-Use `logger.WithContext(ctx)` for all request-scoped logging. The `RequestIDMiddleware` automatically injects `request_id` into `ctx.Request.Context()`, so handlers just pass it through:
+Use `logger.WithContext(ctx)` for request-scoped logging (auto-includes request_id).
+Use plain `logger.Infof()` for startup/seeders.
 
-```go
-// In handlers: ctx.Request.Context() already has requestID from middleware
-handler.userService.DoSomething(ctx.Request.Context(), ...)
+> See `references/cheatsheet.md` for full logging patterns.
 
-// Handler-level logging
-logger.WithContext(ctx.Request.Context()).Errorf("Operation failed: %v", err)
+## Authentication
 
-// In services and repositories: use WithContext
-logger.WithContext(ctx).Infof("Processing user %d", userID)
-logger.WithContext(ctx).Errorf("Failed to update: %v", err)
-logger.WithContext(ctx).Warnf("Token expired for user %d", userID)
-
-// Add extra fields when needed
-logger.WithContext(ctx).WithField("user_id", userID).Infof("Profile updated")
-```
-
-For non-request-scoped logging (startup, seeders, migrations), use plain functions:
-```go
-logger.Infof("Server started on port %s", port)
-logger.Fatalf("Failed to connect to database: %v", err)
-```
-
-For structured logging outside request context (middleware, utilities), use package-level `WithField`/`WithFields`:
-```go
-logger.WithField("request_id", entry.RequestID).Infof("Request completed")
-logger.WithFields(logrus.Fields{"request_id": id, "component": "auth"}).Errorf("Auth failed")
-```
-
-## Authentication & Authorization
-
-**JWT Tokens:**
-- Generated by JWTService
-- Configurable expiration (default: 900s = 15 minutes)
-- Validated by AuthMiddleware on protected routes
-- Stored in Authorization header: `Bearer <token>`
-
-**Refresh Tokens:**
-- Generated during login
-- Stored in database via RefreshTokenRepository
-- Configurable expiration (default: 604800s = 7 days)
-- Used to obtain new JWT tokens
-
-**Middleware:**
-- AuthMiddleware validates JWT on protected routes
-- CorsMiddleware handles cross-origin requests
-- LogMiddleware logs all requests
-- EmptyBodyMiddleware handles empty request bodies
+- **JWT:** 15 min default, validated by AuthMiddleware
+- **Refresh Token:** 7 days default, stored in database
+- **Middleware:** Auth, CORS, Log, EmptyBody
 
 ## Environment Configuration
 
