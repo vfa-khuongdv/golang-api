@@ -187,12 +187,6 @@ If you need to start MySQL via Docker:
 docker-compose up -d mysql
 ```
 
-**Option 4: Start Docker for MySQL first**
-
-```bash
-docker-compose up -d mysql
-```
-
 ### 7. Database Management - PHPMyAdmin
 
 PHPMyAdmin is available for database management through a web interface:
@@ -207,13 +201,13 @@ The following environment variables are required for the application. See `.env.
 **Database Configuration:**
 - `DB_HOST` - MySQL database host (default: 127.0.0.1)
 - `DB_PORT` - MySQL port number (default: 3306)
-- `DB_USERNAME` - MySQL database username (default: user)
-- `DB_PASSWORD` - MySQL database password (default: password)
-- `DB_DATABASE` - MySQL database name (default: dbname)
+- `DB_USERNAME` - MySQL database username (default: db_user)
+- `DB_PASSWORD` - MySQL database password (default: db_password)
+- `DB_DATABASE` - MySQL database name (default: golang_dev)
 
 **Server Configuration:**
-- `APP_PORT` - Port number for the application server (default: 3000)
-- `GIN_MODE` - Gin mode ("debug" or "release", default: debug)
+- `PORT` - Port number for the application server (default: 3000)
+- `GIN_MODE` - Gin mode ("debug" or "release", default: release)
 - `STAGE` - Environment stage ("local", "dev", "prod", default: dev)
 
 **JWT Configuration:**

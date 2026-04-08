@@ -38,7 +38,7 @@ This project targets Go 1.22+ (minimum supported version).
 │   ├── models/                   # Data models
 │   ├── repositories/             # Data access layer
 │   ├── routes/                   # Route definitions
-│   ├── services/                 # Business logic layer
+│   ├── services/                 # Business logic layer    
 │   └── shared/                   # Shared utilities and helpers
 │       └── constants/            # Application constants
 │       └── dto/                  # Data transfer objects for shared use

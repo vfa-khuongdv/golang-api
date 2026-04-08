@@ -1,12 +1,18 @@
 package services
 
 import (
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
+)
+
+var (
+	ErrJWTKeyMissing  = errors.New("JWT_KEY environment variable is required")
+	ErrJWTKeyTooShort = errors.New("JWT_KEY must be at least 32 characters long for security")
 )
 
 const (
@@ -44,17 +50,17 @@ var (
 )
 
 // NewJWTService returns a new instance of jwtServiceImpl
-func NewJWTService() JWTService {
+func NewJWTService() (JWTService, error) {
 	secret := strings.TrimSpace(utils.GetEnv("JWT_KEY", ""))
 	if secret == "" {
-		panic("JWT_KEY environment variable is required")
+		return nil, ErrJWTKeyMissing
 	}
 	if len(secret) < 32 {
-		panic("JWT_KEY must be at least 32 characters long for security")
+		return nil, ErrJWTKeyTooShort
 	}
 	return &jwtServiceImpl{
 		secret: []byte(secret),
-	}
+	}, nil
 }
 
 // GenerateAccessToken creates a new access JWT token for the given user ID

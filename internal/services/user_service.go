@@ -39,7 +39,8 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 	user, err := service.repo.FindByField(ctx, "email", input.Email)
 	if err != nil {
 		appErr, isAppErr := apperror.ToAppError(err)
-		if isAppErr && appErr.Code == apperror.ErrUnauthorized {
+		if isAppErr && appErr.Code == apperror.ErrNotFound {
+			logger.WithContext(ctx).Warnf("Forgot password attempt for non-existent email: %s", input.Email)
 			return nil
 		}
 		logger.WithContext(ctx).Errorf("Forgot password failed for email %s: %v", input.Email, err)

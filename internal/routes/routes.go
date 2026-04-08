@@ -9,6 +9,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
 )
 
@@ -38,7 +39,10 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	bcryptService := services.NewBcryptService()
 	mailerService := services.NewMailerService()
 	userService := services.NewUserService(userRepo, bcryptService, mailerService)
-	jwtService := services.NewJWTService()
+	jwtService, err := services.NewJWTService()
+	if err != nil {
+		logger.Fatalf("Failed to initialize JWT service: %v", err)
+	}
 	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
 
 	// Initialize handlers

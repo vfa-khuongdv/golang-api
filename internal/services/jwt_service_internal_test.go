@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJWTService_InternalBranches(t *testing.T) {
@@ -17,7 +18,8 @@ func TestJWTService_InternalBranches(t *testing.T) {
 	})
 
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-purposes-only-32-chars")
-	svc := NewJWTService()
+	svc, err := NewJWTService()
+	require.NoError(t, err)
 
 	t.Run("GenerateAccessTokenSigningError", func(t *testing.T) {
 		signJWTToken = func(_ *jwt.Token, _ []byte) (string, error) {

@@ -152,7 +152,10 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-middleware-testing-32-chars")
 
-	jwtService := services.NewJWTService()
+	jwtService, err := services.NewJWTService()
+	if err != nil {
+		t.Fatalf("Failed to create JWT service: %v", err)
+	}
 
 	tests := []struct {
 		name               string
@@ -207,7 +210,10 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-middleware-testing-32-chars")
 
-	jwtService := services.NewJWTService()
+	jwtService, err := services.NewJWTService()
+	if err != nil {
+		t.Fatalf("Failed to create JWT service: %v", err)
+	}
 
 	accessTokenResult, err := jwtService.GenerateAccessToken(123)
 	assert.NoError(t, err)

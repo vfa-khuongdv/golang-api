@@ -15,14 +15,13 @@ func TestJWTService(t *testing.T) {
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-purposes-32-chars")
 
 	t.Run("GenerateAccessToken", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
 
-		// Generate an access token for user ID 456
 		result, err := svc.GenerateAccessToken(456)
 		require.NoError(t, err)
 		assert.NotEmpty(t, result.Token)
 
-		// Validate the token
 		claims, err := svc.ValidateToken(result.Token)
 		require.NoError(t, err)
 		assert.Equal(t, uint(456), claims.ID)
@@ -30,13 +29,12 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenWithScope_AccessToken", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
 
-		// Generate an access token
 		result, err := svc.GenerateAccessToken(123)
 		require.NoError(t, err)
 
-		// Validate with correct scope
 		claims, err := svc.ValidateTokenWithScope(result.Token, services.TokenScopeAccess)
 		require.NoError(t, err)
 		assert.Equal(t, uint(123), claims.ID)
@@ -44,13 +42,12 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateToken_InvalidToken", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
 
-		// Totally invalid token string
-		_, err := svc.ValidateToken("this.is.not.a.token")
+		_, err = svc.ValidateToken("this.is.not.a.token")
 		assert.Error(t, err)
 
-		// Token signed with different key
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &services.CustomClaims{
 			ID:    1,
 			Scope: services.TokenScopeAccess,
@@ -59,7 +56,6 @@ func TestJWTService(t *testing.T) {
 				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 		})
-		// Sign with a different secret
 		signedToken, err := token.SignedString([]byte("different_secret"))
 		require.NoError(t, err)
 
@@ -68,22 +64,23 @@ func TestJWTService(t *testing.T) {
 		assert.True(t, strings.Contains(err.Error(), "signature is invalid") || strings.Contains(err.Error(), "token is invalid"))
 	})
 
-	t.Run("NewJWTService_PanicWhenSecretEmpty", func(t *testing.T) {
+	t.Run("NewJWTService_ErrorWhenSecretEmpty", func(t *testing.T) {
 		t.Setenv("JWT_KEY", "   ")
-		assert.Panics(t, func() {
-			_ = services.NewJWTService()
-		})
+		_, err := services.NewJWTService()
+		assert.Error(t, err)
+		assert.Equal(t, services.ErrJWTKeyMissing, err)
 	})
 
-	t.Run("NewJWTService_PanicWhenSecretTooShort", func(t *testing.T) {
+	t.Run("NewJWTService_ErrorWhenSecretTooShort", func(t *testing.T) {
 		t.Setenv("JWT_KEY", "short")
-		assert.Panics(t, func() {
-			_ = services.NewJWTService()
-		})
+		_, err := services.NewJWTService()
+		assert.Error(t, err)
+		assert.Equal(t, services.ErrJWTKeyTooShort, err)
 	})
 
 	t.Run("ValidateTokenWithScope_Mismatch", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
 
 		result, err := svc.GenerateAccessToken(789)
 		require.NoError(t, err)
@@ -94,14 +91,17 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenWithScope_InvalidToken", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
+
 		claims, err := svc.ValidateTokenWithScope("invalid.token.value", services.TokenScopeAccess)
 		assert.Error(t, err)
 		assert.Nil(t, claims)
 	})
 
 	t.Run("ValidateTokenIgnoreExpiration_ExpiredTokenSuccess", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &services.CustomClaims{
 			ID:    21,
@@ -121,7 +121,9 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenIgnoreExpiration_InvalidToken", func(t *testing.T) {
-		svc := services.NewJWTService()
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
+
 		claims, err := svc.ValidateTokenIgnoreExpiration("invalid.token.value")
 		assert.Error(t, err)
 		assert.Nil(t, claims)

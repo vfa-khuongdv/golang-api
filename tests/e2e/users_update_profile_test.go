@@ -35,7 +35,10 @@ func TestUsersUpdateProfile(t *testing.T) {
 	db.Create(&testUser)
 
 	// Generate access token for test user
-	jwtService := services.NewJWTService()
+	jwtService, err := services.NewJWTService()
+	if err != nil {
+		t.Fatalf("Failed to create JWT service: %v", err)
+	}
 	tokenResult, err := jwtService.GenerateAccessToken(testUser.ID)
 	require.NoError(t, err)
 	accessToken := tokenResult.Token
