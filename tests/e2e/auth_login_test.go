@@ -93,4 +93,88 @@ func TestAuthLogin(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
 	})
+
+	t.Run("Login - User Not Found", func(t *testing.T) {
+		loginPayload := map[string]string{
+			"email":    "nonexistent@example.com",
+			"password": password,
+		}
+		payloadBytes, _ := json.Marshal(loginPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrInvalidPassword, errResp.Code)
+	})
+
+	t.Run("Login - Empty Email", func(t *testing.T) {
+		loginPayload := map[string]string{
+			"email":    "",
+			"password": password,
+		}
+		payloadBytes, _ := json.Marshal(loginPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Login - Empty Password", func(t *testing.T) {
+		loginPayload := map[string]string{
+			"email":    "test_login@example.com",
+			"password": "",
+		}
+		payloadBytes, _ := json.Marshal(loginPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Login - Invalid Email Format", func(t *testing.T) {
+		loginPayload := map[string]string{
+			"email":    "not-an-email",
+			"password": password,
+		}
+		payloadBytes, _ := json.Marshal(loginPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
 }

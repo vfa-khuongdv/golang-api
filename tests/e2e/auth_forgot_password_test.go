@@ -82,6 +82,26 @@ func TestAuthForgotPassword(t *testing.T) {
 		assert.Equal(t, "If your email is in our system, you will receive instructions to reset your password", resp["message"])
 	})
 
+	t.Run("Forgot Password - Empty Email", func(t *testing.T) {
+		payload := map[string]string{
+			"email": "",
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/forgot-password", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
 	t.Run("Forgot Password - Invalid Email Format", func(t *testing.T) {
 		payload := map[string]string{
 			"email": "invalid-email",

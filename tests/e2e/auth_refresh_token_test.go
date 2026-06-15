@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,5 +111,113 @@ func TestAuthRefreshToken(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Refresh Token - Missing AccessToken", func(t *testing.T) {
+		refreshPayload := map[string]string{
+			"refresh_token": refreshToken,
+		}
+		payloadBytes, _ := json.Marshal(refreshPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Refresh Token - Both Tokens Missing", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer([]byte(`{}`)))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Refresh Token - Expired Refresh Token", func(t *testing.T) {
+		expiredRefresh := models.RefreshToken{
+			RefreshToken: "expired-refresh-token",
+			IpAddress:    "127.0.0.1",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Add(-1 * time.Hour).Unix(),
+			UserID:       user.ID,
+		}
+		db.Create(&expiredRefresh)
+
+		refreshPayload := map[string]string{
+			"refresh_token": "expired-refresh-token",
+			"access_token":  accessToken,
+		}
+		payloadBytes, _ := json.Marshal(refreshPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrUnauthorized, errResp.Code)
+	})
+
+	t.Run("Refresh Token - Token Mismatch", func(t *testing.T) {
+		otherUser := models.User{
+			Name:     "Other User",
+			Email:    "other@example.com",
+			Password: hashedPassword,
+			Gender:   1,
+		}
+		db.Create(&otherUser)
+
+		otherLoginPayload := map[string]string{
+			"email":    "other@example.com",
+			"password": password,
+		}
+		otherPayloadBytes, _ := json.Marshal(otherLoginPayload)
+		otherW := httptest.NewRecorder()
+		otherReq, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(otherPayloadBytes))
+		otherReq.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(otherW, otherReq)
+		require.Equal(t, http.StatusOK, otherW.Code)
+
+		var otherLogin dto.LoginResponse
+		json.Unmarshal(otherW.Body.Bytes(), &otherLogin)
+
+		refreshPayload := map[string]string{
+			"refresh_token": otherLogin.RefreshToken.Token,
+			"access_token":  accessToken,
+		}
+		payloadBytes, _ := json.Marshal(refreshPayload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrUnauthorized, errResp.Code)
 	})
 }

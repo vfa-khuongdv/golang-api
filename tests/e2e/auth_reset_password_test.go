@@ -79,6 +79,82 @@ func TestAuthResetPassword(t *testing.T) {
 		assert.Equal(t, apperror.ErrNotFound, errResp.Code)
 	})
 
+	t.Run("Reset Password - Missing Token", func(t *testing.T) {
+		payload := map[string]string{
+			"new_password": "newpassword123",
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/reset-password", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Reset Password - Missing NewPassword", func(t *testing.T) {
+		payload := map[string]string{
+			"token": token,
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/reset-password", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Reset Password - Both Fields Missing", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/reset-password", bytes.NewBuffer([]byte(`{}`)))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
+	t.Run("Reset Password - Password Too Short", func(t *testing.T) {
+		payload := map[string]string{
+			"token":        token,
+			"new_password": "123",
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/reset-password", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
+	})
+
 	t.Run("Reset Password - Expired Token", func(t *testing.T) {
 		expiredToken := "expired_token"
 		expiredTime := time.Now().Add(-time.Hour).Unix()

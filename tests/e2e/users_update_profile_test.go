@@ -225,6 +225,17 @@ func TestUsersUpdateProfile(t *testing.T) {
 		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
 	})
 
+	t.Run("Update Profile - Empty Body", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBuffer([]byte(`{}`)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
+
 	t.Run("Update Profile - Unauthorized without Token", func(t *testing.T) {
 		payload := map[string]interface{}{
 			"name": "Unauthorized Update",
