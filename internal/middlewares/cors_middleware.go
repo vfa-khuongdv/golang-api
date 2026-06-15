@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 )
 
 // CORSMiddleware handles Cross-Origin Resource Sharing (CORS)
@@ -14,7 +14,7 @@ import (
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigins := utils.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+		allowedOrigins := configs.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 
 		// Check if origin is allowed and set appropriate headers
 		if isOriginAllowed(origin, allowedOrigins) {

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
-	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 )
 
 var (
@@ -51,7 +51,7 @@ var (
 
 // NewJWTService returns a new instance of jwtServiceImpl
 func NewJWTService() (JWTService, error) {
-	secret := strings.TrimSpace(utils.GetEnv("JWT_KEY", ""))
+	secret := strings.TrimSpace(configs.GetEnv("JWT_KEY", ""))
 	if secret == "" {
 		return nil, ErrJWTKeyMissing
 	}

@@ -4,24 +4,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
-	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
 )
 
 func SetupRouter(db *gorm.DB) *gin.Engine {
-	// Set Gin mode from environment variable
-	ginMode := utils.GetEnv("GIN_MODE", "release")
+	ginMode := configs.GetEnv("GIN_MODE", "release")
 	gin.SetMode(ginMode)
 
 	// Initialize the new Gin router
 	router := gin.New()
 
-	stage := utils.GetEnv("STAGE", "dev")
+	stage := configs.GetEnv("STAGE", "dev")
 
 	// Set up Swagger documentation only in non-production environments
 	if stage != "prod" {
@@ -58,6 +57,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	)
 
 	router.GET("/healthz", handlers.HealthCheck)
+	router.GET("/api/v1/version", handlers.VersionInfo)
 
 	// Setup API routes
 	api := router.Group("/api/v1")

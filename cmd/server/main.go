@@ -17,24 +17,22 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	cfg    *configs.Config
+	server *http.Server
+)
+
 func initializeDatabase() *gorm.DB {
-	config := configs.DatabaseConfig{
-		Host:     utils.GetEnv("DB_HOST", "127.0.0.1"),
-		Port:     utils.GetEnv("DB_PORT", "3306"),
-		User:     utils.GetEnv("DB_USERNAME", ""),
-		Password: utils.GetEnv("DB_PASSWORD", ""),
-		DBName:   utils.GetEnv("DB_DATABASE", ""),
-	}
-	return configs.InitDB(config)
+	return configs.InitDB(cfg.Database)
 }
 
 func runMigrations() {
 	sqlConfig := migrator.MySQLConfig{
-		Host:     utils.GetEnv("DB_HOST", "127.0.0.1"),
-		Port:     utils.GetEnv("DB_PORT", "3306"),
-		User:     utils.GetEnv("DB_USERNAME", ""),
-		Password: utils.GetEnv("DB_PASSWORD", ""),
-		DBName:   utils.GetEnv("DB_DATABASE", ""),
+		Host:     cfg.Database.Host,
+		Port:     cfg.Database.Port,
+		User:     cfg.Database.User,
+		Password: cfg.Database.Password,
+		DBName:   cfg.Database.DBName,
 	}
 	dsn := migrator.NewMySQLDSN(sqlConfig)
 
@@ -52,8 +50,11 @@ func runMigrations() {
 }
 
 func main() {
-	// Load environment variables
-	configs.LoadEnv()
+	var err error
+	cfg, err = configs.Load()
+	if err != nil {
+		logger.Fatalf("Config validation failed: %v", err)
+	}
 
 	// Initialize logger
 	logger.Init()
@@ -62,8 +63,7 @@ func main() {
 	db := initializeDatabase()
 
 	// Run migrations
-	isRunMigrate := utils.GetEnv("RUN_MIGRATE", "false")
-	if isRunMigrate == "true" {
+	if cfg.App.RunMigrate {
 		runMigrations()
 	}
 
@@ -74,15 +74,15 @@ func main() {
 	utils.InitValidator()
 
 	// Start server
-	port := fmt.Sprintf(":%s", utils.GetEnv("PORT", "3000"))
-	srv := &http.Server{
+	port := fmt.Sprintf(":%s", cfg.Server.Port)
+	server = &http.Server{
 		Addr:    port,
 		Handler: router,
 	}
 
 	go func() {
 		logger.Infof("Server starting on %s", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalf("Failed to start server: %v", err)
 		}
 	}()
@@ -95,7 +95,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(ctx); err != nil {
 		logger.Fatalf("Server forced to shutdown: %v", err)
 	}
 	logger.Infof("Server exited")

@@ -4,6 +4,7 @@
     "title": "Golang CMS API",
     "description": "A comprehensive content management system API built with Go, featuring user authentication, multi-factor authentication (MFA), and user management.",
     "version": "1.0.0",
+    "x-api-version": "v1",
     "contact": {
       "name": "API Support",
       "email": "support@example.com"
@@ -38,6 +39,41 @@
     }
   ],
   "paths": {
+    "/api/v1/version": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "API version info",
+        "description": "Returns the API version, build time, and uptime",
+        "operationId": "versionInfo",
+        "responses": {
+          "200": {
+            "description": "Version information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "build_time": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-06-15T10:00:00Z"
+                    },
+                    "uptime": {
+                      "type": "string",
+                      "example": "1h30m15s"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": ["Health"],

@@ -6,7 +6,7 @@ import (
 	"html/template"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
+	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/mailer"
 )
@@ -33,11 +33,11 @@ func NewMailerService() MailerService {
 func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 
 	var config = mailer.GomailSenderConfig{
-		Host:     utils.GetEnv("MAIL_HOST", "smtp.gmail.com"),
-		Port:     utils.GetEnvAsInt("MAIL_PORT", 587),
-		Username: utils.GetEnv("MAIL_USERNAME", ""),
-		Password: utils.GetEnv("MAIL_PASSWORD", ""),
-		From:     utils.GetEnv("MAIL_FROM", ""),
+		Host:     configs.GetEnv("MAIL_HOST", "smtp.gmail.com"),
+		Port:     configs.GetEnvAsInt("MAIL_PORT", 587),
+		Username: configs.GetEnv("MAIL_USERNAME", ""),
+		Password: configs.GetEnv("MAIL_PASSWORD", ""),
+		From:     configs.GetEnv("MAIL_FROM", ""),
 	}
 
 	sender := newEmailSender(mailer.GomailSenderConfig{
@@ -53,7 +53,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	url := utils.GetEnv("FRONTEND_URL", "") + "/reset-password?token=" + *user.Token
+	url := configs.GetEnv("FRONTEND_URL", "") + "/reset-password?token=" + *user.Token
 
 	data := map[string]interface{}{
 		"Name": user.Name,

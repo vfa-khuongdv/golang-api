@@ -26,3 +26,21 @@ func TestHealthCheck(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "healthy", response["status"])
 }
+
+func TestVersionInfo(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mockRouter := gin.Default()
+	mockRouter.GET("/version", handlers.VersionInfo)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/version", nil)
+	mockRouter.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "1.0.0", response["version"])
+	assert.NotEmpty(t, response["build_time"])
+	assert.NotEmpty(t, response["uptime"])
+}
