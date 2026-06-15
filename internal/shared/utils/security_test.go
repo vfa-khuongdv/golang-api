@@ -563,23 +563,23 @@ func TestCensorSensitiveData(t *testing.T) {
 		}
 
 		// First call - builds cache
-		input1 := map[string]string{"username": "user1", "password": "pass1"}
+		input1 := User{Username: "user1", Password: "pass1"}
 		result1 := utils.CensorSensitiveData(input1, maskFields)
 		assert.NotNil(t, result1)
 
 		// Second call with same maskFields - should use cache
-		input2 := map[string]string{"username": "user2", "token": "token123"}
+		input2 := User{Username: "user2", Password: "token123"}
 		result2 := utils.CensorSensitiveData(input2, maskFields)
 		assert.NotNil(t, result2)
 
 		// Verify both results are correctly censored
-		r1 := result1.(map[string]string)
-		r2 := result2.(map[string]string)
+		r1 := result1.(User)
+		r2 := result2.(User)
 
-		assert.Contains(t, r1["password"], "*")
-		assert.Equal(t, "user1", r1["username"])
-		assert.Contains(t, r2["token"], "*")
-		assert.Equal(t, "user2", r2["username"])
+		assert.Contains(t, r1.Password, "*")
+		assert.Equal(t, "user1", r1.Username)
+		assert.Contains(t, r2.Password, "*")
+		assert.Equal(t, "user2", r2.Username)
 	})
 
 	t.Run("Test with interface{} values in map", func(t *testing.T) {
