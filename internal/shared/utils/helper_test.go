@@ -39,7 +39,7 @@ func TestGetUserIDFromContext(t *testing.T) {
 		// Assert
 		require.Error(t, err)
 		assert.Equal(t, uint(0), userID)
-		assert.EqualError(t, err, "User ID not found in context")
+		assert.EqualError(t, err, "user ID not found in context")
 	})
 
 	t.Run("GetUserIDFromContext - Invalid Type", func(t *testing.T) {
@@ -55,6 +55,6 @@ func TestGetUserIDFromContext(t *testing.T) {
 		// Assert
 		require.Error(t, err)
 		assert.Equal(t, uint(0), userID)
-		assert.EqualError(t, err, "User ID in context has invalid type")
+		assert.EqualError(t, err, "user ID in context has invalid type")
 	})
 }

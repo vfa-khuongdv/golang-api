@@ -51,7 +51,7 @@ func CensorSensitiveData(data any, maskFields []string) any {
 		return censorMap(data, maskFields)
 	case reflect.Struct:
 		return censorStruct(data, maskFields)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if val.IsNil() {
 			return nil
 		}
@@ -122,7 +122,7 @@ func censorStruct(data any, maskFields []string) any {
 
 		if containsSensitiveKey(maskFields, fieldType.Name) {
 			// Field needs to be masked
-			if field.Kind() == reflect.Ptr {
+			if field.Kind() == reflect.Pointer {
 				if field.IsNil() {
 					censoredStruct.Field(i).Set(reflect.Zero(field.Type()))
 				} else {
@@ -139,7 +139,7 @@ func censorStruct(data any, maskFields []string) any {
 		} else {
 			// Field does not need to be masked, process recursively
 			censoredValue := CensorSensitiveData(field.Interface(), maskFields)
-			if field.Kind() == reflect.Ptr {
+			if field.Kind() == reflect.Pointer {
 				if field.IsNil() {
 					censoredStruct.Field(i).Set(reflect.Zero(field.Type()))
 				} else {

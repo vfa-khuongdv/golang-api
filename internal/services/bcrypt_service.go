@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,8 +18,6 @@ func NewBcryptService() BcryptService {
 	return &bcryptServiceImpl{}
 }
 
-// HashPassword hashes a password using bcrypt with the default cost
-// Returns the hashed password as a string, or an error if hashing fails
 func (s *bcryptServiceImpl) HashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -27,15 +26,10 @@ func (s *bcryptServiceImpl) HashPassword(password string) (string, error) {
 	return string(hashedPassword), nil
 }
 
-// CheckPasswordHash compares a plain text password with a hashed password
-// Returns true if they match, false otherwise
 func (s *bcryptServiceImpl) CheckPasswordHash(password, hashPassword string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashPassword), []byte(password))
-	return err == nil
+	return utils.CheckPasswordHash(password, hashPassword)
 }
 
-// HashPasswordWithCost hashes a password using bcrypt with a specified cost
-// Returns the hashed password as a string, or an error if hashing fails
 func (s *bcryptServiceImpl) HashPasswordWithCost(password string, cost int) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {

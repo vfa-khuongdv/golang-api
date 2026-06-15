@@ -94,7 +94,7 @@ func TranslateValidationErrors(err error, obj any) *apperror.ValidationError {
 
 	// Reflect type for JSON tag lookup
 	objType := reflect.TypeOf(obj)
-	if objType.Kind() == reflect.Ptr {
+	if objType.Kind() == reflect.Pointer {
 		objType = objType.Elem()
 	}
 
@@ -138,7 +138,7 @@ func TranslateValidationErrors(err error, obj any) *apperror.ValidationError {
 
 			currType = field.Type
 			// Dereference pointers
-			for currType.Kind() == reflect.Ptr {
+			for currType.Kind() == reflect.Pointer {
 				currType = currType.Elem()
 			}
 			// If slice or array, go to element type

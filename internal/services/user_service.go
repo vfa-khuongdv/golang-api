@@ -103,17 +103,17 @@ func (service *userServiceImpl) ChangePassword(ctx context.Context, userId uint,
 		return nil, apperror.NewInvalidPasswordError("Old password is incorrect")
 	}
 
-	newPassword, err := service.bcryptService.HashPassword(input.NewPassword)
-	if err != nil {
-		return nil, apperror.NewPasswordHashFailedError("Failed to hash new password")
-	}
-
 	if input.NewPassword != input.ConfirmPassword {
 		return nil, apperror.NewPasswordMismatchError("New password and confirm password do not match")
 	}
 
 	if input.OldPassword == input.NewPassword {
 		return nil, apperror.NewPasswordUnchangedError("New password must be different from old password")
+	}
+
+	newPassword, err := service.bcryptService.HashPassword(input.NewPassword)
+	if err != nil {
+		return nil, apperror.NewPasswordHashFailedError("Failed to hash new password")
 	}
 
 	user.Password = newPassword

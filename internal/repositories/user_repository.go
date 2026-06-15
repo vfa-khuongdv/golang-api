@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"net/http"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
@@ -39,13 +40,13 @@ func (repo *userRepositoryImpl) GetUsers(ctx context.Context, page, limit int) (
 
 	if err := db.Model(&models.User{}).Count(&totalRows).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to count users: %v", err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to count users", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to count users", err)
 	}
 
 	var users []*models.User
 	if err := db.Offset(offset).Limit(limit).Order("id DESC").Find(&users).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to fetch users: %v", err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch users", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch users", err)
 	}
 
 	pagination := &dto.Pagination[*models.User]{
@@ -62,7 +63,7 @@ func (repo *userRepositoryImpl) GetAll(ctx context.Context) ([]*models.User, err
 	var users []*models.User
 	if err := repo.db.WithContext(ctx).Find(&users).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to fetch users: %v", err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch users", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch users", err)
 	}
 	return users, nil
 }
@@ -71,10 +72,10 @@ func (repo *userRepositoryImpl) GetByID(ctx context.Context, id uint) (*models.U
 	var user models.User
 	if err := repo.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.New(apperror.ErrNotFound, 1001, "User not found")
+			return nil, apperror.New(http.StatusNotFound, apperror.ErrNotFound, "User not found")
 		}
 		logger.WithContext(ctx).Errorf("DB error: failed to fetch user by id %d: %v", id, err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch user", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch user", err)
 	}
 	return &user, nil
 }
@@ -82,7 +83,7 @@ func (repo *userRepositoryImpl) GetByID(ctx context.Context, id uint) (*models.U
 func (repo *userRepositoryImpl) Create(ctx context.Context, user *models.User) (*models.User, error) {
 	if err := repo.db.WithContext(ctx).Create(user).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to create user: %v", err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to create user", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to create user", err)
 	}
 	return user, nil
 }
@@ -90,7 +91,7 @@ func (repo *userRepositoryImpl) Create(ctx context.Context, user *models.User) (
 func (repo *userRepositoryImpl) CreateWithTx(ctx context.Context, tx *gorm.DB, user *models.User) (*models.User, error) {
 	if err := tx.WithContext(ctx).Create(user).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to create user with tx: %v", err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to create user", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to create user", err)
 	}
 	return user, nil
 }
@@ -98,7 +99,7 @@ func (repo *userRepositoryImpl) CreateWithTx(ctx context.Context, tx *gorm.DB, u
 func (repo *userRepositoryImpl) Update(ctx context.Context, user *models.User) error {
 	if err := repo.db.WithContext(ctx).Save(user).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to update user id %d: %v", user.ID, err)
-		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to update user", err)
+		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update user", err)
 	}
 	return nil
 }
@@ -107,7 +108,7 @@ func (repo *userRepositoryImpl) Delete(ctx context.Context, userId uint) error {
 	var user models.User
 	if err := repo.db.WithContext(ctx).Delete(&user, userId).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to delete user id %d: %v", userId, err)
-		return apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to delete user", err)
+		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to delete user", err)
 	}
 	return nil
 }
@@ -120,16 +121,16 @@ func (repo *userRepositoryImpl) FindByField(ctx context.Context, field string, v
 	}
 
 	if !allowedFields[field] {
-		return nil, apperror.New(apperror.ErrBadRequest, 1002, "Invalid field")
+		return nil, apperror.New(http.StatusBadRequest, apperror.ErrBadRequest, "Invalid field")
 	}
 
 	var user models.User
 	if err := repo.db.WithContext(ctx).Where(field+" = ?", value).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.New(apperror.ErrUnauthorized, 1003, "User not found")
+			return nil, apperror.New(http.StatusNotFound, apperror.ErrNotFound, "User not found")
 		}
 		logger.WithContext(ctx).Errorf("DB error: failed to fetch user by field %s: %v", field, err)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to fetch user", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch user", err)
 	}
 	return &user, nil
 }
@@ -138,7 +139,7 @@ func (repo *userRepositoryImpl) BeginTx(ctx context.Context) (*gorm.DB, error) {
 	tx := repo.db.WithContext(ctx).Begin()
 	if tx.Error != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to begin transaction: %v", tx.Error)
-		return nil, apperror.Wrap(apperror.ErrInternalServer, 500, "Failed to begin transaction", tx.Error)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to begin transaction", tx.Error)
 	}
 	return tx, nil
 }

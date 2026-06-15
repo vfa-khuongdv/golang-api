@@ -402,7 +402,7 @@ func TestLogMiddleware_Concurrent(t *testing.T) {
 
 	r.POST("/concurrent", func(c *gin.Context) {
 		var req map[string]interface{}
-		c.ShouldBindJSON(&req)
+		_ = c.ShouldBindJSON(&req)
 		c.JSON(http.StatusOK, gin.H{"id": req["id"]})
 	})
 
@@ -456,9 +456,9 @@ func TestLogMiddleware_PUTandPATCH(t *testing.T) {
 			r.Use(LogMiddleware())
 
 			r.Handle(tt.method, "/resource", func(c *gin.Context) {
-				var req map[string]interface{}
-				c.ShouldBindJSON(&req)
-				c.JSON(http.StatusOK, gin.H{"updated": true})
+			var req map[string]interface{}
+			_ = c.ShouldBindJSON(&req)
+			c.JSON(http.StatusOK, gin.H{"updated": true})
 			})
 
 			reqBody := map[string]interface{}{"password": "secret123"}

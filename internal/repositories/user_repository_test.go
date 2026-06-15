@@ -418,7 +418,7 @@ func TestUserRepository(t *testing.T) {
 				}
 			}
 		})
-		defer db.Callback().Query().Remove("force_find_error_only")
+		defer func() { _ = db.Callback().Query().Remove("force_find_error_only") }()
 
 		_, err := repo.GetUsers(context.Background(), 1, 10)
 		assert.Error(t, err)

@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -160,7 +161,7 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 
 	s.T().Run("UserNotFound", func(t *testing.T) {
 		email := "unknown@example.com"
-		s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), apperror.New(apperror.ErrUnauthorized, 1003, "User not found")).Once()
+		s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), apperror.New(http.StatusNotFound, apperror.ErrNotFound, "User not found")).Once()
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 

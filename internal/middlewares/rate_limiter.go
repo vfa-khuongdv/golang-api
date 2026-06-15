@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -11,41 +12,85 @@ import (
 )
 
 type rateLimiter struct {
-	requests map[string][]time.Time
-	mu       sync.Mutex
-	limit    int
-	window   time.Duration
+	requests        map[string][]time.Time
+	mu              sync.Mutex
+	limit           int
+	window          time.Duration
+	cleanupInterval time.Duration
+	stopCh          chan struct{}
 }
 
 func newRateLimiter(limit int, window time.Duration) *rateLimiter {
-	return &rateLimiter{
-		requests: make(map[string][]time.Time),
-		limit:    limit,
-		window:   window,
+	rl := &rateLimiter{
+		requests:        make(map[string][]time.Time),
+		limit:           limit,
+		window:          window,
+		cleanupInterval: window * 2,
+		stopCh:          make(chan struct{}),
+	}
+	go rl.cleanupLoop()
+	return rl
+}
+
+func (rl *rateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(rl.cleanupInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			rl.cleanup()
+		case <-rl.stopCh:
+			return
+		}
 	}
 }
 
-func (rl *rateLimiter) isAllowed(key string) bool {
+func (rl *rateLimiter) cleanup() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	windowStart := time.Now().Add(-rl.window)
+	for key, timestamps := range rl.requests {
+		valid := timestamps[:0]
+		for _, t := range timestamps {
+			if t.After(windowStart) {
+				valid = append(valid, t)
+			}
+		}
+		if len(valid) == 0 {
+			delete(rl.requests, key)
+		} else {
+			rl.requests[key] = valid
+		}
+	}
+}
+
+func (rl *rateLimiter) allow(key string) (bool, int, int64) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	now := time.Now()
 	windowStart := now.Add(-rl.window)
 
-	var validRequests []time.Time
+	valid := rl.requests[key][:0]
 	for _, t := range rl.requests[key] {
 		if t.After(windowStart) {
-			validRequests = append(validRequests, t)
+			valid = append(valid, t)
 		}
 	}
 
-	if len(validRequests) >= rl.limit {
-		rl.requests[key] = validRequests
-		return false
+	remaining := rl.limit - len(valid)
+	if remaining <= 0 {
+		rl.requests[key] = valid
+		reset := windowStart.Unix()
+		if len(valid) > 0 {
+			reset = valid[0].Add(rl.window).Unix()
+		}
+		return false, 0, reset
 	}
 
-	rl.requests[key] = append(validRequests, now)
-	return true
+	rl.requests[key] = append(valid, now)
+	return true, remaining - 1, now.Add(rl.window).Unix()
 }
 
 func RateLimiter(limit int, window time.Duration) gin.HandlerFunc {
@@ -53,7 +98,13 @@ func RateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		key := ctx.ClientIP()
 
-		if !limiter.isAllowed(key) {
+		allowed, remaining, reset := limiter.allow(key)
+
+		ctx.Header("X-RateLimit-Limit", strconv.Itoa(limit))
+		ctx.Header("X-RateLimit-Remaining", strconv.Itoa(remaining))
+		ctx.Header("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
+
+		if !allowed {
 			utils.RespondWithError(ctx, apperror.New(
 				http.StatusTooManyRequests,
 				429,
