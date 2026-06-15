@@ -80,4 +80,14 @@ func TestUsersGetProfile(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
+
+	t.Run("Get Profile - Expired Token", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/api/v1/profile", nil)
+		req.Header.Set("Authorization", "Bearer "+generateExpiredToken(1))
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
 }

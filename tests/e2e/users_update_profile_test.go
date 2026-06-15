@@ -239,4 +239,20 @@ func TestUsersUpdateProfile(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
+
+	t.Run("Update Profile - Expired Token", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"name": "Expired Token Update",
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+generateExpiredToken(1))
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
 }

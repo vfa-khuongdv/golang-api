@@ -196,4 +196,22 @@ func TestUsersChangePassword(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
+
+	t.Run("Change Password - Expired Token", func(t *testing.T) {
+		payload := map[string]string{
+			"old_password":     "newpassword123",
+			"new_password":     "anotherpassword",
+			"confirm_password": "anotherpassword",
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+generateExpiredToken(1))
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
 }
