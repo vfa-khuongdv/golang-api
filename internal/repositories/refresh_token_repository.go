@@ -16,7 +16,9 @@ type RefreshTokenRepository interface {
 	Create(ctx context.Context, token *models.RefreshToken) error
 	Update(ctx context.Context, token *models.RefreshToken) error
 	FindByToken(ctx context.Context, token string) (*models.RefreshToken, error)
-	UpdateWithTx(ctx context.Context, token *models.RefreshToken, tx *gorm.DB) error
+	FindByTokenWithTx(ctx context.Context, tx *gorm.DB, token string) (*models.RefreshToken, error)
+	UpdateWithTx(ctx context.Context, tx *gorm.DB, token *models.RefreshToken) error
+	BeginTx(ctx context.Context) (*gorm.DB, error)
 }
 
 type refreshTokenRepositoryImpl struct {
@@ -55,10 +57,31 @@ func (repo *refreshTokenRepositoryImpl) Update(ctx context.Context, token *model
 	return nil
 }
 
-func (repo *refreshTokenRepositoryImpl) UpdateWithTx(ctx context.Context, token *models.RefreshToken, tx *gorm.DB) error {
+func (repo *refreshTokenRepositoryImpl) FindByTokenWithTx(ctx context.Context, tx *gorm.DB, token string) (*models.RefreshToken, error) {
+	var refreshToken models.RefreshToken
+	if err := tx.WithContext(ctx).Where("refresh_token = ? and expired_at > ?", token, time.Now().Unix()).First(&refreshToken).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.New(http.StatusNotFound, apperror.ErrNotFound, "Refresh token not found or expired")
+		}
+		logger.WithContext(ctx).Errorf("DB error: failed to fetch refresh token: %v", err)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch refresh token", err)
+	}
+	return &refreshToken, nil
+}
+
+func (repo *refreshTokenRepositoryImpl) UpdateWithTx(ctx context.Context, tx *gorm.DB, token *models.RefreshToken) error {
 	if err := tx.WithContext(ctx).Save(token).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to update refresh token with tx: %v", err)
 		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update refresh token", err)
 	}
 	return nil
+}
+
+func (repo *refreshTokenRepositoryImpl) BeginTx(ctx context.Context) (*gorm.DB, error) {
+	tx := repo.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		logger.WithContext(ctx).Errorf("DB error: failed to begin transaction: %v", tx.Error)
+		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to begin transaction", tx.Error)
+	}
+	return tx, nil
 }

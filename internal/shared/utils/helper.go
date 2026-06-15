@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	ErrUserIDNotFound      = errors.New("user ID not found in context")
-	ErrUserIDInvalidType   = errors.New("user ID in context has invalid type")
+	ErrUserIDNotFound    = errors.New("user ID not found in context")
+	ErrUserIDInvalidType = errors.New("user ID in context has invalid type")
 )
 
 func GetUserIDFromContext(ctx *gin.Context) (uint, error) {

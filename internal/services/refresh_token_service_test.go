@@ -10,8 +10,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
+	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type RefreshTokenServiceTestSuite struct {
@@ -48,61 +51,87 @@ func (s *RefreshTokenServiceTestSuite) TestCreate() {
 	})
 
 	s.T().Run("Error", func(t *testing.T) {
-		s.repo = new(mocks.MockRefreshTokenRepository) // reset
-		s.refreshTokenService = services.NewRefreshTokenService(s.repo)
+		mockRepo := new(mocks.MockRefreshTokenRepository)
+		mockRepo.On("Create", mock.Anything, mock.Anything).Return(originErrors.New("database error"))
+		svc := services.NewRefreshTokenService(mockRepo)
 
-		s.repo.On("Create", mock.Anything, mock.Anything).Return(originErrors.New("database error"))
-		_, err := s.refreshTokenService.Create(context.Background(), user, ipAddress)
+		_, err := svc.Create(context.Background(), user, ipAddress)
 		assert.Error(t, err)
-		s.repo.AssertExpectations(t)
+		mockRepo.AssertExpectations(t)
 	})
 }
 
 func (s *RefreshTokenServiceTestSuite) TestUpdate() {
-	originalToken := &models.RefreshToken{
-		RefreshToken: "existing_token",
-		IpAddress:    "",
-		UsedCount:    0,
-		ExpiredAt:    0,
-		UserID:       1,
-	}
-
 	s.T().Run("Success", func(t *testing.T) {
-		s.repo.On("FindByToken", mock.Anything, "existing_token").Return(originalToken, nil).Once()
-		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		assert.NoError(t, err)
+		err = db.AutoMigrate(&models.RefreshToken{})
+		assert.NoError(t, err)
 
-		result, err := s.refreshTokenService.Update(context.Background(), "existing_token", "127.0.0.2")
+		repo := repositories.NewRefreshTokenRepository(db)
+		svc := services.NewRefreshTokenService(repo)
+
+		orig := &models.RefreshToken{
+			RefreshToken: "existing_token",
+			IpAddress:    "",
+			UsedCount:    0,
+			ExpiredAt:    9999999999,
+			UserID:       1,
+		}
+		assert.NoError(t, repo.Create(context.Background(), orig))
+
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.2")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, originalToken.UserID, result.UserId)
+		assert.Equal(t, uint(1), result.UserId)
 		assert.Len(t, result.Token.Token, 60)
 		assert.Greater(t, result.Token.ExpiresAt, int64(0))
-
-		s.repo.AssertExpectations(t)
 	})
 
 	s.T().Run("TokenNotFound", func(t *testing.T) {
-		s.repo.On("FindByToken", mock.Anything, "missing_token").Return((*models.RefreshToken)(nil), assert.AnError).Once()
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		assert.NoError(t, err)
+		err = db.AutoMigrate(&models.RefreshToken{})
+		assert.NoError(t, err)
 
-		result, err := s.refreshTokenService.Update(context.Background(), "missing_token", "127.0.0.1")
+		repo := repositories.NewRefreshTokenRepository(db)
+		svc := services.NewRefreshTokenService(repo)
+
+		result, err := svc.Update(context.Background(), "missing_token", "127.0.0.1")
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
-
-		s.repo.AssertExpectations(t)
 	})
 
-	s.T().Run("Error", func(t *testing.T) {
-		s.repo.On("FindByToken", mock.Anything, "existing_token").Return(originalToken, nil).Once()
-		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(originErrors.New("Update item error")).Once()
+	s.T().Run("UpdateError", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		assert.NoError(t, err)
+		db = db.Debug()
+		err = db.AutoMigrate(&models.RefreshToken{})
+		assert.NoError(t, err)
 
-		result, err := s.refreshTokenService.Update(context.Background(), "existing_token", "127.0.0.1")
+		repo := repositories.NewRefreshTokenRepository(db)
+		svc := services.NewRefreshTokenService(repo)
+
+		orig := &models.RefreshToken{
+			RefreshToken: "existing_token",
+			IpAddress:    "",
+			UsedCount:    0,
+			ExpiredAt:    9999999999,
+			UserID:       1,
+		}
+		assert.NoError(t, repo.Create(context.Background(), orig))
+
+		// Force a tx error by closing the underlying connection
+		sqlDB, errr := db.DB()
+		assert.NoError(t, errr)
+		_ = sqlDB.Close()
+
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
-
-		s.repo.AssertExpectations(t)
 	})
 }
 

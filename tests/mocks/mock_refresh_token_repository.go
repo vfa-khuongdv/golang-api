@@ -27,7 +27,17 @@ func (m *MockRefreshTokenRepository) FindByToken(ctx context.Context, token stri
 	return args.Get(0).(*models.RefreshToken), args.Error(1)
 }
 
-func (m *MockRefreshTokenRepository) UpdateWithTx(ctx context.Context, token *models.RefreshToken, tx *gorm.DB) error {
-	args := m.Called(ctx, token, tx)
+func (m *MockRefreshTokenRepository) UpdateWithTx(ctx context.Context, tx *gorm.DB, token *models.RefreshToken) error {
+	args := m.Called(ctx, tx, token)
 	return args.Error(0)
+}
+
+func (m *MockRefreshTokenRepository) FindByTokenWithTx(ctx context.Context, tx *gorm.DB, token string) (*models.RefreshToken, error) {
+	args := m.Called(ctx, tx, token)
+	return args.Get(0).(*models.RefreshToken), args.Error(1)
+}
+
+func (m *MockRefreshTokenRepository) BeginTx(ctx context.Context) (*gorm.DB, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*gorm.DB), args.Error(1)
 }

@@ -58,9 +58,18 @@ type RefreshTokenResult struct {
 }
 
 func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString string, ipAddress string) (*RefreshTokenResult, error) {
-	result, err := service.repo.FindByToken(ctx, tokenString)
+	tx, err := service.repo.BeginTx(ctx)
 	if err != nil {
-		return nil, apperror.NewNotFoundError("Refresh token not found or expired")
+		logger.WithContext(ctx).Errorf("Failed to begin transaction: %v", err)
+		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
+	}
+
+	result, err := service.repo.FindByTokenWithTx(ctx, tx, tokenString)
+	if err != nil {
+		if rerr := tx.Rollback().Error; rerr != nil {
+			logger.WithContext(ctx).Errorf("Rollback failed: %v", rerr)
+		}
+		return nil, err
 	}
 
 	newToken := utils.GenerateRandomString(60)
@@ -71,8 +80,16 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 	result.IpAddress = ipAddress
 	result.UsedCount += 1
 
-	if err := service.repo.Update(ctx, result); err != nil {
+	if err := service.repo.UpdateWithTx(ctx, tx, result); err != nil {
+		if rerr := tx.Rollback().Error; rerr != nil {
+			logger.WithContext(ctx).Errorf("Rollback failed: %v", rerr)
+		}
 		logger.WithContext(ctx).Errorf("Failed to update refresh token: %v", err)
+		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		logger.WithContext(ctx).Errorf("Failed to commit transaction: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
 	}
 

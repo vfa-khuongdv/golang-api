@@ -217,7 +217,7 @@ func TestRefreshTokenRepository(t *testing.T) {
 		require.NotNil(t, tx)
 
 		item.UsedCount = 1
-		err = repo.UpdateWithTx(context.Background(), item, tx)
+		err = repo.UpdateWithTx(context.Background(), tx, item)
 
 		// Assert
 		require.NoError(t, err)
