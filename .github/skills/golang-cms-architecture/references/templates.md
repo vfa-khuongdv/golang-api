@@ -75,17 +75,17 @@ func (svc *exampleServiceImpl) CreateExample(ctx context.Context, input *dto.Cre
 func (h *exampleHandler) CreateExample(c *gin.Context) {
     var input dto.CreateExampleInput
     if err := c.ShouldBindJSON(&input); err != nil {
-        utils.ResponseWithError(c, apperror.NewValidationError(err.Error()))
+        utils.RespondWithError(c, apperror.NewValidationError(err.Error()))
         return
     }
 
     example, err := h.exampleService.CreateExample(c.Request.Context(), &input)
     if err != nil {
-        utils.ResponseWithError(c, err)
+        utils.RespondWithError(c, err)
         return
     }
 
-    utils.ResponseWithOK(c, http.StatusCreated, "Created successfully", example)
+    utils.RespondWithOK(c, http.StatusCreated, "Created successfully", example)
 }
 ```
 

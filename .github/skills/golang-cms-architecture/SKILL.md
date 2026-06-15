@@ -13,8 +13,9 @@ metadata:
 
 ## Project Overview
 
-This project targets Go 1.22+ (minimum supported version).
+This project targets Go 1.25+ (minimum supported version).
 - User authentication with JWT tokens and refresh tokens
+- Multi-factor authentication (MFA) with TOTP
 - Clean architecture: handlers → services → repositories → models
 - Comprehensive testing with testify (assert, require, mock)
 - Standardized error handling via apperror package
@@ -40,8 +41,8 @@ This project targets Go 1.22+ (minimum supported version).
 │   ├── routes/                   # Route definitions
 │   ├── services/                 # Business logic layer    
 │   └── shared/                   # Shared utilities and helpers
-│       └── constants/            # Application constants
-│       └── dto/                  # Data transfer objects for shared use
+│       ├── constants/            # Application constants
+│       ├── dto/                  # Data transfer objects for shared use
 │       └── utils/                # Utility functions  for shared use
 ├── pkg/                          # Public packages
 │   ├── apperror/                 # Custom error handling
@@ -161,12 +162,12 @@ return nil, apperror.NewInternalServerError("Failed to create user: %w", err)
 Never ignore errors silently. Always handle explicitly.
 
 ## Response API
-- User utils.ResponseWithOK, ResponseWithError for consistent API responses
+- Use utils.RespondWithOK, RespondWithError for consistent API responses
 - Example:
 
 ```go
-utils.ResponseWithOK(c, http.StatusCreated, "User created successfully", user)
-utils.ResponseWithError(c, err)
+utils.RespondWithOK(c, http.StatusCreated, "User created successfully", user)
+utils.RespondWithError(c, err)
 ```
 
 ## Testing Standards
@@ -228,8 +229,8 @@ Use plain `logger.Infof()` for startup/seeders.
 
 ## Authentication
 
-- **JWT:** 15 min default, validated by AuthMiddleware
-- **Refresh Token:** 7 days default, stored in database
+- **JWT:** 1 hour default, validated by AuthMiddleware
+- **Refresh Token:** 30 days default, stored in database
 - **Middleware:** Auth, CORS, Log, EmptyBody
 
 ## Environment Configuration
@@ -238,25 +239,22 @@ Environment variables (from `.env` or passed to application):
 
 ```bash
 # Database
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_USER=root
+DB_USERNAME=root
 DB_PASSWORD=password
-DB_NAME=golang_cms
+DB_DATABASE=golang_dev
 
 # JWT
-JWT_SECRET=your-secret-key
-JWT_EXPIRY=900
+JWT_KEY=your-32-character-secret-key-here
 
-# Refresh Token
-REFRESH_TOKEN_EXPIRY=604800
-
-# Email (SMTP)
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=user@example.com
-SMTP_PASSWORD=password
+# Email
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=user@example.com
+MAIL_PASSWORD=password
+MAIL_FROM=noreply@example.com
 
 # Server
-APP_PORT=3000
+PORT=3000
 ```

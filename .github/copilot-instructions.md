@@ -1,13 +1,13 @@
 # Golang CMS - Copilot Instructions
 
-This is a Go 1.21+ CMS REST API with JWT auth, MFA (TOTP), and clean architecture. 
+This is a Go 1.25+ CMS REST API with JWT auth, MFA (TOTP), and clean architecture. 
 See [.github/skills/golang-cms-architecture/SKILL.md](skills/golang-cms-architecture/SKILL.md) for comprehensive guidelines.
 
-**Key Technologies:** Go 1.21+, Gin, GORM, MySQL, JWT, Testify, Docker
+**Key Technologies:** Go 1.25+, Gin, GORM, MySQL, JWT, Testify, Docker
 
 ## Build & Validation Commands
 
-**Prerequisites:** Go 1.21+, MySQL 8.0+, Make
+**Prerequisites:** Go 1.25+, MySQL 8.0+, Make
 
 **Bootstrap & Setup:**
 ```bash
@@ -26,7 +26,7 @@ go run cmd/seeder/seeder.go
 # Build server binary
 make build
 
-# Output: ./tmp/server executable
+# Output: ./bin/server executable
 ```
 
 **Tests & Validation:**
@@ -164,18 +164,16 @@ When making changes, verify:
 2. **No formatting issues:** `go fmt ./...`
 3. **No vet warnings:** `go vet ./...`
 4. **No lint errors:** `golangci-lint run ./...` (if installed)
-5. **Server builds:** `go build -o /tmp/server ./cmd/server/main.go`
+5. **Server builds:** `go build -o ./bin/server ./cmd/server/main.go`
 6. **Database migrations work:** `go run cmd/seeder/seeder.go`
 
 ## Configuration & Environment
 
 Environment variables (from `.env` file, see `internal/configs/env.go`):
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` - Database connection
-- `JWT_SECRET` - Secret key for JWT token signing
-- `JWT_EXPIRY` - Token expiration in seconds (default: 900)
-- `REFRESH_TOKEN_EXPIRY` - Refresh token expiration in seconds (default: 604800)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` - Email configuration
-- `APP_PORT` - Server port (default: 8080)
+- `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` - Database connection
+- `JWT_KEY` - Secret key for JWT token signing (min 32 characters)
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` - Email configuration
+- `PORT` - Server port (default: 3000)
 
 For local development, see `.env.example` in root directory.
 

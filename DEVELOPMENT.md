@@ -744,20 +744,20 @@ Create `.env.example` file for required variables:
 
 ```bash
 # Database
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_USER=root
+DB_USERNAME=root
 DB_PASSWORD=password
-DB_NAME=golang_cms
+DB_DATABASE=golang_dev
 
-# JWT
-JWT_SECRET_KEY=your_secret_key_here
-JWT_EXPIRATION_HOURS=24
-JWT_REFRESH_EXPIRATION_HOURS=168
+# JWT (must be at least 32 characters)
+JWT_KEY=your-32-character-secret-key-here
 
 # Server
-SERVER_PORT=8080
-SERVER_ENV=development
+PORT=3000
+GIN_MODE=debug
+RUN_MIGRATE=true
+STAGE=local
 
 # Email
 MAIL_HOST=smtp.gmail.com
@@ -782,7 +782,7 @@ FRONTEND_URL=http://localhost:5173
 4. Use health checks
 
 ```dockerfile
-FROM golang:1.23 as builder
+FROM golang:1.25 as builder
 WORKDIR /app
 COPY . .
 RUN go build -o app ./cmd/server
@@ -803,11 +803,11 @@ CMD ["./app"]
 Always use migration tools:
 
 ```bash
-# Run migrations
-go run cmd/server/main.go migrate
+# Run migrations with seeder
+go run cmd/seeder/seeder.go
 
-# Rollback migrations  
-go run cmd/server/main.go migrate-down
+# Or enable auto-migration on server start
+RUN_MIGRATE=true go run cmd/server/main.go
 ```
 
 ---
