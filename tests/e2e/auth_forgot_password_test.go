@@ -19,7 +19,7 @@ func TestAuthForgotPassword(t *testing.T) {
 
 	// Helper to create a user directly in DB
 	password := "password123"
-	hashedPassword := utils.HashPassword(password)
+	hashedPassword, _ := utils.HashPassword(password)
 	user := models.User{
 		Name:     "Test User Forgot",
 		Email:    "test_forgot@example.com",

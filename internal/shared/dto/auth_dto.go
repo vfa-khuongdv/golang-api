@@ -19,3 +19,8 @@ type LoginResponse struct {
 	AccessToken  JwtResult `json:"access_token"`
 	RefreshToken JwtResult `json:"refresh_token"`
 }
+
+type RefreshTokenResult struct {
+	Token  *JwtResult
+	UserId uint
+}

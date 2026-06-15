@@ -18,7 +18,7 @@ import (
 func TestAuthResetPassword(t *testing.T) {
 	router, db := setupTestRouter()
 
-	hashedPassword := utils.HashPassword("oldpassword123")
+	hashedPassword, _ := utils.HashPassword("oldpassword123")
 	token := "valid_reset_token"
 	expiredAt := time.Now().Add(time.Hour).Unix()
 

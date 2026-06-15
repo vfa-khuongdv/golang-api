@@ -19,7 +19,7 @@ func TestUsersGetProfile(t *testing.T) {
 
 	// Create test user
 	password := "password123"
-	hashedPassword := utils.HashPassword(password)
+	hashedPassword, _ := utils.HashPassword(password)
 	birthday := time.Date(1990, 5, 15, 0, 0, 0, 0, time.UTC)
 	address := "123 Test Street"
 	testUser := models.User{

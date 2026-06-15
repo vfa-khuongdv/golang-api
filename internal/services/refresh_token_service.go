@@ -14,7 +14,7 @@ import (
 
 type RefreshTokenService interface {
 	Create(ctx context.Context, user *models.User, ipAddress string) (*dto.JwtResult, error)
-	Update(ctx context.Context, token string, ipAddress string) (*RefreshTokenResult, error)
+	Update(ctx context.Context, token string, ipAddress string) (*dto.RefreshTokenResult, error)
 }
 
 type refreshTokenServiceImpl struct {
@@ -52,12 +52,7 @@ func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models
 	}, nil
 }
 
-type RefreshTokenResult struct {
-	Token  *dto.JwtResult
-	UserId uint
-}
-
-func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString string, ipAddress string) (*RefreshTokenResult, error) {
+func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString string, ipAddress string) (*dto.RefreshTokenResult, error) {
 	tx, err := service.repo.BeginTx(ctx)
 	if err != nil {
 		logger.WithContext(ctx).Errorf("Failed to begin transaction: %v", err)
@@ -93,7 +88,7 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
 	}
 
-	return &RefreshTokenResult{
+	return &dto.RefreshTokenResult{
 		Token: &dto.JwtResult{
 			Token:     newToken,
 			ExpiresAt: expiredAt,

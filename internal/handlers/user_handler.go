@@ -11,14 +11,6 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
-type UserHandler interface {
-	ForgotPassword(c *gin.Context)
-	ResetPassword(c *gin.Context)
-	ChangePassword(c *gin.Context)
-	GetProfile(c *gin.Context)
-	UpdateProfile(c *gin.Context)
-}
-
 type userHandlerImpl struct {
 	userService   services.UserService
 	mailerService services.MailerService
@@ -27,7 +19,7 @@ type userHandlerImpl struct {
 func NewUserHandler(
 	userService services.UserService,
 	mailerService services.MailerService,
-) UserHandler {
+) *userHandlerImpl {
 	return &userHandlerImpl{
 		userService:   userService,
 		mailerService: mailerService,

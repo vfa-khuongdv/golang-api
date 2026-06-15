@@ -36,14 +36,13 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
-	bcryptService := services.NewBcryptService()
 	mailerService := services.NewMailerService()
-	userService := services.NewUserService(userRepo, bcryptService, mailerService)
+	userService := services.NewUserService(userRepo, mailerService)
 	jwtService, err := services.NewJWTService()
 	if err != nil {
 		logger.Fatalf("Failed to initialize JWT service: %v", err)
 	}
-	authService := services.NewAuthService(userRepo, refreshTokenService, bcryptService, jwtService)
+	authService := services.NewAuthService(userRepo, refreshTokenService, jwtService)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)

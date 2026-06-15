@@ -10,16 +10,11 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
-type AuthHandler interface {
-	Login(c *gin.Context)
-	RefreshToken(c *gin.Context)
-}
-
 type authHandlerImpl struct {
 	authService services.AuthService
 }
 
-func NewAuthHandler(authService services.AuthService) AuthHandler {
+func NewAuthHandler(authService services.AuthService) *authHandlerImpl {
 	return &authHandlerImpl{
 		authService: authService,
 	}

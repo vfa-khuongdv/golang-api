@@ -21,7 +21,7 @@ func TestUsersUpdateProfile(t *testing.T) {
 
 	// Create test user
 	password := "password123"
-	hashedPassword := utils.HashPassword(password)
+	hashedPassword, _ := utils.HashPassword(password)
 	birthday := time.Date(1990, 1, 15, 0, 0, 0, 0, time.UTC)
 	address := "123 Original Street"
 	testUser := models.User{

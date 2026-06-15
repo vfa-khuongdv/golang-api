@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,34 +20,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type mockBcryptService struct {
-	hashResult string
-	hashErr    error
-	checkValid bool
-}
-
-func (m *mockBcryptService) HashPassword(_ string) (string, error) {
-	if m.hashResult != "" {
-		return m.hashResult, m.hashErr
-	}
-	return "hashed-password", m.hashErr
-}
-
-func (m *mockBcryptService) CheckPasswordHash(_, _ string) bool {
-	return m.checkValid
-}
-
-func (m *mockBcryptService) HashPasswordWithCost(password string, _ int) (string, error) {
-	return m.HashPassword(password)
-}
-
 type UserServiceTestSuite struct {
 	suite.Suite
 	db      *gorm.DB
 	repo    *mocks.MockUserRepository
 	mailer  *mocks.MockMailerService
 	service services.UserService
-	bcrypt  services.BcryptService
 }
 
 func (s *UserServiceTestSuite) SetupTest() {
@@ -59,9 +38,7 @@ func (s *UserServiceTestSuite) SetupTest() {
 	s.db = db
 	s.repo = new(mocks.MockUserRepository)
 	s.mailer = new(mocks.MockMailerService)
-	s.bcrypt = services.NewBcryptService()
-	s.service = services.NewUserService(s.repo, s.bcrypt, s.mailer)
-
+	s.service = services.NewUserService(s.repo, s.mailer)
 }
 
 func (s *UserServiceTestSuite) TearDownTest() {
@@ -237,22 +214,6 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		s.Error(err)
 	})
 
-	s.T().Run("HashPasswordFailure", func(t *testing.T) {
-		input := &dto.ResetPasswordInput{Token: "token-3", NewPassword: "new-password"}
-		notExpired := time.Now().Add(10 * time.Minute).Unix()
-		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: &notExpired}
-
-		mockBcrypt := &mockBcryptService{hashErr: errors.New("hash failed"), checkValid: true}
-		localService := services.NewUserService(s.repo, mockBcrypt, s.mailer)
-
-		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
-
-		result, err := localService.ResetPassword(context.Background(), input)
-
-		s.Nil(result)
-		s.Error(err)
-	})
-
 	s.T().Run("UpdateFailure", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-4", NewPassword: "new-password"}
 		notExpired := time.Now().Add(10 * time.Minute).Unix()
@@ -283,6 +244,19 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		s.Nil(result.Token)
 		s.Nil(result.ExpiredAt)
 	})
+
+	s.T().Run("HashPasswordFailure", func(t *testing.T) {
+		input := &dto.ResetPasswordInput{Token: "token-6", NewPassword: strings.Repeat("a", 73)}
+		notExpired := time.Now().Add(10 * time.Minute).Unix()
+		user := &models.User{ID: 1, Token: &input.Token, ExpiredAt: &notExpired}
+
+		s.repo.On("FindByField", mock.Anything, "token", input.Token).Return(user, nil).Once()
+
+		result, err := s.service.ResetPassword(context.Background(), input)
+
+		s.Nil(result)
+		s.Error(err)
+	})
 }
 
 func (s *UserServiceTestSuite) TestChangePassword() {
@@ -306,9 +280,8 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			NewPassword:     "new-password",
 			ConfirmPassword: "new-password",
 		}
-		hash, err := s.bcrypt.HashPassword("correct-old")
-		s.Require().NoError(err)
-		user := &models.User{ID: 1, Password: hash}
+		hashedPassword, _ := utils.HashPassword("correct-old")
+		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 1, input)
@@ -323,9 +296,8 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			NewPassword:     "new-password",
 			ConfirmPassword: "different-password",
 		}
-		hash, err := s.bcrypt.HashPassword(input.OldPassword)
-		s.Require().NoError(err)
-		user := &models.User{ID: 1, Password: hash}
+		hashedPassword, _ := utils.HashPassword(input.OldPassword)
+		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(2)).Return(user, nil).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 2, input)
@@ -340,9 +312,8 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			NewPassword:     "same-password",
 			ConfirmPassword: "same-password",
 		}
-		hash, err := s.bcrypt.HashPassword(input.OldPassword)
-		s.Require().NoError(err)
-		user := &models.User{ID: 1, Password: hash}
+		hashedPassword, _ := utils.HashPassword(input.OldPassword)
+		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(3)).Return(user, nil).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 3, input)
@@ -354,15 +325,14 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 	s.T().Run("HashPasswordFailure", func(t *testing.T) {
 		input := &dto.ChangePasswordInput{
 			OldPassword:     "old-password",
-			NewPassword:     "new-password",
-			ConfirmPassword: "new-password",
+			NewPassword:     strings.Repeat("a", 73),
+			ConfirmPassword: strings.Repeat("a", 73),
 		}
-		mockBcrypt := &mockBcryptService{hashErr: errors.New("hash failed"), checkValid: true}
-		localService := services.NewUserService(s.repo, mockBcrypt, s.mailer)
-		user := &models.User{ID: 1, Password: "existing-hash"}
+		hashedPassword, _ := utils.HashPassword(input.OldPassword)
+		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(4)).Return(user, nil).Once()
 
-		result, err := localService.ChangePassword(context.Background(), 4, input)
+		result, err := s.service.ChangePassword(context.Background(), 4, input)
 
 		s.Nil(result)
 		s.Error(err)
@@ -374,9 +344,8 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			NewPassword:     "new-password",
 			ConfirmPassword: "new-password",
 		}
-		hash, err := s.bcrypt.HashPassword(input.OldPassword)
-		s.Require().NoError(err)
-		user := &models.User{ID: 1, Password: hash}
+		hashedPassword, _ := utils.HashPassword(input.OldPassword)
+		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(5)).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
 
@@ -392,9 +361,8 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 			NewPassword:     "new-password",
 			ConfirmPassword: "new-password",
 		}
-		hash, err := s.bcrypt.HashPassword(input.OldPassword)
-		s.Require().NoError(err)
-		user := &models.User{ID: 1, Password: hash}
+		hashedPassword, _ := utils.HashPassword(input.OldPassword)
+		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(6)).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
@@ -402,7 +370,7 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 
 		s.NoError(err)
 		s.NotNil(result)
-		s.True(s.bcrypt.CheckPasswordHash(input.NewPassword, result.Password))
+		s.True(utils.CheckPasswordHash(input.NewPassword, result.Password))
 	})
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
@@ -17,15 +18,13 @@ type AuthService interface {
 type authServiceImpl struct {
 	repo                repositories.UserRepository
 	refreshTokenService RefreshTokenService
-	bcryptService       BcryptService
 	jwtService          JWTService
 }
 
-func NewAuthService(repo repositories.UserRepository, refreshTokenService RefreshTokenService, bcryptService BcryptService, jwtService JWTService) AuthService {
+func NewAuthService(repo repositories.UserRepository, refreshTokenService RefreshTokenService, jwtService JWTService) AuthService {
 	return &authServiceImpl{
 		repo:                repo,
 		refreshTokenService: refreshTokenService,
-		bcryptService:       bcryptService,
 		jwtService:          jwtService,
 	}
 }
@@ -39,7 +38,7 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
-	if isValid := service.bcryptService.CheckPasswordHash(password, user.Password); !isValid {
+	if isValid := utils.CheckPasswordHash(password, user.Password); !isValid {
 		logger.WithContext(ctx).Warnf("Login failed - invalid password for email: %s", email)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}

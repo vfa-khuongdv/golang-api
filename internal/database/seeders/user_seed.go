@@ -7,6 +7,11 @@ import (
 	"gorm.io/gorm"
 )
 
+func hashPassword(password string) string {
+	hashed, _ := utils.HashPassword(password)
+	return hashed
+}
+
 type UserSeeder struct {
 	User *models.User
 }
@@ -17,14 +22,14 @@ func SeedUsers(db *gorm.DB) error {
 			User: &models.User{
 				Name:     "John Doe",
 				Email:    "john@example.com",
-				Password: utils.HashPassword("password123"),
+				Password: hashPassword("password123"),
 			},
 		},
 		{
 			User: &models.User{
 				Name:     "Jane Smith",
 				Email:    "jane@example.com",
-				Password: utils.HashPassword("password123"),
+				Password: hashPassword("password123"),
 			},
 		},
 	}

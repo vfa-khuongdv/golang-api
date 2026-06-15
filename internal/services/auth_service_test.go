@@ -23,20 +23,17 @@ type AuthServiceTestSuite struct {
 	repo                *mocks.MockUserRepository
 	refreshTokenService *mocks.MockRefreshTokenService
 	service             services.AuthService
-	bcryptService       *mocks.MockBcryptService
 	jwtService          *mocks.MockJWTService
 }
 
 func (s *AuthServiceTestSuite) SetupTest() {
 	s.repo = new(mocks.MockUserRepository)
 	s.refreshTokenService = new(mocks.MockRefreshTokenService)
-	s.bcryptService = new(mocks.MockBcryptService)
 	s.jwtService = new(mocks.MockJWTService)
 
 	s.service = services.NewAuthService(
 		s.repo,
 		s.refreshTokenService,
-		s.bcryptService,
 		s.jwtService,
 	)
 }
@@ -56,9 +53,9 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		{
 			name: "Success",
 			setupMocks: func() {
-				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
+				hashedPassword, _ := utils.HashPassword(password)
+				user := &models.User{ID: 1, Email: email, Password: hashedPassword}
 				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
-				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "mocked-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -80,9 +77,8 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		{
 			name: "InvalidPassword",
 			setupMocks: func() {
-				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
+				user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
 				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
-				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(false)
 			},
 			expectErr: true,
 			errCode:   apperror.ErrInvalidPassword,
@@ -90,9 +86,9 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		{
 			name: "JwtError",
 			setupMocks: func() {
-				user := &models.User{ID: 1, Email: email, Password: utils.HashPassword(password)}
+				hashedPassword, _ := utils.HashPassword(password)
+				user := &models.User{ID: 1, Email: email, Password: hashedPassword}
 				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
-				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
 			},
 			expectErr: true,
@@ -101,9 +97,9 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		{
 			name: "RefreshTokenCreateError",
 			setupMocks: func() {
-				user := &models.User{ID: 1, Email: email, Password: "hashed_password"}
+				hashedPassword, _ := utils.HashPassword(password)
+				user := &models.User{ID: 1, Email: email, Password: hashedPassword}
 				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
-				s.bcryptService.On("CheckPasswordHash", password, user.Password).Return(true)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "mocked-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -154,7 +150,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			name: "Success",
 			setupMocks: func() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
+				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				user := &models.User{ID: userID, Email: "user@example.com"}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
@@ -179,7 +175,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			name: "GetByIDError",
 			setupMocks: func() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
+				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
 				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
@@ -193,7 +189,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			name: "JwtError",
 			setupMocks: func() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
+				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				user := &models.User{ID: userID, Email: "user@example.com"}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
@@ -209,7 +205,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			name: "InvalidAccessToken",
 			setupMocks: func() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
+				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 
 				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(nil, errors.New("Invalid token signature"))
@@ -223,7 +219,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				refreshUserID := userID
 				accessUserID := uint(2)
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &services.RefreshTokenResult{UserId: refreshUserID, Token: mockRefreshToken}
+				mockRes := &dto.RefreshTokenResult{UserId: refreshUserID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: accessUserID, Scope: services.TokenScopeAccess}
 
 				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
@@ -236,7 +232,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			name: "InvalidAccessTokenScope",
 			setupMocks: func() {
 				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &services.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
+				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: userID, Scope: "other-scope"}
 
 				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)

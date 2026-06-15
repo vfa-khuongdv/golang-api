@@ -23,14 +23,12 @@ type UserService interface {
 
 type userServiceImpl struct {
 	repo          repositories.UserRepository
-	bcryptService BcryptService
 	mailerService MailerService
 }
 
-func NewUserService(repo repositories.UserRepository, bcryptService BcryptService, mailerService MailerService) UserService {
+func NewUserService(repo repositories.UserRepository, mailerService MailerService) UserService {
 	return &userServiceImpl{
 		repo:          repo,
-		bcryptService: bcryptService,
 		mailerService: mailerService,
 	}
 }
@@ -76,7 +74,7 @@ func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.Re
 		return nil, apperror.NewTokenExpiredError("Token has expired")
 	}
 
-	newPassword, err := service.bcryptService.HashPassword(input.NewPassword)
+	newPassword, err := utils.HashPassword(input.NewPassword)
 	if err != nil {
 		return nil, apperror.NewPasswordHashFailedError("Failed to hash password")
 	}
@@ -99,7 +97,7 @@ func (service *userServiceImpl) ChangePassword(ctx context.Context, userId uint,
 		return nil, apperror.NewNotFoundError("User not found")
 	}
 
-	if isValid := service.bcryptService.CheckPasswordHash(input.OldPassword, user.Password); !isValid {
+	if isValid := utils.CheckPasswordHash(input.OldPassword, user.Password); !isValid {
 		return nil, apperror.NewInvalidPasswordError("Old password is incorrect")
 	}
 
@@ -111,7 +109,7 @@ func (service *userServiceImpl) ChangePassword(ctx context.Context, userId uint,
 		return nil, apperror.NewPasswordUnchangedError("New password must be different from old password")
 	}
 
-	newPassword, err := service.bcryptService.HashPassword(input.NewPassword)
+	newPassword, err := utils.HashPassword(input.NewPassword)
 	if err != nil {
 		return nil, apperror.NewPasswordHashFailedError("Failed to hash new password")
 	}

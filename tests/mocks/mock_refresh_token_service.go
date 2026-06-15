@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
-	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 )
 
@@ -22,11 +21,11 @@ func (m *MockRefreshTokenService) Create(ctx context.Context, user *models.User,
 	return result, args.Error(1)
 }
 
-func (m *MockRefreshTokenService) Update(ctx context.Context, token string, ipAddress string) (*services.RefreshTokenResult, error) {
+func (m *MockRefreshTokenService) Update(ctx context.Context, token string, ipAddress string) (*dto.RefreshTokenResult, error) {
 	args := m.Called(ctx, token, ipAddress)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	result, _ := args.Get(0).(*services.RefreshTokenResult)
+	result, _ := args.Get(0).(*dto.RefreshTokenResult)
 	return result, args.Error(1)
 }

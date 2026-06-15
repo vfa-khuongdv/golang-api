@@ -20,7 +20,7 @@ func TestUsersChangePassword(t *testing.T) {
 
 	// Create test user
 	password := "password123"
-	hashedPassword := utils.HashPassword(password)
+	hashedPassword, _ := utils.HashPassword(password)
 	testUser := models.User{
 		Name:     "Test User",
 		Email:    "testuser@example.com",
@@ -63,8 +63,7 @@ func TestUsersChangePassword(t *testing.T) {
 		// Verify password was changed
 		var updatedUser models.User
 		db.First(&updatedUser, testUser.ID)
-		bcryptService := services.NewBcryptService()
-		assert.True(t, bcryptService.CheckPasswordHash("newpassword123", updatedUser.Password))
+		assert.True(t, utils.CheckPasswordHash("newpassword123", updatedUser.Password))
 	})
 
 	t.Run("Change Password - Incorrect Old Password", func(t *testing.T) {

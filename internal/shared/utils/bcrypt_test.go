@@ -4,21 +4,24 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 )
 
 func TestHashPassword(t *testing.T) {
 	t.Run("HashPassword", func(t *testing.T) {
 		password := "mySecret123"
-		hashed := utils.HashPassword(password)
+		hashed, err := utils.HashPassword(password)
 
+		require.NoError(t, err, "HashPassword should not return an error")
 		assert.NotEmpty(t, hashed, "Hashed password should not be empty")
 		assert.NotEqual(t, password, hashed, "Hashed password should not equal plain password")
 	})
 
 	t.Run("CheckPasswordHash", func(t *testing.T) {
 		password := "mySecret123"
-		hashed := utils.HashPassword(password)
+		hashed, err := utils.HashPassword(password)
+		require.NoError(t, err)
 
 		// Valid match
 		isMatch := utils.CheckPasswordHash(password, hashed)
@@ -39,7 +42,31 @@ func TestHashPassword(t *testing.T) {
 
 	t.Run("HashPasswordWithInvalidCost", func(t *testing.T) {
 		password := "mySecret123"
-		hashed := utils.HashPasswordWithCost(password, 1000) // cost 1000 will invalid cost triggers error
-		assert.Equal(t, "", hashed, "Should return empty string on error")
+		hashed, err := utils.HashPasswordWithCost(password, 1000)
+
+		assert.Error(t, err, "Should return error for invalid cost")
+		assert.Empty(t, hashed, "Should return empty string on error")
+	})
+
+	t.Run("HashPasswordWithCost", func(t *testing.T) {
+		password := "mySecret123"
+		hashed, err := utils.HashPasswordWithCost(password, 4)
+
+		require.NoError(t, err)
+		assert.NotEmpty(t, hashed)
+		assert.True(t, utils.CheckPasswordHash(password, hashed))
+	})
+}
+
+func TestBcryptPackageVars(t *testing.T) {
+	t.Run("HashPasswordTooLong", func(t *testing.T) {
+		password := ""
+		for i := 0; i < 80; i++ {
+			password += "a"
+		}
+
+		hashed, err := utils.HashPassword(password)
+		assert.Error(t, err, "HashPassword should return error when password exceeds bcrypt length limit")
+		assert.Empty(t, hashed)
 	})
 }
