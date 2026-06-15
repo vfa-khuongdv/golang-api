@@ -271,6 +271,22 @@ func maskReflectedValue(value any) any {
 	val := reflect.ValueOf(value)
 
 	switch val.Kind() {
+	case reflect.Map:
+		maskedMap := reflect.MakeMap(val.Type())
+		iter := val.MapRange()
+		for iter.Next() {
+			k, v := iter.Key(), iter.Value()
+			if v.Kind() == reflect.Interface {
+				v = v.Elem()
+			}
+			switch v.Kind() {
+			case reflect.String:
+				maskedMap.SetMapIndex(k, reflect.ValueOf(maskString(v.String())))
+			default:
+				maskedMap.SetMapIndex(k, v)
+			}
+		}
+		return maskedMap.Interface()
 	case reflect.Slice, reflect.Array:
 		// Create a new slice/array and mask each element based on its type
 		var maskedSlice reflect.Value
@@ -300,7 +316,7 @@ func maskReflectedValue(value any) any {
 			}
 			switch field.Kind() {
 			case reflect.String:
-				field.SetString("*****")
+				field.SetString(maskString(val.Field(i).String()))
 			case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 				field.SetInt(0)
 			case reflect.Bool:
@@ -319,7 +335,7 @@ func maskReflectedValue(value any) any {
 func maskElementByType(elem reflect.Value) reflect.Value {
 	switch elem.Kind() {
 	case reflect.String:
-		return reflect.ValueOf("*****")
+		return reflect.ValueOf(maskString(elem.String()))
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		return reflect.ValueOf(0).Convert(elem.Type())
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:

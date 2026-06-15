@@ -94,7 +94,7 @@ func TestMaskReflectedValue_InternalBranches(t *testing.T) {
 		}
 
 		out := maskReflectedValue(in).(sample)
-		assert.Equal(t, "*****", out.Name)
+		assert.Equal(t, "john", out.Name) // "john" ≤ 4 chars → shown as-is
 		assert.Equal(t, 0, out.Age)
 		assert.False(t, out.Active)
 		assert.Nil(t, out.Meta)

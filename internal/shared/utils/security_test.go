@@ -601,4 +601,24 @@ func TestCensorSensitiveData(t *testing.T) {
 		assert.Equal(t, true, result["active"])
 	})
 
+	t.Run("Test nested map in sensitive field", func(t *testing.T) {
+		maskFields := []string{"access_token"}
+
+		input := map[string]interface{}{
+			"access_token": map[string]interface{}{
+				"token":      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0",
+				"expires_at": 1712345678,
+			},
+			"username": "user",
+		}
+
+		result := utils.CensorSensitiveData(input, maskFields).(map[string]interface{})
+
+		nested, ok := result["access_token"].(map[string]interface{})
+		assert.True(t, ok)
+		assert.Contains(t, nested["token"].(string), "*****")
+		assert.NotContains(t, nested["token"].(string), "eyJhbGciOiJIUzI1NiJ9")
+		assert.Equal(t, 1712345678, nested["expires_at"]) // int unchanged
+		assert.Equal(t, "user", result["username"])
+	})
 }
