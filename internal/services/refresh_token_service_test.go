@@ -3,11 +3,13 @@ package services_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	originErrors "errors"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
@@ -132,6 +134,65 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
+	})
+
+	s.T().Run("RollbackAfterFindError", func(t *testing.T) {
+		mockRepo := new(mocks.MockRefreshTokenRepository)
+		realDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		tx := realDB.Session(&gorm.Session{})
+		mockRepo.On("BeginTx", mock.Anything).Return(tx, nil)
+		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "some_token").Return((*models.RefreshToken)(nil), originErrors.New("find error"))
+		svc := services.NewRefreshTokenService(mockRepo)
+
+		result, err := svc.Update(context.Background(), "some_token", "127.0.0.1")
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		mockRepo.AssertExpectations(t)
+	})
+
+	s.T().Run("UpdateWithTxError", func(t *testing.T) {
+		mockRepo := new(mocks.MockRefreshTokenRepository)
+		realDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		tx := realDB.Session(&gorm.Session{})
+		mockRepo.On("BeginTx", mock.Anything).Return(tx, nil)
+		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "existing_token").Return(&models.RefreshToken{
+			RefreshToken: "old_token",
+			IpAddress:    "",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Add(time.Hour).Unix(),
+			UserID:       1,
+		}, nil)
+		mockRepo.On("UpdateWithTx", mock.Anything, mock.Anything, mock.Anything).Return(originErrors.New("update error"))
+		svc := services.NewRefreshTokenService(mockRepo)
+
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		mockRepo.AssertExpectations(t)
+	})
+
+	s.T().Run("CommitError", func(t *testing.T) {
+		mockRepo := new(mocks.MockRefreshTokenRepository)
+		realDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		tx := realDB.Session(&gorm.Session{})
+		mockRepo.On("BeginTx", mock.Anything).Return(tx, nil)
+		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "existing_token").Return(&models.RefreshToken{
+			RefreshToken: "old_token",
+			IpAddress:    "",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Add(time.Hour).Unix(),
+			UserID:       1,
+		}, nil)
+		mockRepo.On("UpdateWithTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		svc := services.NewRefreshTokenService(mockRepo)
+
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		mockRepo.AssertExpectations(t)
 	})
 }
 

@@ -58,6 +58,20 @@ func TestRespondWith(t *testing.T) {
 		assert.JSONEq(t, expectedJSON, w.Body.String())
 	})
 
+	t.Run("RespondWithError_InternalServerErrorWithRequest", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(w)
+		req, _ := http.NewRequest("GET", "/test", nil)
+		ctx.Request = req
+
+		internalErr := stdErrors.New("some internal error")
+		utils.RespondWithError(ctx, internalErr)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		expectedJSON := `{"code":1000,"message":"Internal server error"}`
+		assert.JSONEq(t, expectedJSON, w.Body.String())
+	})
+
 	t.Run("RespondWithError_ValidationError", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		ctx, _ := gin.CreateTestContext(w)

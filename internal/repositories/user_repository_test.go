@@ -516,4 +516,78 @@ func TestUserRepository(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, pagination)
 	})
+
+	t.Run("Delete - Success", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		user := &models.User{
+			Name: "Delete Me", Email: "delete@example.com", Password: "pass", Gender: 1,
+		}
+		created, err := repo.Create(context.Background(), user)
+		require.NoError(t, err)
+
+		err = repo.Delete(context.Background(), created.ID)
+		require.NoError(t, err)
+
+		_, err = repo.GetByID(context.Background(), created.ID)
+		assert.Error(t, err)
+	})
+
+	t.Run("GetByID - Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+
+		_ = db.Callback().Query().Before("gorm:query").Register("force_getbyid_db_error", func(tx *gorm.DB) {
+			_ = tx.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Query().Remove("force_getbyid_db_error") }()
+
+		user, err := repo.GetByID(context.Background(), 1)
+		assert.Error(t, err)
+		assert.Nil(t, user)
+	})
+
+	t.Run("Update - Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		created, err := repo.Create(context.Background(), &models.User{
+			Name: "Update Error", Email: "updateerr@example.com", Password: "pass", Gender: 1,
+		})
+		require.NoError(t, err)
+
+		_ = db.Callback().Update().Before("gorm:update").Register("force_update_db_error", func(tx *gorm.DB) {
+			_ = tx.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Update().Remove("force_update_db_error") }()
+
+		err = repo.Update(context.Background(), created)
+		assert.Error(t, err)
+	})
+
+	t.Run("FindByField - Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+
+		_ = db.Callback().Query().Before("gorm:query").Register("force_findbyfield_db_error", func(tx *gorm.DB) {
+			_ = tx.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Query().Remove("force_findbyfield_db_error") }()
+
+		user, err := repo.FindByField(context.Background(), "email", "test@test.com")
+		assert.Error(t, err)
+		assert.Nil(t, user)
+	})
+
+	t.Run("BeginTx - Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		err = sqlDB.Close()
+		require.NoError(t, err)
+
+		tx, err := repo.BeginTx(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, tx)
+	})
 }

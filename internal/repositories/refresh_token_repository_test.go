@@ -228,4 +228,165 @@ func TestRefreshTokenRepository(t *testing.T) {
 		require.NotNil(t, foundItem)
 		assert.Equal(t, int64(1), foundItem.UsedCount)
 	})
+
+	t.Run("FindByToken - Database Error", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		_ = db.Callback().Query().Before("gorm:query").Register("force_findbytoken_db_error", func(tx *gorm.DB) {
+			_ = tx.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Query().Remove("force_findbytoken_db_error") }()
+
+		found, err := repo.FindByToken(context.Background(), "any_token")
+		assert.Error(t, err)
+		assert.Nil(t, found)
+	})
+
+	t.Run("Update - Database Error", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		item := &models.RefreshToken{
+			RefreshToken: "update_error_token",
+			IpAddress:    "127.0.0.1",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
+			UserID:       1,
+		}
+		err := repo.Create(context.Background(), item)
+		require.NoError(t, err)
+
+		_ = db.Callback().Update().Before("gorm:update").Register("force_update_db_error", func(tx *gorm.DB) {
+			_ = tx.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Update().Remove("force_update_db_error") }()
+
+		err = repo.Update(context.Background(), item)
+		assert.Error(t, err)
+	})
+
+	t.Run("FindByTokenWithTx - Success", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		item := &models.RefreshToken{
+			RefreshToken: "token_tx_success",
+			IpAddress:    "127.0.0.1",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
+			UserID:       1,
+		}
+		err := repo.Create(context.Background(), item)
+		require.NoError(t, err)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+
+		found, err := repo.FindByTokenWithTx(context.Background(), tx, item.RefreshToken)
+		require.NoError(t, err)
+		require.NotNil(t, found)
+		assert.Equal(t, item.RefreshToken, found.RefreshToken)
+	})
+
+	t.Run("FindByTokenWithTx - Not Found", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+
+		found, err := repo.FindByTokenWithTx(context.Background(), tx, "nonexistent")
+		assert.Error(t, err)
+		assert.Nil(t, found)
+	})
+
+	t.Run("FindByTokenWithTx - Expired", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		item := &models.RefreshToken{
+			RefreshToken: "token_tx_expired",
+			IpAddress:    "127.0.0.1",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Unix() - int64(time.Minute),
+			UserID:       1,
+		}
+		err := repo.Create(context.Background(), item)
+		require.NoError(t, err)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+
+		found, err := repo.FindByTokenWithTx(context.Background(), tx, item.RefreshToken)
+		assert.Error(t, err)
+		assert.Nil(t, found)
+	})
+
+	t.Run("FindByTokenWithTx - Database Error", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+
+		_ = db.Callback().Query().Before("gorm:query").Register("force_token_tx_db_error", func(tx2 *gorm.DB) {
+			_ = tx2.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Query().Remove("force_token_tx_db_error") }()
+
+		found, err := repo.FindByTokenWithTx(context.Background(), tx, "any_token")
+		assert.Error(t, err)
+		assert.Nil(t, found)
+	})
+
+	t.Run("UpdateWithTx - Database Error", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		item := &models.RefreshToken{
+			RefreshToken: "updatetx_error_token",
+			IpAddress:    "127.0.0.1",
+			UsedCount:    0,
+			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
+			UserID:       1,
+		}
+		err := repo.Create(context.Background(), item)
+		require.NoError(t, err)
+
+		tx := db.Begin()
+		require.NoError(t, tx.Error)
+		defer tx.Rollback()
+
+		_ = db.Callback().Update().Before("gorm:update").Register("force_updatetx_db_error", func(tx2 *gorm.DB) {
+			_ = tx2.AddError(assert.AnError)
+		})
+		defer func() { _ = db.Callback().Update().Remove("force_updatetx_db_error") }()
+
+		err = repo.UpdateWithTx(context.Background(), tx, item)
+		assert.Error(t, err)
+	})
+
+	t.Run("BeginTx - Success", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		tx, err := repo.BeginTx(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, tx)
+		tx.Rollback()
+	})
+
+	t.Run("BeginTx - Database Error", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		err = sqlDB.Close()
+		require.NoError(t, err)
+
+		tx, err := repo.BeginTx(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, tx)
+	})
 }

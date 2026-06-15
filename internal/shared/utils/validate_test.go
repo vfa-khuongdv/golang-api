@@ -60,6 +60,7 @@ func TestValidateBirthday(t *testing.T) {
 }
 func TestTranslateValidationErrors(t *testing.T) {
 	validate := validator.New()
+	_ = validate.RegisterValidation("password_complexity", utils.ValidatePasswordComplexity)
 
 	testCases := []struct {
 		name     string
@@ -241,6 +242,10 @@ func TestTranslateValidationErrors(t *testing.T) {
 		{name: "unique", tag: "unique", value: struct {
 			Field []string `validate:"unique"`
 		}{Field: []string{"a", "b", "a"}}, expected: []apperror.FieldError{{Field: "Field", Message: "Field must contain unique values"}}},
+		// password_complexity
+		{name: "password_complexity", tag: "password_complexity", value: struct {
+			Field string `validate:"password_complexity"`
+		}{Field: "weak"}, expected: []apperror.FieldError{{Field: "Field", Message: "Field must be at least 8 characters and contain uppercase, lowercase, digit, and special character"}}},
 	}
 
 	for _, tc := range testCases {

@@ -17,9 +17,14 @@ type MailerService interface {
 
 type mailerServiceImpl struct{}
 
-var newEmailSender = func(config mailer.GomailSenderConfig) mailer.EmailSender {
-	return mailer.NewGomailSender(config)
-}
+var (
+	newEmailSender = func(config mailer.GomailSenderConfig) mailer.EmailSender {
+		return mailer.NewGomailSender(config)
+	}
+	parseForgotTemplate = func() (*template.Template, error) {
+		return template.ParseFS(mailer.ForgotTemplate, "templates/forgot_template.html")
+	}
+)
 
 func NewMailerService() MailerService {
 	return &mailerServiceImpl{}
@@ -43,7 +48,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		Password: config.Password,
 	})
 
-	tmpl, err := template.ParseFS(mailer.ForgotTemplate, "templates/forgot_template.html")
+	tmpl, err := parseForgotTemplate()
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}

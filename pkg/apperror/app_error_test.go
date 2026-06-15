@@ -1,6 +1,7 @@
 package apperror_test
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -127,4 +128,17 @@ func TestAppErrorWithUnderlyingError(t *testing.T) {
 	expected := "code: 1000, message: internal server error, error: " + underlying.Error()
 	assert.Equal(t, expected, appErr.Error())
 	assert.Equal(t, http.StatusInternalServerError, appErr.HttpStatusCode)
+}
+
+func TestUnwrap(t *testing.T) {
+	underlying := errors.New("wrapped error")
+	appErr := apperror.Wrap(
+		http.StatusBadRequest,
+		apperror.ErrBadRequest,
+		"bad request",
+		underlying,
+	)
+
+	assert.True(t, errors.Is(appErr, underlying), "errors.Is should find the wrapped error")
+	assert.Equal(t, underlying, errors.Unwrap(appErr))
 }
