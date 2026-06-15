@@ -42,6 +42,8 @@ type (
 	}
 
 	AppConfig struct {
+		ServiceName string
+		Version     string
 		FrontendURL string
 		RunMigrate  bool
 	}
@@ -79,6 +81,8 @@ func Load() (*Config, error) {
 			AllowedOrigins: strings.Split(GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		},
 		App: AppConfig{
+			ServiceName: GetEnv("APP_SERVICE", "golang-cms"),
+			Version:     GetEnv("APP_VERSION", "dev"),
 			FrontendURL: GetEnv("FRONTEND_URL", ""),
 			RunMigrate:  GetEnv("RUN_MIGRATE", "false") == "true",
 		},

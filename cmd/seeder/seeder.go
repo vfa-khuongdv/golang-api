@@ -13,7 +13,10 @@ func main() {
 	}
 
 	// Init logger
-	logger.Init()
+	logger.Init(logger.LogConfig{
+		ServiceName: "golang-cms",
+		Stage:       cfg.Server.Stage,
+	})
 
 	// Initialize database connection
 	db := configs.InitDB(cfg.Database)

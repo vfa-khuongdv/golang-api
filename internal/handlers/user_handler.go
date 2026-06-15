@@ -36,7 +36,7 @@ func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {
 
 	err := handler.userService.ForgotPassword(ctx.Request.Context(), &input)
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Forgot password failed for email %s: %v", input.Email, err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventPasswordResetRequest).Errorf("Forgot password failed for email %s: %v", utils.MaskWithPrefix(input.Email, 4), err)
 		utils.RespondWithError(ctx, err)
 		return
 	}
@@ -54,7 +54,7 @@ func (handler *userHandlerImpl) ResetPassword(ctx *gin.Context) {
 
 	_, err := handler.userService.ResetPassword(ctx.Request.Context(), &input)
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Reset password failed: %v", err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventPasswordReset).Errorf("Reset password failed: %v", err)
 		utils.RespondWithError(ctx, err)
 		return
 	}
@@ -78,7 +78,7 @@ func (handler *userHandlerImpl) ChangePassword(ctx *gin.Context) {
 
 	_, err = handler.userService.ChangePassword(ctx.Request.Context(), userId, &input)
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Change password failed for user %d: %v", userId, err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventPasswordChangeFailed).Errorf("Change password failed for user %d: %v", userId, err)
 		utils.RespondWithError(ctx, err)
 		return
 	}
@@ -95,7 +95,7 @@ func (handler *userHandlerImpl) GetProfile(ctx *gin.Context) {
 
 	dbUser, err := handler.userService.GetProfile(ctx.Request.Context(), userId)
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Get profile failed for user %d: %v", userId, err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventProfileGet).Errorf("Get profile failed for user %d: %v", userId, err)
 		utils.RespondWithError(ctx, err)
 		return
 	}
@@ -119,7 +119,7 @@ func (handler *userHandlerImpl) UpdateProfile(ctx *gin.Context) {
 
 	err = handler.userService.UpdateProfile(ctx.Request.Context(), userId, &input)
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Update profile failed for user %d: %v", userId, err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventProfileUpdateFailed).Errorf("Update profile failed for user %d: %v", userId, err)
 		utils.RespondWithError(ctx, err)
 		return
 	}

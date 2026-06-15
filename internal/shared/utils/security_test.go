@@ -32,7 +32,7 @@ func TestCensorSensitiveData(t *testing.T) {
 		}
 
 		passwordPtr := "12345"
-		passwordPtrMasked := "1***5"
+		passwordPtrMasked := "1234*****"
 
 		input := TestInput{
 			Name: "test", Password: nil,
@@ -96,7 +96,7 @@ func TestCensorSensitiveData(t *testing.T) {
 
 	t.Run("Map with sensitive keys", func(t *testing.T) {
 		input := map[string]string{"password": "secret", "username": "user"}
-		expected := map[string]string{"password": "s****t", "username": "user"}
+		expected := map[string]string{"password": "secr*****", "username": "user"}
 		result := utils.CensorSensitiveData(input, maskFields)
 		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("Expected %v, got %v", expected, result)
@@ -109,7 +109,7 @@ func TestCensorSensitiveData(t *testing.T) {
 			Username string
 		}
 		input := User{Password: "secret", Username: "user"}
-		expected := User{Password: "s****t", Username: "user"}
+		expected := User{Password: "secr*****", Username: "user"}
 		result := utils.CensorSensitiveData(input, maskFields).(User)
 		if result != expected {
 			t.Errorf("Expected %v, got %v", expected, result)
@@ -122,7 +122,7 @@ func TestCensorSensitiveData(t *testing.T) {
 			Username string
 		}
 		input := &User{Password: "secret", Username: "user"}
-		expected := User{Password: "s****t", Username: "user"}
+		expected := User{Password: "secr*****", Username: "user"}
 		result := utils.CensorSensitiveData(input, maskFields)
 		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("Expected %v, got %v", expected, result)
@@ -149,9 +149,9 @@ func TestCensorSensitiveData(t *testing.T) {
 			},
 		}
 		expected := User{
-			Password: "m********d",
+			Password: "mypa*****",
 			Profile: Profile{
-				APIKey: "1***5",
+				APIKey: "1234*****",
 				Details: map[string]string{
 					"username": "user",
 					"email":    "user@example.com",
@@ -173,7 +173,7 @@ func TestCensorSensitiveData(t *testing.T) {
 			{Password: "secret", Username: "user"},
 		}
 		expected := []User{
-			{Password: "s****t", Username: "user"},
+			{Password: "secr*****", Username: "user"},
 		}
 		result := utils.CensorSensitiveData(input, maskFields).([]User)
 		if !reflect.DeepEqual(result, expected) {
@@ -205,7 +205,7 @@ func TestCensorSensitiveData(t *testing.T) {
 
 		input := User{Password: "1", Username: "user"}
 		expected := User{
-			Password: "*", // Assuming the mask function replaces the password with a single asterisk
+			Password: "1", // Strings ≤4 chars are kept as-is
 			Username: "user",
 		}
 
@@ -277,7 +277,7 @@ func TestCensorSensitiveData(t *testing.T) {
 			t.Fatalf("expected testStruct, got %T", got)
 		}
 
-		expectedMasked := "v********t"
+		expectedMasked := "very*****"
 		if result.Secret != expectedMasked {
 			t.Errorf("expected masked Secret %q, got %q", expectedMasked, result.Secret)
 		}
@@ -301,7 +301,7 @@ func TestCensorSensitiveData(t *testing.T) {
 			Other:  "public",
 		}
 		expected := byteStruct{
-			Secret: []byte("v********t"),
+			Secret: []byte("very*****"),
 			Other:  "public",
 		}
 
@@ -340,17 +340,17 @@ func TestCensorSensitiveData(t *testing.T) {
 			{
 				name:     "lowercase keys should match",
 				input:    map[string]string{"password": "secret", "username": "user"},
-				expected: map[string]string{"password": "s****t", "username": "user"},
+				expected: map[string]string{"password": "secr*****", "username": "user"},
 			},
 			{
 				name:     "uppercase keys should match",
 				input:    map[string]string{"PASSWORD": "secret", "username": "user"},
-				expected: map[string]string{"PASSWORD": "s****t", "username": "user"},
+				expected: map[string]string{"PASSWORD": "secr*****", "username": "user"},
 			},
 			{
 				name:     "mixed case keys should match",
 				input:    map[string]string{"PaSsWoRd": "secret", "username": "user"},
-				expected: map[string]string{"PaSsWoRd": "s****t", "username": "user"},
+				expected: map[string]string{"PaSsWoRd": "secr*****", "username": "user"},
 			},
 		}
 
@@ -412,7 +412,7 @@ func TestCensorSensitiveData(t *testing.T) {
 			UintField:   0,
 			FloatField:  0.0,
 			BoolField:   false,
-			StringField: "s****t",
+			StringField: "secr*****",
 		}
 
 		result := utils.CensorSensitiveData(input, maskFields).(ComplexStruct)
@@ -514,10 +514,11 @@ func TestCensorSensitiveData(t *testing.T) {
 
 		tests := []TestCase{
 			{Name: "Empty string", Input: "", Expected: ""},
-			{Name: "Single character", Input: "a", Expected: "*"},
-			{Name: "Two characters", Input: "ab", Expected: "**"},
-			{Name: "Three characters", Input: "abc", Expected: "a*c"},
-			{Name: "Long string", Input: "verylongpassword", Expected: "v********d"},
+			{Name: "Single character", Input: "a", Expected: "a"},
+			{Name: "Two characters", Input: "ab", Expected: "ab"},
+			{Name: "Three characters", Input: "abc", Expected: "abc"},
+			{Name: "Four characters", Input: "abcd", Expected: "abcd"},
+			{Name: "Long string", Input: "verylongpassword", Expected: "very*****"},
 		}
 
 		for _, tc := range tests {

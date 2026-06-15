@@ -14,7 +14,7 @@ import (
 
 func TestLogger(t *testing.T) {
 	t.Run("Init", func(t *testing.T) {
-		logger.Init()
+		logger.Init(logger.LogConfig{ServiceName: "test"})
 		assert.NotNil(t, logrus.StandardLogger().Formatter)
 	})
 
@@ -369,5 +369,47 @@ func TestLogger(t *testing.T) {
 			assert.Equal(t, "error: something failed", entry.Message)
 			assert.Equal(t, "pkg-req-789", entry.Data["request_id"])
 		})
+	})
+
+	t.Run("WithEvent", func(t *testing.T) {
+		hook := test.NewGlobal()
+		logrus.SetLevel(logrus.InfoLevel)
+		defer hook.Reset()
+
+		ctx := logger.WithRequestIDContext(context.Background(), "req-event")
+		logger.WithEvent(ctx, logger.EventLoginAttempt).Infof("test login")
+
+		require.Len(t, hook.Entries, 1)
+		entry := hook.LastEntry()
+		assert.Equal(t, "test login", entry.Message)
+		assert.Equal(t, logger.EventLoginAttempt, entry.Data["event"])
+		assert.Equal(t, "req-event", entry.Data["request_id"])
+	})
+
+	t.Run("WithEventAndFields", func(t *testing.T) {
+		hook := test.NewGlobal()
+		logrus.SetLevel(logrus.InfoLevel)
+		defer hook.Reset()
+
+		ctx := logger.WithRequestIDContext(context.Background(), "req-event-fields")
+		logger.WithEventAndFields(ctx, logger.EventLoginSuccess, logrus.Fields{
+			"user_id": 42,
+		}).Infof("test success")
+
+		require.Len(t, hook.Entries, 1)
+		entry := hook.LastEntry()
+		assert.Equal(t, "test success", entry.Message)
+		assert.Equal(t, logger.EventLoginSuccess, entry.Data["event"])
+		assert.Equal(t, 42, entry.Data["user_id"])
+		assert.Equal(t, "req-event-fields", entry.Data["request_id"])
+	})
+
+	t.Run("Init with full config", func(t *testing.T) {
+		logger.Init(logger.LogConfig{
+			ServiceName: "test-service",
+			Stage:       "staging",
+			Version:     "2.0.0",
+		})
+		assert.NotNil(t, logrus.StandardLogger().Formatter)
 	})
 }

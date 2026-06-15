@@ -249,15 +249,20 @@ func maskValue(value any) any {
 	}
 }
 
-// maskString masks a string by replacing its middle characters with asterisks.
-// For strings longer than 2 characters, it shows the first and last character.
-// For shorter strings, it fully masks with asterisks.
-func maskString(s string) string {
-	if len(s) > 2 {
-		maskLen := min(len(s)-2, 8) // Use built-in min() from Go 1.21+
-		return string(s[0]) + strings.Repeat("*", maskLen) + string(s[len(s)-1])
+// MaskWithPrefix shows the first N characters then replaces the rest with "*****".
+// For strings shorter than N, the entire string is shown.
+// Example: MaskWithPrefix("eyJhbGciOiJIUzI1NiJ9", 4) → "eyJh*****"
+func MaskWithPrefix(s string, prefixLen int) string {
+	if len(s) <= prefixLen {
+		return s
 	}
-	return strings.Repeat("*", len(s))
+	return s[:prefixLen] + "*****"
+}
+
+// maskString masks a string showing the first 4 characters.
+// For strings shorter than 4 characters, the entire string is shown.
+func maskString(s string) string {
+	return MaskWithPrefix(s, 4)
 }
 
 // maskReflectedValue masks values of non-standard types using reflection.

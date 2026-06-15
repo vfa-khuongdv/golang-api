@@ -25,6 +25,9 @@ var sensitiveKeys = []string{
 	"ccv", "credit_card", "debit_card", "social_security_number",
 	"ssn", "bank_account", "bank_account_number",
 	"email", "phone", "address", "cvv",
+	"secret", "otp", "totp", "mfa_code", "mfa_secret",
+	"verification_code", "new_password", "old_password", "confirm_password",
+	"session", "session_id", "sessionid", "sid",
 }
 
 // sensitiveHeaders are HTTP headers that contain sensitive information
@@ -35,6 +38,13 @@ var sensitiveHeaders = map[string]bool{
 	"x-api-key":           true,
 	"x-auth-token":        true,
 	"proxy-authorization": true,
+	"x-forwarded-for":     true,
+	"x-real-ip":           true,
+	"forwarded":           true,
+	"true-client-ip":      true,
+	"x-csrf-token":        true,
+	"xsrf-token":          true,
+	"x-xsrf-token":        true,
 }
 
 var marshalLogEntry = json.Marshal
@@ -62,13 +72,81 @@ func (w *bodyWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// censorQueryParams censors sensitive query parameters (keeps first 4 chars)
+func censorQueryParams(queryParams map[string][]string) map[string][]string {
+	censored := make(map[string][]string, len(queryParams))
+	for key, values := range queryParams {
+		if containsIgnoreCase(sensitiveKeys, key) {
+			masked := make([]string, len(values))
+			for i, v := range values {
+				masked[i] = utils.MaskWithPrefix(v, 4)
+			}
+			censored[key] = masked
+		} else {
+			censored[key] = values
+		}
+	}
+	return censored
+}
+
+// containsIgnoreCase checks if a string matches any key in the list (case-insensitive)
+func containsIgnoreCase(keys []string, target string) bool {
+	targetLower := strings.ToLower(target)
+	for _, k := range keys {
+		if strings.ToLower(k) == targetLower {
+			return true
+		}
+	}
+	return false
+}
+
+// maskCookieValue parses a cookie string and masks sensitive values while keeping keys.
+// Known sensitive cookie keys (session, token, auth) are masked.
+// Technical attributes (Path, Domain, HttpOnly, Secure) are kept for debugging.
+// Example: "session_id=abc123; Path=/" → "session_id=abc1*****; Path=/"
+func maskCookieValue(value string) string {
+	parts := strings.Split(value, ";")
+	for i, part := range parts {
+		part = strings.TrimSpace(part)
+		eqIdx := strings.Index(part, "=")
+		if eqIdx > 0 {
+			key := part[:eqIdx]
+			if containsIgnoreCase(sensitiveKeys, key) {
+				rawVal := part[eqIdx+1:]
+				parts[i] = key + "=" + utils.MaskWithPrefix(rawVal, 4)
+			} else {
+				parts[i] = part // keep non-sensitive attributes, trimmed
+			}
+		} else {
+			parts[i] = part // keep flag attributes (HttpOnly, Secure), trimmed
+		}
+	}
+	return strings.Join(parts, "; ")
+}
+
 // filterSensitiveHeaders creates a copy of headers with sensitive values censored
 func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
 	filtered := make(map[string][]string, len(headers))
 	for key, values := range headers {
 		lowerKey := strings.ToLower(key)
 		if sensitiveHeaders[lowerKey] {
-			filtered[key] = []string{"*****"}
+			if lowerKey == "authorization" && len(values) > 0 {
+				parts := strings.SplitN(values[0], " ", 2)
+				if len(parts) == 2 {
+					// Show the scheme (e.g., "Bearer") and first 4 chars of token
+					filtered[key] = []string{parts[0] + " " + utils.MaskWithPrefix(parts[1], 4)}
+				} else {
+					filtered[key] = []string{utils.MaskWithPrefix(values[0], 4)}
+				}
+			} else if lowerKey == "cookie" || lowerKey == "set-cookie" {
+				masked := make([]string, len(values))
+				for i, v := range values {
+					masked[i] = maskCookieValue(v)
+				}
+				filtered[key] = masked
+			} else {
+				filtered[key] = []string{utils.MaskWithPrefix(values[0], 4)}
+			}
 		} else {
 			filtered[key] = values
 		}
@@ -85,7 +163,7 @@ func LogMiddleware() gin.HandlerFunc {
 			Method:    c.Request.Method,
 			URL:       c.Request.URL.String(),
 			Header:    filterSensitiveHeaders(c.Request.Header),
-			Request:   c.Request.URL.Query(),
+			Request:   censorQueryParams(c.Request.URL.Query()),
 		}
 
 		// Only log request body if method is POST or PUT, and limit to maxBodySize

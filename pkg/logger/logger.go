@@ -11,6 +11,24 @@ type contextKey string
 
 const RequestIDKey contextKey = "requestID"
 
+// Event type constants for structured logging.
+// Used as the "event" field in every log entry for easy filtering in ELK/Kibana.
+const (
+	EventLoginAttempt            = "login_attempt"
+	EventLoginSuccess            = "login_success"
+	EventLoginFailed             = "login_failed"
+	EventTokenRefresh            = "token_refresh"
+	EventTokenRefreshSuccess     = "token_refresh_success"
+	EventTokenRefreshFailed      = "token_refresh_failed"
+	EventPasswordResetRequest    = "password_reset_request"
+	EventPasswordReset           = "password_reset"
+	EventPasswordChange          = "password_change"
+	EventPasswordChangeFailed    = "password_change_failed"
+	EventProfileGet              = "profile_get"
+	EventProfileUpdate           = "profile_update"
+	EventProfileUpdateFailed     = "profile_update_failed"
+)
+
 // Logger wraps a logrus entry for structured logging
 type Logger struct {
 	entry *log.Entry
@@ -61,10 +79,33 @@ func RequestIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-// Init configures the global logger
-func Init() {
-	log.SetFormatter(&log.JSONFormatter{})
+type LogConfig struct {
+	ServiceName string
+	Stage       string
+	Version     string
+}
+
+// Init configures the global logger with standard fields.
+// serviceName, stage, and version are added to every log entry.
+func Init(cfg LogConfig) {
+	log.SetFormatter(&log.JSONFormatter{
+		FieldMap: log.FieldMap{
+			log.FieldKeyMsg: "message",
+		},
+	})
 	log.SetOutput(os.Stdout)
+
+	defaultFields := log.Fields{
+		"service": cfg.ServiceName,
+		"version": cfg.Version,
+	}
+	if cfg.Stage != "" {
+		defaultFields["env"] = cfg.Stage
+	}
+
+	if logEntry := log.WithFields(defaultFields); cfg.Version != "" {
+		logEntry.Info("starting")
+	}
 }
 
 // Plain log functions (no context, no requestID) for startup, seeders, etc.
@@ -88,4 +129,19 @@ func WithField(key string, value interface{}) Logger {
 // WithFields returns a Logger with multiple fields for non-context structured logging
 func WithFields(fields log.Fields) Logger {
 	return Logger{entry: log.WithFields(fields)}
+}
+
+// WithEvent returns a Logger with an "event" field set.
+// Use for consistent event tracking across ELK/Kibana.
+func WithEvent(ctx context.Context, event string) Logger {
+	return WithContext(ctx).WithField("event", event)
+}
+
+// WithEventAndFields returns a Logger with event and extra fields.
+func WithEventAndFields(ctx context.Context, event string, fields log.Fields) Logger {
+	f := log.Fields{"event": event}
+	for k, v := range fields {
+		f[k] = v
+	}
+	return Logger{entry: WithContext(ctx).entry.WithFields(f)}
 }

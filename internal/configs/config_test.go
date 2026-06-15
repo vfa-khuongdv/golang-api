@@ -55,6 +55,35 @@ JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
 		assert.Nil(t, cfg)
 	})
 
+	t.Run("Load - Missing multiple required vars", func(t *testing.T) {
+		_ = os.Unsetenv("PORT")
+		_ = os.Unsetenv("DB_USERNAME")
+		_ = os.Unsetenv("DB_PASSWORD")
+		_ = os.Unsetenv("DB_DATABASE")
+		_ = os.Unsetenv("JWT_KEY")
+
+		cfg, err := configs.Load()
+		assert.Error(t, err)
+		assert.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "DB_USERNAME")
+		assert.Contains(t, err.Error(), "DB_PASSWORD")
+		assert.Contains(t, err.Error(), "DB_DATABASE")
+		assert.Contains(t, err.Error(), "JWT_KEY")
+	})
+
+	t.Run("Load - Empty PORT env var", func(t *testing.T) {
+		_ = os.Setenv("PORT", "")
+		_ = os.Setenv("DB_USERNAME", "u")
+		_ = os.Setenv("DB_PASSWORD", "p")
+		_ = os.Setenv("DB_DATABASE", "d")
+		_ = os.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-32chars")
+
+		cfg, err := configs.Load()
+		assert.Error(t, err)
+		assert.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "PORT")
+	})
+
 	t.Run("Load - Uses system env as fallback", func(t *testing.T) {
 		_ = os.Setenv("PORT", "5000")
 		_ = os.Setenv("DB_USERNAME", "sysuser")

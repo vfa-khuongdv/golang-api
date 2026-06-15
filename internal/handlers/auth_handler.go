@@ -30,7 +30,7 @@ func (handler *authHandlerImpl) Login(ctx *gin.Context) {
 
 	res, err := handler.authService.Login(ctx.Request.Context(), credentials.Email, credentials.Password, ctx.ClientIP())
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Login failed for email %s: %v", credentials.Email, err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventLoginFailed).Errorf("Login failed for email %s: %v", utils.MaskWithPrefix(credentials.Email, 4), err)
 		utils.RespondWithError(ctx, err)
 		return
 	}
@@ -48,7 +48,7 @@ func (handler *authHandlerImpl) RefreshToken(ctx *gin.Context) {
 
 	res, err := handler.authService.RefreshToken(ctx.Request.Context(), input.RefreshToken, input.AccessToken, ctx.ClientIP())
 	if err != nil {
-		logger.WithContext(ctx.Request.Context()).Errorf("Token refresh failed: %v", err)
+		logger.WithEvent(ctx.Request.Context(), logger.EventTokenRefreshFailed).Errorf("Token refresh failed: %v", err)
 		utils.RespondWithError(ctx, err)
 		return
 	}

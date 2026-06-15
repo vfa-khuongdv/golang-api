@@ -57,7 +57,11 @@ func main() {
 	}
 
 	// Initialize logger
-	logger.Init()
+	logger.Init(logger.LogConfig{
+		ServiceName: cfg.App.ServiceName,
+		Stage:       cfg.Server.Stage,
+		Version:     cfg.App.Version,
+	})
 
 	// Initialize database
 	db := initializeDatabase()
