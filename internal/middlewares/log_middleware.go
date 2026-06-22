@@ -200,31 +200,35 @@ func LogMiddleware() gin.HandlerFunc {
 
 		c.Next()
 
+		statusCode := c.Writer.Status()
 		logEntry.Latency = fmt.Sprintf("%d (ms)", time.Since(timeStart).Milliseconds())
-		logEntry.StatusCode = fmt.Sprintf("%d", c.Writer.Status())
+		logEntry.StatusCode = fmt.Sprintf("%d", statusCode)
 
-		// Limit response body to MAX_BODY_SIZE for logging
-		respBodyBytes := responseBody.Bytes()
-		if len(respBodyBytes) > MAX_BODY_SIZE {
-			respBodyBytes = respBodyBytes[:MAX_BODY_SIZE]
-		}
+		// Only log response body for error status codes (>= 400)
+		if statusCode >= 400 {
+			respBodyBytes := responseBody.Bytes()
+			if len(respBodyBytes) > MAX_BODY_SIZE {
+				respBodyBytes = respBodyBytes[:MAX_BODY_SIZE]
+			}
 
-		// If response is JSON, unmarshal and censor sensitive data
-		if strings.Contains(c.Writer.Header().Get("Content-Type"), "application/json") {
-			var responseBodyData any
-			if err := json.Unmarshal(respBodyBytes, &responseBodyData); err == nil {
-				responseBodyData = utils.CensorSensitiveData(responseBodyData, sensitiveKeys)
-				logEntry.Response = responseBodyData
+			if strings.Contains(c.Writer.Header().Get("Content-Type"), "application/json") {
+				var responseBodyData any
+				if err := json.Unmarshal(respBodyBytes, &responseBodyData); err == nil {
+					responseBodyData = utils.CensorSensitiveData(responseBodyData, sensitiveKeys)
+					logEntry.Response = responseBodyData
+				} else {
+					logEntry.Response = string(respBodyBytes)
+				}
 			} else {
 				logEntry.Response = string(respBodyBytes)
 			}
 		} else {
-			logEntry.Response = string(respBodyBytes)
+			logEntry.Response = "<not_log>"
 		}
 
 		// Use goroutine to write log entry to avoid blocking
-		go func(entry LogResponse) {
-			logger.WithFields(log.Fields{
+		go func(entry LogResponse, sc int) {
+			fields := log.Fields{
 				"request_id":  entry.RequestID,
 				"method":      entry.Method,
 				"url":         entry.URL,
@@ -233,7 +237,15 @@ func LogMiddleware() gin.HandlerFunc {
 				"header":      entry.Header,
 				"request":     entry.Request,
 				"response":    entry.Response,
-			}).Info("HTTP request completed")
-		}(logEntry)
+			}
+			switch {
+			case sc >= 500:
+				logger.WithFields(fields).Error("HTTP request completed")
+			case sc >= 400:
+				logger.WithFields(fields).Warn("HTTP request completed")
+			default:
+				logger.WithFields(fields).Info("HTTP request completed")
+			}
+		}(logEntry, statusCode)
 	}
 }

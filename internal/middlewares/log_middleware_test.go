@@ -106,12 +106,8 @@ func TestLogMiddleware(t *testing.T) {
 	assert.NotEqual(t, "user@example.com", reqMap["email"])
 	assert.Contains(t, reqMap["email"], "*")
 
-	// Verify Response Body Censoring
-	respMap, ok := logEntry["response"].(map[string]interface{})
-	assert.True(t, ok)
-	assert.Equal(t, "success", respMap["message"])
-	assert.NotEqual(t, "response_token_123", respMap["token"])
-	assert.Contains(t, respMap["token"], "*")
+	// Verify Response is not logged for success status (200 <= 400)
+	assert.Equal(t, "<not_log>", logEntry["response"])
 }
 
 func TestLogMiddleware_GetRequest(t *testing.T) {
@@ -142,7 +138,7 @@ func TestLogMiddleware_GetRequest(t *testing.T) {
 	assert.Equal(t, "GET", logEntry["method"])
 	assert.Equal(t, "/ping", logEntry["url"])
 	assert.Equal(t, "200", logEntry["status_code"])
-	assert.Equal(t, "pong", logEntry["response"])
+	assert.Equal(t, "<not_log>", logEntry["response"])
 }
 
 func TestLogMiddleware_LargeBody(t *testing.T) {
@@ -207,10 +203,8 @@ func TestLogMiddleware_LargeResponseBody(t *testing.T) {
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	// Verify response was truncated to maxBodySize (64KB)
-	respStr, ok := logEntry["response"].(string)
-	assert.True(t, ok)
-	assert.LessOrEqual(t, len(respStr), 1<<16, "Response should be truncated to 64KB")
+	// Verify response is not logged for success status (200 <= 400)
+	assert.Equal(t, "<not_log>", logEntry["response"])
 }
 
 func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
@@ -298,7 +292,7 @@ func TestLogMiddleware_MalformedJSON(t *testing.T) {
 	assert.Equal(t, "POST", logEntry["method"])
 	assert.Equal(t, "/malformed", logEntry["url"])
 	assert.NotEmpty(t, logEntry["request"])
-	assert.NotEmpty(t, logEntry["response"])
+	assert.Equal(t, "<not_log>", logEntry["response"])
 }
 
 func TestLogMiddleware_NonJSONContentType(t *testing.T) {
@@ -328,9 +322,9 @@ func TestLogMiddleware_NonJSONContentType(t *testing.T) {
 	err := json.Unmarshal(buf.Bytes(), &logEntry)
 	assert.NoError(t, err)
 
-	// Verify non-JSON content is logged as string
+	// Verify non-JSON request is logged as string, response is not logged for success
 	assert.Equal(t, "plain text request", logEntry["request"])
-	assert.Equal(t, "plain text response", logEntry["response"])
+	assert.Equal(t, "<not_log>", logEntry["response"])
 }
 
 func TestLogMiddleware_RequestBodyReadError(t *testing.T) {
@@ -516,4 +510,50 @@ func TestLogMiddleware_EmptyBody(t *testing.T) {
 	assert.Equal(t, "/empty", logEntry["url"])
 	// Empty body should not cause errors
 	assert.NotNil(t, logEntry["request"])
+}
+
+func TestLogMiddleware_ErrorResponseBody(t *testing.T) {
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/error", func(c *gin.Context) {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":  "internal server error",
+			"secret": "leaked_data_123",
+			"token":  "sensitive_token_xyz",
+		})
+	})
+
+	req, _ := http.NewRequest("POST", "/error", nil)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(100 * time.Millisecond)
+
+	var logEntry map[string]interface{}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "500", logEntry["status_code"])
+	assert.Equal(t, "error", logEntry["level"])
+
+	// Verify response body IS logged for error status (>= 400)
+	respMap, ok := logEntry["response"].(map[string]interface{})
+	assert.True(t, ok, "response should be logged for error status codes")
+	assert.Equal(t, "internal server error", respMap["error"])
+
+	// Verify sensitive fields in error response are censored
+	assert.NotEqual(t, "leaked_data_123", respMap["secret"])
+	assert.Contains(t, respMap["secret"], "*")
+	assert.NotEqual(t, "sensitive_token_xyz", respMap["token"])
+	assert.Contains(t, respMap["token"], "*")
 }
