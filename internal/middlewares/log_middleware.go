@@ -17,6 +17,9 @@ import (
 const (
 	// MAX_BODY_SIZE is the maximum size of request and response body to log (64 KB)
 	MAX_BODY_SIZE = 1 << 16 // 64 KB
+
+	// NotLoggedResponse is the placeholder used when response body is not logged for successful requests
+	NotLoggedResponse = "<not_log>"
 )
 
 // sensitiveKeys are field names that contain sensitive data and should be censored in logs
@@ -223,7 +226,7 @@ func LogMiddleware() gin.HandlerFunc {
 				logEntry.Response = string(respBodyBytes)
 			}
 		} else {
-			logEntry.Response = "<not_log>"
+			logEntry.Response = NotLoggedResponse
 		}
 
 		// Use goroutine to write log entry to avoid blocking

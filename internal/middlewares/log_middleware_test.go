@@ -107,7 +107,7 @@ func TestLogMiddleware(t *testing.T) {
 	assert.Contains(t, reqMap["email"], "*")
 
 	// Verify Response is not logged for success status (200 <= 400)
-	assert.Equal(t, "<not_log>", logEntry["response"])
+	assert.Equal(t, NotLoggedResponse, logEntry["response"])
 }
 
 func TestLogMiddleware_GetRequest(t *testing.T) {
@@ -138,7 +138,7 @@ func TestLogMiddleware_GetRequest(t *testing.T) {
 	assert.Equal(t, "GET", logEntry["method"])
 	assert.Equal(t, "/ping", logEntry["url"])
 	assert.Equal(t, "200", logEntry["status_code"])
-	assert.Equal(t, "<not_log>", logEntry["response"])
+	assert.Equal(t, NotLoggedResponse, logEntry["response"])
 }
 
 func TestLogMiddleware_LargeBody(t *testing.T) {
@@ -204,7 +204,7 @@ func TestLogMiddleware_LargeResponseBody(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify response is not logged for success status (200 <= 400)
-	assert.Equal(t, "<not_log>", logEntry["response"])
+	assert.Equal(t, NotLoggedResponse, logEntry["response"])
 }
 
 func TestLogMiddleware_SensitiveHeaders(t *testing.T) {
@@ -292,7 +292,7 @@ func TestLogMiddleware_MalformedJSON(t *testing.T) {
 	assert.Equal(t, "POST", logEntry["method"])
 	assert.Equal(t, "/malformed", logEntry["url"])
 	assert.NotEmpty(t, logEntry["request"])
-	assert.Equal(t, "<not_log>", logEntry["response"])
+	assert.Equal(t, NotLoggedResponse, logEntry["response"])
 }
 
 func TestLogMiddleware_NonJSONContentType(t *testing.T) {
@@ -324,7 +324,7 @@ func TestLogMiddleware_NonJSONContentType(t *testing.T) {
 
 	// Verify non-JSON request is logged as string, response is not logged for success
 	assert.Equal(t, "plain text request", logEntry["request"])
-	assert.Equal(t, "<not_log>", logEntry["response"])
+	assert.Equal(t, NotLoggedResponse, logEntry["response"])
 }
 
 func TestLogMiddleware_RequestBodyReadError(t *testing.T) {
@@ -556,4 +556,50 @@ func TestLogMiddleware_ErrorResponseBody(t *testing.T) {
 	assert.Contains(t, respMap["secret"], "*")
 	assert.NotEqual(t, "sensitive_token_xyz", respMap["token"])
 	assert.Contains(t, respMap["token"], "*")
+}
+
+func TestLogMiddleware_ClientErrorResponse(t *testing.T) {
+	// Setup log capture with thread-safe buffer
+	var buf syncBuffer
+	logrus.SetOutput(&buf)
+	logrus.SetFormatter(&logrus.JSONFormatter{})
+	defer logrus.SetOutput(nil)
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(LogMiddleware())
+
+	r.POST("/bad-request", func(c *gin.Context) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid input",
+			"email":   "user@example.com",
+			"session": "session_token_abc",
+		})
+	})
+
+	req, _ := http.NewRequest("POST", "/bad-request", nil)
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	time.Sleep(100 * time.Millisecond)
+
+	var logEntry map[string]interface{}
+	err := json.Unmarshal(buf.Bytes(), &logEntry)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "400", logEntry["status_code"])
+	assert.Equal(t, "warning", logEntry["level"])
+
+	// Verify response body IS logged for 4xx (>= 400)
+	respMap, ok := logEntry["response"].(map[string]interface{})
+	assert.True(t, ok, "response should be logged for 4xx error status codes")
+	assert.Equal(t, "invalid input", respMap["error"])
+
+	// Verify sensitive fields in 4xx response are censored
+	assert.NotEqual(t, "user@example.com", respMap["email"])
+	assert.Contains(t, respMap["email"], "*")
+	assert.NotEqual(t, "session_token_abc", respMap["session"])
+	assert.Contains(t, respMap["session"], "*")
 }
