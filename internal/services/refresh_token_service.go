@@ -15,6 +15,7 @@ import (
 type RefreshTokenService interface {
 	Create(ctx context.Context, user *models.User, ipAddress string) (*dto.JwtResult, error)
 	Update(ctx context.Context, token string, ipAddress string) (*dto.RefreshTokenResult, error)
+	DeleteByUserID(ctx context.Context, userID uint) error
 }
 
 type refreshTokenServiceImpl struct {
@@ -33,7 +34,6 @@ func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models
 	token := models.RefreshToken{
 		RefreshToken: tokenString,
 		IpAddress:    ipAddress,
-		UsedCount:    0,
 		ExpiredAt:    expiredAt,
 		UserID:       user.ID,
 	}
@@ -73,7 +73,6 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 	result.RefreshToken = newToken
 	result.ExpiredAt = expiredAt
 	result.IpAddress = ipAddress
-	result.UsedCount += 1
 
 	if err := service.repo.UpdateWithTx(ctx, tx, result); err != nil {
 		if rerr := tx.Rollback().Error; rerr != nil {
@@ -95,4 +94,14 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 		},
 		UserId: result.UserID,
 	}, nil
+}
+
+func (service *refreshTokenServiceImpl) DeleteByUserID(ctx context.Context, userID uint) error {
+	err := service.repo.DeleteByUserID(ctx, userID)
+	if err != nil {
+		logger.WithContext(ctx).Errorf("Failed to delete refresh tokens for user ID %d: %v", userID, err)
+		return apperror.NewDBDeleteError("Failed to delete refresh tokens")
+	}
+	logger.WithContext(ctx).Infof("Deleted refresh tokens for user ID %d", userID)
+	return nil
 }

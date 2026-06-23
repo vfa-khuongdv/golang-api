@@ -7,6 +7,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
@@ -36,6 +37,22 @@ func (handler *authHandlerImpl) Login(ctx *gin.Context) {
 	}
 
 	utils.RespondWithOK(ctx, http.StatusOK, res)
+}
+
+func (handler *authHandlerImpl) Logout(ctx *gin.Context) {
+	userID, exists := ctx.Get("UserID")
+	if !exists {
+		utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Unauthorized"))
+		return
+	}
+
+	if err := handler.authService.Logout(ctx.Request.Context(), userID.(uint)); err != nil {
+		logger.WithEvent(ctx.Request.Context(), logger.EventLogout).Errorf("Logout failed for user ID %d: %v", userID, err)
+		utils.RespondWithError(ctx, err)
+		return
+	}
+
+	utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
 func (handler *authHandlerImpl) RefreshToken(ctx *gin.Context) {

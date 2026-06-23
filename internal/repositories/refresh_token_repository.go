@@ -19,6 +19,7 @@ type RefreshTokenRepository interface {
 	FindByTokenWithTx(ctx context.Context, tx *gorm.DB, token string) (*models.RefreshToken, error)
 	UpdateWithTx(ctx context.Context, tx *gorm.DB, token *models.RefreshToken) error
 	BeginTx(ctx context.Context) (*gorm.DB, error)
+	DeleteByUserID(ctx context.Context, userID uint) error
 }
 
 type refreshTokenRepositoryImpl struct {
@@ -73,6 +74,14 @@ func (repo *refreshTokenRepositoryImpl) UpdateWithTx(ctx context.Context, tx *go
 	if err := tx.WithContext(ctx).Save(token).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to update refresh token with tx: %v", err)
 		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update refresh token", err)
+	}
+	return nil
+}
+
+func (repo *refreshTokenRepositoryImpl) DeleteByUserID(ctx context.Context, userID uint) error {
+	if err := repo.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&models.RefreshToken{}).Error; err != nil {
+		logger.WithContext(ctx).Errorf("DB error: failed to delete refresh tokens for user ID %d: %v", userID, err)
+		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to delete refresh tokens", err)
 	}
 	return nil
 }

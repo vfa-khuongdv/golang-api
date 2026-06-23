@@ -215,14 +215,14 @@ func TestUserRepository(t *testing.T) {
 			Name:     "Token User",
 			Email:    "token@example.com",
 			Password: "password",
-			Token:    utils.StringToPtr("token123"),
+			ResetToken:    utils.StringToPtr("token123"),
 			Gender:   1,
 		}
 		_, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)
 
 		// Act
-		foundUser, err := repo.FindByField(context.Background(), "token", "token123")
+		foundUser, err := repo.FindByField(context.Background(), "reset_token", "token123")
 
 		// Assert
 		require.NoError(t, err)

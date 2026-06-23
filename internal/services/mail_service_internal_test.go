@@ -30,7 +30,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 	user := &models.User{
 		Email: "user@example.com",
 		Name:  "User",
-		Token: &token,
+		ResetToken: &token,
 	}
 
 	t.Setenv("FRONTEND_URL", "https://example.com")

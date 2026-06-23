@@ -14,6 +14,7 @@ import (
 type AuthService interface {
 	Login(ctx context.Context, email, password string, ipAddress string) (*dto.LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken, accessToken string, ipAddress string) (*dto.LoginResponse, error)
+	Logout(ctx context.Context, userID uint) error
 }
 
 type authServiceImpl struct {
@@ -40,9 +41,31 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
+	if user.LockedUntil != nil && time.Now().Unix() < *user.LockedUntil {
+		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - account locked for email: %s", utils.MaskWithPrefix(email, 4))
+		return nil, apperror.NewAccountLockedError("Account is temporarily locked due to too many failed attempts. Try again later.")
+	}
+
 	if isValid := utils.CheckPasswordHash(password, user.Password); !isValid {
-		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - invalid password for email: %s", utils.MaskWithPrefix(email, 4))
+		user.FailedAttempts++
+		lockUntil := time.Now().Unix()
+		if user.FailedAttempts >= MaxFailedAttempts {
+			lockUntil = time.Now().Add(time.Minute * LockoutDurationMinutes).Unix()
+			user.LockedUntil = &lockUntil
+		}
+		if updateErr := service.repo.Update(ctx, user); updateErr != nil {
+			logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to update user after failed login: %v", updateErr)
+		}
+		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - invalid password for email: %s (attempt %d/%d)", utils.MaskWithPrefix(email, 4), user.FailedAttempts, MaxFailedAttempts)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
+	}
+
+	if user.FailedAttempts > 0 || user.LockedUntil != nil {
+		user.FailedAttempts = 0
+		user.LockedUntil = nil
+		if updateErr := service.repo.Update(ctx, user); updateErr != nil {
+			logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to reset failed attempts for user ID %d: %v", user.ID, updateErr)
+		}
 	}
 
 	accessToken, err := service.jwtService.GenerateAccessToken(user.ID)
@@ -51,11 +74,11 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 		return nil, apperror.NewInternalServerError("Failed to generate access token")
 	}
 
-	refreshToken, errToken := service.refreshTokenService.Create(ctx, user, ipAddress)
+	refreshToken, err := service.refreshTokenService.Create(ctx, user, ipAddress)
 
-	if errToken != nil {
-		logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to create refresh token for user ID %d: %v", user.ID, errToken)
-		return nil, errToken
+	if err != nil {
+		logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to create refresh token for user ID %d: %v", user.ID, err)
+		return nil, err
 	}
 
 	logger.WithEvent(ctx, logger.EventLoginSuccess).
@@ -126,4 +149,9 @@ func (service *authServiceImpl) RefreshToken(ctx context.Context, refreshToken, 
 			ExpiresAt: refreshResult.Token.ExpiresAt,
 		},
 	}, nil
+}
+
+func (service *authServiceImpl) Logout(ctx context.Context, userID uint) error {
+	logger.WithEvent(ctx, logger.EventLogout).Infof("Logout for user ID %d", userID)
+	return service.refreshTokenService.DeleteByUserID(ctx, userID)
 }

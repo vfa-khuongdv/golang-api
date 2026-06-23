@@ -29,3 +29,8 @@ func (m *MockRefreshTokenService) Update(ctx context.Context, token string, ipAd
 	result, _ := args.Get(0).(*dto.RefreshTokenResult)
 	return result, args.Error(1)
 }
+
+func (m *MockRefreshTokenService) DeleteByUserID(ctx context.Context, userID uint) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}

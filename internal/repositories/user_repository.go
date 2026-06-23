@@ -115,9 +115,9 @@ func (repo *userRepositoryImpl) Delete(ctx context.Context, userId uint) error {
 
 func (repo *userRepositoryImpl) FindByField(ctx context.Context, field string, value string) (*models.User, error) {
 	allowedFields := map[string]bool{
-		"name":  true,
-		"email": true,
-		"token": true,
+		"name":        true,
+		"email":       true,
+		"reset_token": true,
 	}
 
 	if !allowedFields[field] {

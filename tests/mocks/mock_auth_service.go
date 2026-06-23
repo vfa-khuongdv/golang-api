@@ -26,3 +26,8 @@ func (m *MockAuthService) RefreshToken(ctx context.Context, refreshToken, access
 	}
 	return nil, args.Error(1)
 }
+
+func (m *MockAuthService) Logout(ctx context.Context, userID uint) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}

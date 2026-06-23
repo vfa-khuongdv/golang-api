@@ -76,7 +76,6 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		orig := &models.RefreshToken{
 			RefreshToken: "existing_token",
 			IpAddress:    "",
-			UsedCount:    0,
 			ExpiredAt:    9999999999,
 			UserID:       1,
 		}
@@ -119,7 +118,6 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		orig := &models.RefreshToken{
 			RefreshToken: "existing_token",
 			IpAddress:    "",
-			UsedCount:    0,
 			ExpiredAt:    9999999999,
 			UserID:       1,
 		}
@@ -160,7 +158,6 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "existing_token").Return(&models.RefreshToken{
 			RefreshToken: "old_token",
 			IpAddress:    "",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Add(time.Hour).Unix(),
 			UserID:       1,
 		}, nil)
@@ -182,7 +179,6 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "existing_token").Return(&models.RefreshToken{
 			RefreshToken: "old_token",
 			IpAddress:    "",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Add(time.Hour).Unix(),
 			UserID:       1,
 		}, nil)
@@ -193,6 +189,29 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		mockRepo.AssertExpectations(t)
+	})
+}
+
+func (s *RefreshTokenServiceTestSuite) TestDeleteByUserID() {
+	userID := uint(1)
+
+	s.T().Run("Success", func(t *testing.T) {
+		s.repo.On("DeleteByUserID", mock.Anything, userID).Return(nil)
+
+		err := s.refreshTokenService.DeleteByUserID(context.Background(), userID)
+
+		assert.NoError(t, err)
+		s.repo.AssertExpectations(t)
+	})
+
+	s.T().Run("Error", func(t *testing.T) {
+		s.SetupTest()
+		s.repo.On("DeleteByUserID", mock.Anything, userID).Return(originErrors.New("delete error"))
+
+		err := s.refreshTokenService.DeleteByUserID(context.Background(), userID)
+
+		assert.Error(t, err)
+		s.repo.AssertExpectations(t)
 	})
 }
 

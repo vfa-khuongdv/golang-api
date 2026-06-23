@@ -48,8 +48,8 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 	token := utils.GenerateRandomString(32)
 	expiredAt := time.Now().Add(1 * time.Hour).Unix()
 
-	user.Token = &token
-	user.ExpiredAt = &expiredAt
+	user.ResetToken = &token
+	user.ResetExpiredAt = &expiredAt
 
 	err = service.repo.Update(ctx, user)
 	if err != nil {
@@ -65,12 +65,12 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 }
 
 func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.ResetPasswordInput) (*models.User, error) {
-	user, err := service.repo.FindByField(ctx, "token", input.Token)
+	user, err := service.repo.FindByField(ctx, "reset_token", input.Token)
 	if err != nil {
 		return nil, apperror.NewNotFoundError("Invalid token")
 	}
 
-	if user.ExpiredAt == nil || time.Now().Unix() > *user.ExpiredAt {
+	if user.ResetExpiredAt == nil || time.Now().Unix() > *user.ResetExpiredAt {
 		return nil, apperror.NewTokenExpiredError("Token has expired")
 	}
 
@@ -80,8 +80,8 @@ func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.Re
 	}
 
 	user.Password = newPassword
-	user.Token = nil
-	user.ExpiredAt = nil
+	user.ResetToken = nil
+	user.ResetExpiredAt = nil
 
 	err = service.repo.Update(ctx, user)
 	if err != nil {

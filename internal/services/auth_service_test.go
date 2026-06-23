@@ -79,6 +79,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
 				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+				s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 			},
 			expectErr: true,
 			errCode:   apperror.ErrInvalidPassword,
@@ -263,6 +264,130 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			}
 		})
 	}
+}
+
+// --------------------- LOGOUT TESTS ---------------------
+func (s *AuthServiceTestSuite) TestLogout() {
+	userID := uint(1)
+
+	s.refreshTokenService.On("DeleteByUserID", mock.Anything, userID).Return(nil)
+
+	err := s.service.Logout(context.Background(), userID)
+
+	assert.NoError(s.T(), err)
+	s.refreshTokenService.AssertExpectations(s.T())
+}
+
+func (s *AuthServiceTestSuite) TestLogout_Error() {
+	userID := uint(1)
+
+	s.refreshTokenService.On("DeleteByUserID", mock.Anything, userID).Return(errors.New("delete failed"))
+
+	err := s.service.Logout(context.Background(), userID)
+
+	assert.Error(s.T(), err)
+	s.refreshTokenService.AssertExpectations(s.T())
+}
+
+// --------------------- LOCKOUT TESTS ---------------------
+func (s *AuthServiceTestSuite) TestLogin_AccountLocked() {
+	email := "locked@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	lockedUntil := time.Now().Add(30 * time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: "irrelevant", LockedUntil: &lockedUntil}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), resp)
+	if appErr, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrAccountLocked, appErr.Code)
+	}
+}
+
+func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
+	email := "reset@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	hashedPassword, _ := utils.HashPassword(password)
+	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+		Token:     "token",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}, nil)
+	s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
+		Token:     "refresh",
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	}, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
+	assert.Equal(s.T(), 0, user.FailedAttempts)
+	assert.Nil(s.T(), user.LockedUntil)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_InvalidPasswordUpdateError() {
+	email := "updatefail@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update error"))
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), resp)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
+	email := "lockout@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: 4}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), resp)
+	assert.Equal(s.T(), 5, user.FailedAttempts)
+	assert.NotNil(s.T(), user.LockedUntil)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
+	email := "resetfail@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	hashedPassword, _ := utils.HashPassword(password)
+	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 2}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update error"))
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+		Token:     "token",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}, nil)
+	s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
+		Token:     "refresh",
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	}, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
 }
 
 // --------------------- RUN TEST SUITE ---------------------

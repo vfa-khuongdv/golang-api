@@ -22,6 +22,7 @@ const (
 	ErrPasswordHashFailed = 3003 // Failed to hash password
 	ErrPasswordMismatch   = 3004 // Password mismatch
 	ErrPasswordUnchanged  = 3005 // Old and new password are the same
+	ErrAccountLocked      = 3006 // Account is temporarily locked
 
 	// Common
 	ErrParseError       = 4000 // Parsing or field error

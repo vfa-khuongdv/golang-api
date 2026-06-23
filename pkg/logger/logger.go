@@ -27,6 +27,7 @@ const (
 	EventProfileGet              = "profile_get"
 	EventProfileUpdate           = "profile_update"
 	EventProfileUpdateFailed     = "profile_update_failed"
+	EventLogout                  = "logout"
 )
 
 // Logger wraps a logrus entry for structured logging

@@ -49,8 +49,8 @@ func TestAuthForgotPassword(t *testing.T) {
 			// Verify token was generated despite email failure
 			var updatedUser models.User
 			db.First(&updatedUser, user.ID)
-			assert.NotNil(t, updatedUser.Token)
-			assert.NotNil(t, updatedUser.ExpiredAt)
+			assert.NotNil(t, updatedUser.ResetToken)
+			assert.NotNil(t, updatedUser.ResetExpiredAt)
 
 			var errResp ErrorResponse
 			err := json.Unmarshal(w.Body.Bytes(), &errResp)

@@ -53,7 +53,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
 
-	url := configs.GetEnv("FRONTEND_URL", "") + "/reset-password?token=" + *user.Token
+	url := configs.GetEnv("FRONTEND_URL", "") + "/reset-password?token=" + *user.ResetToken
 
 	data := map[string]interface{}{
 		"Name": user.Name,

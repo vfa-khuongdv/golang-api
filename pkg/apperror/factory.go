@@ -166,6 +166,14 @@ func NewPasswordUnchangedError(message string) *AppError {
 	}
 }
 
+func NewAccountLockedError(message string) *AppError {
+	return &AppError{
+		HttpStatusCode: http.StatusTooManyRequests,
+		Code:           ErrAccountLocked,
+		Message:        message,
+	}
+}
+
 // === Common errors ===
 func NewParseError(message string) *AppError {
 	return &AppError{

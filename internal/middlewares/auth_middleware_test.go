@@ -13,24 +13,6 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 )
 
-func hasValidBearerPrefix(authHeader string) bool {
-	return len(authHeader) >= 7 && authHeader[:7] == "Bearer "
-}
-
-func extractTokenFromHeader(authHeader string) string {
-	if len(authHeader) > 7 {
-		return authHeader[7:]
-	}
-	return ""
-}
-
-func respondWithUnauthorizedError(c *gin.Context, message string) {
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-		"code":    "UNAUTHORIZED",
-		"message": message,
-	})
-}
-
 func TestAuthMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -70,8 +52,8 @@ func TestAuthMiddleware(t *testing.T) {
 			name:       "valid token with successful validation",
 			authHeader: "Bearer valid-token",
 			mockSetup: func(m *mocks.MockJWTService) {
-				claims := &services.CustomClaims{ID: 123}
-				m.On("ValidateToken", "valid-token").Return(claims, nil)
+				claims := &services.CustomClaims{ID: 123, Scope: services.TokenScopeAccess}
+				m.On("ValidateTokenWithScope", "valid-token", services.TokenScopeAccess).Return(claims, nil)
 			},
 			expectedStatusCode: http.StatusOK,
 			expectedUserID:     uint(123),
@@ -81,7 +63,7 @@ func TestAuthMiddleware(t *testing.T) {
 			name:       "invalid token that fails validation",
 			authHeader: "Bearer invalid-token",
 			mockSetup: func(m *mocks.MockJWTService) {
-				m.On("ValidateToken", "invalid-token").Return((*services.CustomClaims)(nil), errors.New("invalid token"))
+				m.On("ValidateTokenWithScope", "invalid-token", services.TokenScopeAccess).Return((*services.CustomClaims)(nil), errors.New("invalid token"))
 			},
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedUserID:     nil,
@@ -91,7 +73,17 @@ func TestAuthMiddleware(t *testing.T) {
 			name:       "empty token after Bearer prefix",
 			authHeader: "Bearer ",
 			mockSetup: func(m *mocks.MockJWTService) {
-				m.On("ValidateToken", "").Return((*services.CustomClaims)(nil), errors.New("empty token"))
+				m.On("ValidateTokenWithScope", "", services.TokenScopeAccess).Return((*services.CustomClaims)(nil), errors.New("empty token"))
+			},
+			expectedStatusCode: http.StatusUnauthorized,
+			expectedUserID:     nil,
+			expectNext:         false,
+		},
+		{
+			name:       "token with wrong scope",
+			authHeader: "Bearer wrong-scope-token",
+			mockSetup: func(m *mocks.MockJWTService) {
+				m.On("ValidateTokenWithScope", "wrong-scope-token", services.TokenScopeAccess).Return((*services.CustomClaims)(nil), errors.New("invalid scope"))
 			},
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedUserID:     nil,
@@ -101,7 +93,6 @@ func TestAuthMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			mockJWTService := new(mocks.MockJWTService)
 			tt.mockSetup(mockJWTService)
 
@@ -109,24 +100,7 @@ func TestAuthMiddleware(t *testing.T) {
 			nextCalled := false
 			var capturedUserID interface{}
 
-			router.Use(func(c *gin.Context) {
-				authHeader := c.GetHeader("Authorization")
-				if authHeader == "" || !hasValidBearerPrefix(authHeader) {
-					respondWithUnauthorizedError(c, "Authorization header required")
-					return
-				}
-
-				tokenString := extractTokenFromHeader(authHeader)
-				claims, err := mockJWTService.ValidateToken(tokenString)
-				if err != nil {
-					respondWithUnauthorizedError(c, "Unauthorized")
-					return
-				}
-
-				c.Set("UserID", claims.ID)
-				c.Next()
-			})
-
+			router.Use(middlewares.AuthMiddleware(mockJWTService))
 			router.GET("/test", func(c *gin.Context) {
 				nextCalled = true
 				capturedUserID, _ = c.Get("UserID")
@@ -139,10 +113,8 @@ func TestAuthMiddleware(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 
-			// Act
 			router.ServeHTTP(w, req)
 
-			// Assert
 			assert.Equal(t, tt.expectedStatusCode, w.Code)
 			assert.Equal(t, tt.expectNext, nextCalled)
 			if tt.expectedUserID != nil {
@@ -175,7 +147,6 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Arrange
 			router := gin.New()
 			router.Use(middlewares.AuthMiddleware(jwtService))
 			router.GET("/test", func(c *gin.Context) {
@@ -188,10 +159,8 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 			}
 			w := httptest.NewRecorder()
 
-			// Act
 			router.ServeHTTP(w, req)
 
-			// Assert
 			assert.Equal(t, tt.expectedStatusCode, w.Code)
 		})
 	}
@@ -211,7 +180,6 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	assert.NotNil(t, accessTokenResult)
 
 	t.Run("valid JWT access token", func(t *testing.T) {
-		// Arrange
 		router := gin.New()
 		router.Use(middlewares.AuthMiddleware(jwtService))
 
@@ -225,10 +193,8 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+accessTokenResult.Token)
 		w := httptest.NewRecorder()
 
-		// Act
 		router.ServeHTTP(w, req)
 
-		// Assert
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, uint(123), capturedUserID)
 	})

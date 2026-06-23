@@ -38,7 +38,7 @@ func TestJWTService_InternalBranches(t *testing.T) {
 
 		claims, err := svc.ValidateToken("any")
 		assert.Nil(t, claims)
-		assert.NoError(t, err)
+		assert.ErrorIs(t, err, jwt.ErrInvalidType)
 	})
 
 	t.Run("ValidateTokenIgnoreExpirationInvalidClaimsType", func(t *testing.T) {

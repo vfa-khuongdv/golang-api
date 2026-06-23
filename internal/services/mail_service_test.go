@@ -31,7 +31,7 @@ func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 			ID:    1,
 			Email: "user@example.com",
 			Name:  "Test User",
-			Token: nil,
+			ResetToken: nil,
 		}
 
 		assert.Panics(t, func() {

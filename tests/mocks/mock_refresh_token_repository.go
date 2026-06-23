@@ -41,3 +41,8 @@ func (m *MockRefreshTokenRepository) BeginTx(ctx context.Context) (*gorm.DB, err
 	args := m.Called(ctx)
 	return args.Get(0).(*gorm.DB), args.Error(1)
 }
+
+func (m *MockRefreshTokenRepository) DeleteByUserID(ctx context.Context, userID uint) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}

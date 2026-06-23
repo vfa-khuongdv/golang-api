@@ -34,7 +34,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "test_refresh_token",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    1710000000,
 			UserID:       1,
 		}
@@ -77,7 +76,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "test_refresh_token_1",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
@@ -93,7 +91,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		assert.Equal(t, item.RefreshToken, foundItem.RefreshToken)
 		assert.Equal(t, item.IpAddress, foundItem.IpAddress)
 		assert.Equal(t, item.UserID, foundItem.UserID)
-		assert.Equal(t, item.UsedCount, foundItem.UsedCount)
 	})
 
 	t.Run("FindByToken - Not Found", func(t *testing.T) {
@@ -117,7 +114,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "test_refresh_token",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    now,
 			UserID:       1,
 		}
@@ -133,7 +129,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		assert.Equal(t, item.RefreshToken, foundItem.RefreshToken)
 		assert.Equal(t, item.IpAddress, foundItem.IpAddress)
 		assert.Equal(t, item.UserID, foundItem.UserID)
-		assert.Equal(t, item.UsedCount, foundItem.UsedCount)
 		assert.Equal(t, item.ExpiredAt, foundItem.ExpiredAt)
 	})
 
@@ -145,7 +140,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "test_refresh_token_expired",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    now,
 			UserID:       1,
 		}
@@ -167,7 +161,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "test_original_refresh_token",
 			IpAddress:    "",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
@@ -177,7 +170,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		// Update fields
 		item.IpAddress = "127.0.0.1"
 		item.RefreshToken = "test_updated_refresh_token"
-		item.UsedCount = 1
 		item.ExpiredAt = time.Now().Unix() + int64(time.Hour)
 
 		// Act
@@ -193,7 +185,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		assert.Equal(t, item.RefreshToken, foundItem.RefreshToken)
 		assert.Equal(t, item.IpAddress, foundItem.IpAddress)
 		assert.Equal(t, item.UserID, foundItem.UserID)
-		assert.Equal(t, item.UsedCount, foundItem.UsedCount)
 		assert.Equal(t, item.ExpiredAt, foundItem.ExpiredAt)
 	})
 
@@ -205,7 +196,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "test_tx_token",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    now,
 			UserID:       1,
 		}
@@ -216,7 +206,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		tx := db.Begin()
 		require.NotNil(t, tx)
 
-		item.UsedCount = 1
 		err = repo.UpdateWithTx(context.Background(), tx, item)
 
 		// Assert
@@ -226,7 +215,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		foundItem, err := repo.FindByToken(context.Background(), "test_tx_token")
 		require.NoError(t, err)
 		require.NotNil(t, foundItem)
-		assert.Equal(t, int64(1), foundItem.UsedCount)
 	})
 
 	t.Run("FindByToken - Database Error", func(t *testing.T) {
@@ -249,7 +237,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "update_error_token",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
@@ -271,7 +258,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "token_tx_success",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
@@ -307,7 +293,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "token_tx_expired",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Unix() - int64(time.Minute),
 			UserID:       1,
 		}
@@ -347,7 +332,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		item := &models.RefreshToken{
 			RefreshToken: "updatetx_error_token",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
 			UserID:       1,
 		}
@@ -388,5 +372,41 @@ func TestRefreshTokenRepository(t *testing.T) {
 		tx, err := repo.BeginTx(context.Background())
 		assert.Error(t, err)
 		assert.Nil(t, tx)
+	})
+
+	t.Run("DeleteByUserID - Success", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		item := &models.RefreshToken{
+			RefreshToken: "delete_me",
+			IpAddress:    "127.0.0.1",
+			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
+			UserID:       1,
+		}
+		require.NoError(t, repo.Create(context.Background(), item))
+
+		err := repo.DeleteByUserID(context.Background(), 1)
+		assert.NoError(t, err)
+	})
+
+	t.Run("DeleteByUserID - No Tokens", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		err := repo.DeleteByUserID(context.Background(), 999)
+		assert.NoError(t, err)
+	})
+
+	t.Run("DeleteByUserID - Database Error", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		sqlDB.Close()
+
+		err = repo.DeleteByUserID(context.Background(), 1)
+		assert.Error(t, err)
 	})
 }

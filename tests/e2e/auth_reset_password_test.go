@@ -27,8 +27,8 @@ func TestAuthResetPassword(t *testing.T) {
 		Email:     "test_reset@example.com",
 		Password:  hashedPassword,
 		Gender:    1,
-		Token:     &token,
-		ExpiredAt: &expiredAt,
+		ResetToken:     &token,
+		ResetExpiredAt: &expiredAt,
 	}
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
@@ -54,8 +54,8 @@ func TestAuthResetPassword(t *testing.T) {
 		var updatedUser models.User
 		db.First(&updatedUser, user.ID)
 		assert.True(t, utils.CheckPasswordHash(newPassword, updatedUser.Password))
-		assert.Nil(t, updatedUser.Token)
-		assert.Nil(t, updatedUser.ExpiredAt)
+		assert.Nil(t, updatedUser.ResetToken)
+		assert.Nil(t, updatedUser.ResetExpiredAt)
 	})
 
 	t.Run("Reset Password - Invalid Token", func(t *testing.T) {
@@ -164,8 +164,8 @@ func TestAuthResetPassword(t *testing.T) {
 			Email:     "expired@example.com",
 			Password:  hashedPassword,
 			Gender:    1,
-			Token:     &expiredToken,
-			ExpiredAt: &expiredTime,
+			ResetToken:     &expiredToken,
+			ResetExpiredAt: &expiredTime,
 		}
 		db.Create(&expiredUser)
 

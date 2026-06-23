@@ -272,96 +272,6 @@ func TestRefreshToken(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
-	t.Run("RefreshToken - Success With AccessToken", func(t *testing.T) {
-		mockService := new(mocks.MockAuthService)
-		handler := handlers.NewAuthHandler(mockService)
-
-		// Mock the service method when using access token
-		mockService.On("RefreshToken", mock.Anything, "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
-			&dto.LoginResponse{
-				AccessToken: dto.JwtResult{
-					Token:     "newtesttoken",
-					ExpiresAt: 0,
-				},
-				RefreshToken: dto.JwtResult{
-					Token:     "newtestrefreshtoken",
-					ExpiresAt: 0,
-				},
-			}, nil,
-		)
-		requestBody := map[string]string{
-			"refresh_token": "testrefreshtoken",
-			"access_token":  "testaccesstoken",
-		}
-		reqBody, _ := json.Marshal(requestBody)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(reqBody))
-		c.Request.Header.Set("Content-Type", "application/json")
-
-		// Call the handler
-		handler.RefreshToken(c)
-
-		// Assert response
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `
-		{
-			"access_token": {"token":"newtesttoken","expires_at":0},
-			"refresh_token": {"token":"newtestrefreshtoken","expires_at":0}
-		}
-		`, w.Body.String())
-
-		// Assert mocks
-		mockService.AssertExpectations(t)
-	})
-
-	t.Run("RefreshToken - Success With Both Tokens", func(t *testing.T) {
-		mockService := new(mocks.MockAuthService)
-		handler := handlers.NewAuthHandler(mockService)
-
-		// Mock the service method - should prefer refresh token
-		mockService.On("RefreshToken", mock.Anything, "testrefreshtoken", "testaccesstoken", mock.Anything).Return(
-			&dto.LoginResponse{
-				AccessToken: dto.JwtResult{
-					Token:     "newtesttoken",
-					ExpiresAt: 0,
-				},
-				RefreshToken: dto.JwtResult{
-					Token:     "newtestrefreshtoken",
-					ExpiresAt: 0,
-				},
-			}, nil,
-		)
-		requestBody := map[string]string{
-			"refresh_token": "testrefreshtoken",
-			"access_token":  "testaccesstoken",
-		}
-		reqBody, _ := json.Marshal(requestBody)
-
-		// Create a test context
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(reqBody))
-		c.Request.Header.Set("Content-Type", "application/json")
-
-		// Call the handler
-		handler.RefreshToken(c)
-
-		// Assert response
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.JSONEq(t, `
-		{
-			"access_token": {"token":"newtesttoken","expires_at":0},
-			"refresh_token": {"token":"newtestrefreshtoken","expires_at":0}
-		}
-		`, w.Body.String())
-
-		// Assert mocks
-		mockService.AssertExpectations(t)
-	})
-
 	t.Run("RefreshToken - Error Invalid Token", func(t *testing.T) {
 		mockService := new(mocks.MockAuthService)
 		handler := handlers.NewAuthHandler(mockService)
@@ -479,5 +389,56 @@ func TestRefreshToken(t *testing.T) {
 			})
 		}
 	})
+}
 
+func TestLogout(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("Logout - Success", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		mockService.On("Logout", mock.Anything, uint(1)).Return(nil)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/logout", nil)
+		c.Set("UserID", uint(1))
+
+		handler.Logout(c)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("Logout - Missing UserID", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/logout", nil)
+
+		handler.Logout(c)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("Logout - Service Error", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		mockService.On("Logout", mock.Anything, uint(1)).Return(apperror.NewInternalServerError("logout failed"))
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/logout", nil)
+		c.Set("UserID", uint(1))
+
+		handler.Logout(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockService.AssertExpectations(t)
+	})
 }

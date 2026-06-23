@@ -18,6 +18,12 @@ var (
 const (
 	// TokenScopeAccess is the scope for regular access tokens
 	TokenScopeAccess = "access"
+
+	// MaxFailedAttempts is the maximum number of failed login attempts before lockout
+	MaxFailedAttempts = 5
+
+	// LockoutDurationMinutes is how long the account is locked after too many failures
+	LockoutDurationMinutes = 15
 )
 
 // CustomClaims represents JWT claims with a custom user ID field and scope
@@ -102,7 +108,7 @@ func (s *jwtServiceImpl) ValidateToken(tokenString string) (*CustomClaims, error
 		return claims, nil
 	}
 
-	return nil, err
+	return nil, jwt.ErrInvalidType
 }
 
 // ValidateTokenWithScope validates a JWT token string with a specific required scope

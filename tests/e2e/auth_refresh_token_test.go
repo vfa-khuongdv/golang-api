@@ -152,7 +152,6 @@ func TestAuthRefreshToken(t *testing.T) {
 		expiredRefresh := models.RefreshToken{
 			RefreshToken: "expired-refresh-token",
 			IpAddress:    "127.0.0.1",
-			UsedCount:    0,
 			ExpiredAt:    time.Now().Add(-1 * time.Hour).Unix(),
 			UserID:       user.ID,
 		}
