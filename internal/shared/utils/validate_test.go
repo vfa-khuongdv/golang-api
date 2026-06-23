@@ -16,6 +16,11 @@ type User struct {
 	Birthday string `validate:"required,valid_birthday"`
 }
 
+type mockBindingValidator struct{}
+
+func (m mockBindingValidator) ValidateStruct(any) error { return nil }
+func (m mockBindingValidator) Engine() any              { return "not-a-validator-engine" }
+
 type TestStruct struct {
 	Field string `validate:"%s=%s"`
 }
@@ -463,6 +468,119 @@ func TestTranslateValidationErrors_InternalBranches(t *testing.T) {
 
 		result := utils.TranslateValidationErrors(err, input)
 		assert.Equal(t, "profile.email", result.Fields[0].Field)
+	})
+}
+
+func TestInitValidator_WrongEngineType(t *testing.T) {
+	// Arrange
+	original := binding.Validator
+	binding.Validator = mockBindingValidator{}
+	t.Cleanup(func() { binding.Validator = original })
+
+	// Act (should log error but not panic)
+	utils.InitValidator()
+}
+
+func TestInitValidator_RegistrationError(t *testing.T) {
+	// Arrange
+	v, ok := binding.Validator.Engine().(*validator.Validate)
+	if !ok {
+		t.Skip("validator engine not available")
+	}
+	// Pre-register a conflicting validation function with the same name
+	_ = v.RegisterValidation("valid_birthday", func(fl validator.FieldLevel) bool {
+		return true
+	})
+
+	// Act (should log error for duplicate registration but not panic)
+	utils.InitValidator()
+}
+
+func TestValidateNotBlank_NonStringField(t *testing.T) {
+	// Arrange
+	validate := validator.New()
+	_ = validate.RegisterValidation("not_blank", utils.ValidateNotBlank)
+
+	// Act
+	err := validate.Struct(struct {
+		Field int `validate:"not_blank"`
+	}{Field: 0})
+
+	// Assert
+	assert.Error(t, err)
+	result := utils.TranslateValidationErrors(err, struct {
+		Field int `validate:"not_blank"`
+	}{})
+	assert.Equal(t, "Field must not be blank", result.Fields[0].Message)
+}
+
+func TestTranslateValidationErrors_CrossFieldValidators(t *testing.T) {
+	validate := validator.New()
+
+	t.Run("eqfield", func(t *testing.T) {
+		input := struct {
+			Password string `validate:"eqfield=Confirm"`
+			Confirm  string
+		}{Password: "abc", Confirm: "xyz"}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "Password must be equal to Confirm", result.Fields[0].Message)
+	})
+
+	t.Run("nefield", func(t *testing.T) {
+		input := struct {
+			Old string `validate:"nefield=New"`
+			New string
+		}{Old: "same", New: "same"}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "Old must not be equal to New", result.Fields[0].Message)
+	})
+
+	t.Run("gtfield", func(t *testing.T) {
+		input := struct {
+			Start int `validate:"gtfield=End"`
+			End   int
+		}{Start: 1, End: 5}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "Start must be greater than End", result.Fields[0].Message)
+	})
+
+	t.Run("gtefield", func(t *testing.T) {
+		input := struct {
+			Start int `validate:"gtefield=End"`
+			End   int
+		}{Start: 1, End: 5}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "Start must be greater than or equal to End", result.Fields[0].Message)
+	})
+
+	t.Run("ltfield", func(t *testing.T) {
+		input := struct {
+			Start int `validate:"ltfield=End"`
+			End   int
+		}{Start: 10, End: 5}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "Start must be less than End", result.Fields[0].Message)
+	})
+
+	t.Run("ltefield", func(t *testing.T) {
+		input := struct {
+			Start int `validate:"ltefield=End"`
+			End   int
+		}{Start: 10, End: 5}
+		err := validate.Struct(input)
+		assert.Error(t, err)
+		result := utils.TranslateValidationErrors(err, input)
+		assert.Equal(t, "Start must be less than or equal to End", result.Fields[0].Message)
 	})
 }
 

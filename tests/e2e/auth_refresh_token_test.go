@@ -199,7 +199,8 @@ func TestAuthRefreshToken(t *testing.T) {
 		require.Equal(t, http.StatusOK, otherW.Code)
 
 		var otherLogin dto.LoginResponse
-		json.Unmarshal(otherW.Body.Bytes(), &otherLogin)
+		err := json.Unmarshal(otherW.Body.Bytes(), &otherLogin)
+		require.NoError(t, err)
 
 		refreshPayload := map[string]string{
 			"refresh_token": otherLogin.RefreshToken.Token,
@@ -216,7 +217,7 @@ func TestAuthRefreshToken(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errResp ErrorResponse
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		err = json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Equal(t, apperror.ErrUnauthorized, errResp.Code)
 	})
