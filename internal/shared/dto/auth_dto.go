@@ -21,6 +21,6 @@ type LoginResponse struct {
 }
 
 type RefreshTokenResult struct {
-	Token  *JwtResult
-	UserId uint
+	Token  *JwtResult `json:"token,omitempty"`
+	UserId uint       `json:"user_id"`
 }
