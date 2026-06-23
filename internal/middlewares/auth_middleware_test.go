@@ -1,4 +1,4 @@
-package middlewares
+package middlewares_test
 
 import (
 	"errors"
@@ -8,9 +8,28 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 )
+
+func hasValidBearerPrefix(authHeader string) bool {
+	return len(authHeader) >= 7 && authHeader[:7] == "Bearer "
+}
+
+func extractTokenFromHeader(authHeader string) string {
+	if len(authHeader) > 7 {
+		return authHeader[7:]
+	}
+	return ""
+}
+
+func respondWithUnauthorizedError(c *gin.Context, message string) {
+	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+		"code":    "UNAUTHORIZED",
+		"message": message,
+	})
+}
 
 func TestAuthMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -18,15 +37,15 @@ func TestAuthMiddleware(t *testing.T) {
 	tests := []struct {
 		name               string
 		authHeader         string
-		setupMock          func(*mocks.MockJWTService)
+		mockSetup          func(*mocks.MockJWTService)
 		expectedStatusCode int
 		expectedUserID     interface{}
 		expectNext         bool
 	}{
 		{
-			name:               "Missing Authorization header",
+			name:               "missing Authorization header",
 			authHeader:         "",
-			setupMock:          func(m *mocks.MockJWTService) {},
+			mockSetup:          func(m *mocks.MockJWTService) {},
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedUserID:     nil,
 			expectNext:         false,
@@ -34,7 +53,7 @@ func TestAuthMiddleware(t *testing.T) {
 		{
 			name:               "Authorization header without Bearer prefix",
 			authHeader:         "InvalidToken",
-			setupMock:          func(m *mocks.MockJWTService) {},
+			mockSetup:          func(m *mocks.MockJWTService) {},
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedUserID:     nil,
 			expectNext:         false,
@@ -42,18 +61,16 @@ func TestAuthMiddleware(t *testing.T) {
 		{
 			name:               "Authorization header with wrong prefix",
 			authHeader:         "Basic some-token",
-			setupMock:          func(m *mocks.MockJWTService) {},
+			mockSetup:          func(m *mocks.MockJWTService) {},
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedUserID:     nil,
 			expectNext:         false,
 		},
 		{
-			name:       "Valid token with successful validation",
+			name:       "valid token with successful validation",
 			authHeader: "Bearer valid-token",
-			setupMock: func(m *mocks.MockJWTService) {
-				claims := &services.CustomClaims{
-					ID: 123,
-				}
+			mockSetup: func(m *mocks.MockJWTService) {
+				claims := &services.CustomClaims{ID: 123}
 				m.On("ValidateToken", "valid-token").Return(claims, nil)
 			},
 			expectedStatusCode: http.StatusOK,
@@ -61,9 +78,9 @@ func TestAuthMiddleware(t *testing.T) {
 			expectNext:         true,
 		},
 		{
-			name:       "Invalid token that fails validation",
+			name:       "invalid token that fails validation",
 			authHeader: "Bearer invalid-token",
-			setupMock: func(m *mocks.MockJWTService) {
+			mockSetup: func(m *mocks.MockJWTService) {
 				m.On("ValidateToken", "invalid-token").Return((*services.CustomClaims)(nil), errors.New("invalid token"))
 			},
 			expectedStatusCode: http.StatusUnauthorized,
@@ -71,9 +88,9 @@ func TestAuthMiddleware(t *testing.T) {
 			expectNext:         false,
 		},
 		{
-			name:       "Empty token after Bearer prefix",
+			name:       "empty token after Bearer prefix",
 			authHeader: "Bearer ",
-			setupMock: func(m *mocks.MockJWTService) {
+			mockSetup: func(m *mocks.MockJWTService) {
 				m.On("ValidateToken", "").Return((*services.CustomClaims)(nil), errors.New("empty token"))
 			},
 			expectedStatusCode: http.StatusUnauthorized,
@@ -84,18 +101,14 @@ func TestAuthMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a mock JWT service
+			// Arrange
 			mockJWTService := new(mocks.MockJWTService)
-			tt.setupMock(mockJWTService)
+			tt.mockSetup(mockJWTService)
 
-			// Create a test router
 			router := gin.New()
-
-			// Variable to track if next was called
 			nextCalled := false
 			var capturedUserID interface{}
 
-			// Add the auth middleware with a test endpoint using mock
 			router.Use(func(c *gin.Context) {
 				authHeader := c.GetHeader("Authorization")
 				if authHeader == "" || !hasValidBearerPrefix(authHeader) {
@@ -120,34 +133,26 @@ func TestAuthMiddleware(t *testing.T) {
 				c.JSON(http.StatusOK, gin.H{"message": "success"})
 			})
 
-			// Create a test request
-			req, _ := http.NewRequest("GET", "/test", nil)
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
 			}
-
-			// Create a response recorder
 			w := httptest.NewRecorder()
 
-			// Perform the request
+			// Act
 			router.ServeHTTP(w, req)
 
-			// Assert the response
+			// Assert
 			assert.Equal(t, tt.expectedStatusCode, w.Code)
 			assert.Equal(t, tt.expectNext, nextCalled)
-
-			// If we expect the middleware to set UserID, check it
 			if tt.expectedUserID != nil {
 				assert.Equal(t, tt.expectedUserID, capturedUserID)
 			}
-
-			// Verify all expectations were met
 			mockJWTService.AssertExpectations(t)
 		})
 	}
 }
 
-// TestAuthMiddleware_DirectCall tests the actual AuthMiddleware function directly
 func TestAuthMiddleware_DirectCall(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-middleware-testing-32-chars")
@@ -162,50 +167,36 @@ func TestAuthMiddleware_DirectCall(t *testing.T) {
 		authHeader         string
 		expectedStatusCode int
 	}{
-		{
-			name:               "No authorization header",
-			authHeader:         "",
-			expectedStatusCode: http.StatusUnauthorized,
-		},
-		{
-			name:               "Invalid authorization header format",
-			authHeader:         "InvalidFormat",
-			expectedStatusCode: http.StatusUnauthorized,
-		},
-		{
-			name:               "Bearer with no token",
-			authHeader:         "Bearer",
-			expectedStatusCode: http.StatusUnauthorized,
-		},
-		{
-			name:               "Bearer with space but no token",
-			authHeader:         "Bearer ",
-			expectedStatusCode: http.StatusUnauthorized,
-		},
+		{name: "no authorization header", authHeader: "", expectedStatusCode: http.StatusUnauthorized},
+		{name: "invalid authorization header format", authHeader: "InvalidFormat", expectedStatusCode: http.StatusUnauthorized},
+		{name: "Bearer with no token", authHeader: "Bearer", expectedStatusCode: http.StatusUnauthorized},
+		{name: "Bearer with space but no token", authHeader: "Bearer ", expectedStatusCode: http.StatusUnauthorized},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
 			router := gin.New()
-			router.Use(AuthMiddleware(jwtService))
+			router.Use(middlewares.AuthMiddleware(jwtService))
 			router.GET("/test", func(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{"message": "success"})
 			})
 
-			req, _ := http.NewRequest("GET", "/test", nil)
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
 			}
-
 			w := httptest.NewRecorder()
+
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			assert.Equal(t, tt.expectedStatusCode, w.Code)
 		})
 	}
 }
 
-// TestAuthMiddleware_WithRealJWT tests with real JWT tokens to verify the complete flow
 func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-middleware-testing-32-chars")
@@ -219,9 +210,10 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, accessTokenResult)
 
-	t.Run("Valid JWT access token", func(t *testing.T) {
+	t.Run("valid JWT access token", func(t *testing.T) {
+		// Arrange
 		router := gin.New()
-		router.Use(AuthMiddleware(jwtService))
+		router.Use(middlewares.AuthMiddleware(jwtService))
 
 		var capturedUserID interface{}
 		router.GET("/test", func(c *gin.Context) {
@@ -229,34 +221,19 @@ func TestAuthMiddleware_WithRealJWT(t *testing.T) {
 			c.JSON(http.StatusOK, gin.H{"message": "success"})
 		})
 
-		req, _ := http.NewRequest("GET", "/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.Header.Set("Authorization", "Bearer "+accessTokenResult.Token)
-
 		w := httptest.NewRecorder()
+
+		// Act
 		router.ServeHTTP(w, req)
 
+		// Assert
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, uint(123), capturedUserID)
 	})
 }
 
-// Helper function to check if authorization header has valid Bearer prefix
-func hasValidBearerPrefix(authHeader string) bool {
-	return len(authHeader) >= 7 && authHeader[:7] == "Bearer "
-}
-
-// Helper function to extract token from authorization header
-func extractTokenFromHeader(authHeader string) string {
-	if len(authHeader) > 7 {
-		return authHeader[7:]
-	}
-	return ""
-}
-
-// Helper function to respond with unauthorized error
-func respondWithUnauthorizedError(c *gin.Context, message string) {
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-		"code":    "UNAUTHORIZED",
-		"message": message,
-	})
+func init() {
+	gin.SetMode(gin.TestMode)
 }

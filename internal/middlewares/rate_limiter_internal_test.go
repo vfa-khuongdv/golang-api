@@ -10,6 +10,7 @@ import (
 
 func TestCleanup(t *testing.T) {
 	t.Run("removes expired entries, keeps valid ones", func(t *testing.T) {
+		// Arrange
 		rl := &rateLimiter{
 			requests:        make(map[string][]time.Time),
 			limit:           5,
@@ -20,8 +21,10 @@ func TestCleanup(t *testing.T) {
 		now := time.Now()
 		rl.requests["key1"] = []time.Time{now.Add(-100 * time.Millisecond), now.Add(-10 * time.Millisecond)}
 
+		// Act
 		rl.cleanup()
 
+		// Assert
 		rl.mu.Lock()
 		entries := rl.requests["key1"]
 		rl.mu.Unlock()
@@ -30,6 +33,7 @@ func TestCleanup(t *testing.T) {
 	})
 
 	t.Run("deletes key when no valid entries remain", func(t *testing.T) {
+		// Arrange
 		rl := &rateLimiter{
 			requests:        make(map[string][]time.Time),
 			limit:           5,
@@ -39,8 +43,10 @@ func TestCleanup(t *testing.T) {
 		}
 		rl.requests["expired"] = []time.Time{time.Now().Add(-time.Hour)}
 
+		// Act
 		rl.cleanup()
 
+		// Assert
 		rl.mu.Lock()
 		_, exists := rl.requests["expired"]
 		rl.mu.Unlock()
@@ -49,6 +55,7 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestCleanupLoopStop(t *testing.T) {
+	// Arrange
 	rl := &rateLimiter{
 		requests:        make(map[string][]time.Time),
 		limit:           5,
@@ -58,6 +65,8 @@ func TestCleanupLoopStop(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)
+
+	// Act
 	go func() {
 		defer wg.Done()
 		rl.cleanupLoop()
@@ -69,6 +78,7 @@ func TestCleanupLoopStop(t *testing.T) {
 }
 
 func TestCleanupLoopTicker(t *testing.T) {
+	// Arrange
 	rl := &rateLimiter{
 		requests:        make(map[string][]time.Time),
 		limit:           5,
@@ -87,8 +97,10 @@ func TestCleanupLoopTicker(t *testing.T) {
 	rl.requests["ticker_test"] = []time.Time{time.Now().Add(-time.Hour)}
 	rl.mu.Unlock()
 
+	// Act
 	time.Sleep(30 * time.Millisecond)
 
+	// Assert
 	rl.mu.Lock()
 	_, exists := rl.requests["ticker_test"]
 	rl.mu.Unlock()

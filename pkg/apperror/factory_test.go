@@ -3,6 +3,8 @@ package apperror
 import (
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestErrorConstructors(t *testing.T) {
@@ -48,18 +50,16 @@ func TestErrorConstructors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Arrange
 			msg := "test message"
+
+			// Act
 			err := tt.fn(msg)
 
-			if err.HttpStatusCode != tt.wantHTTP {
-				t.Errorf("expected HttpStatusCode %d, got %d", tt.wantHTTP, err.HttpStatusCode)
-			}
-			if err.Code != tt.wantCode {
-				t.Errorf("expected Code %d, got %d", tt.wantCode, err.Code)
-			}
-			if err.Message != msg {
-				t.Errorf("expected Message %s, got %s", msg, err.Message)
-			}
+			// Assert
+			assert.Equal(t, tt.wantHTTP, err.HttpStatusCode, "HttpStatusCode")
+			assert.Equal(t, tt.wantCode, err.Code, "Code")
+			assert.Equal(t, msg, err.Message, "Message")
 		})
 	}
 }

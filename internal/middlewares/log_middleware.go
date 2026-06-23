@@ -52,7 +52,6 @@ var sensitiveHeaders = map[string]bool{
 
 var marshalLogEntry = json.Marshal
 
-// LogResponse defines the structure for logging HTTP requests and responses
 type LogResponse struct {
 	RequestID  string `json:"request_id,omitempty"`
 	Method     string `json:"method"`
@@ -64,7 +63,6 @@ type LogResponse struct {
 	StatusCode string `json:"status_code"`
 }
 
-// the bodyWriter is a custom ResponseWriter that captures the response body
 type bodyWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer
@@ -75,7 +73,6 @@ func (w *bodyWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// censorQueryParams censors sensitive query parameters (keeps first 4 chars)
 func censorQueryParams(queryParams map[string][]string) map[string][]string {
 	censored := make(map[string][]string, len(queryParams))
 	for key, values := range queryParams {
@@ -92,7 +89,6 @@ func censorQueryParams(queryParams map[string][]string) map[string][]string {
 	return censored
 }
 
-// containsIgnoreCase checks if a string matches any key in the list (case-insensitive)
 func containsIgnoreCase(keys []string, target string) bool {
 	targetLower := strings.ToLower(target)
 	for _, k := range keys {
@@ -118,16 +114,15 @@ func maskCookieValue(value string) string {
 				rawVal := part[eqIdx+1:]
 				parts[i] = key + "=" + utils.MaskWithPrefix(rawVal, 4)
 			} else {
-				parts[i] = part // keep non-sensitive attributes, trimmed
+				parts[i] = part 
 			}
 		} else {
-			parts[i] = part // keep flag attributes (HttpOnly, Secure), trimmed
+			parts[i] = part 
 		}
 	}
 	return strings.Join(parts, "; ")
 }
 
-// filterSensitiveHeaders creates a copy of headers with sensitive values censored
 func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
 	filtered := make(map[string][]string, len(headers))
 	for key, values := range headers {

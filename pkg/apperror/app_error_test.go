@@ -19,8 +19,11 @@ func TestAppError_Error(t *testing.T) {
 		)
 		expected := "code: 1000, message: internal error"
 
-		// Act & Assert
-		assert.Equal(t, expected, appErr.Error())
+		// Act
+		result := appErr.Error()
+
+		// Assert
+		assert.Equal(t, expected, result)
 	})
 }
 
@@ -47,17 +50,21 @@ func TestWrap(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
+	// Arrange
+	expectedCode := apperror.ErrUnauthorized
+	expectedMessage := "unauthorized"
+
 	// Act
 	appErr := apperror.New(
 		http.StatusUnauthorized,
-		apperror.ErrUnauthorized,
-		"unauthorized",
+		expectedCode,
+		expectedMessage,
 	)
 
 	// Assert
 	assert.NotNil(t, appErr)
-	assert.Equal(t, apperror.ErrUnauthorized, appErr.Code)
-	assert.Equal(t, "unauthorized", appErr.Message)
+	assert.Equal(t, expectedCode, appErr.Code)
+	assert.Equal(t, expectedMessage, appErr.Message)
 }
 
 func TestIsAppError(t *testing.T) {
@@ -69,16 +76,22 @@ func TestIsAppError(t *testing.T) {
 			"forbidden",
 		)
 
+		// Act
+		result := apperror.IsAppError(appErr)
+
 		// Assert
-		assert.True(t, apperror.IsAppError(appErr))
+		assert.True(t, result)
 	})
 
 	t.Run("is not AppError", func(t *testing.T) {
 		// Arrange
 		err := assert.AnError
 
+		// Act
+		result := apperror.IsAppError(err)
+
 		// Assert
-		assert.False(t, apperror.IsAppError(err))
+		assert.False(t, result)
 	})
 }
 
@@ -131,6 +144,7 @@ func TestAppErrorWithUnderlyingError(t *testing.T) {
 }
 
 func TestUnwrap(t *testing.T) {
+	// Arrange
 	underlying := errors.New("wrapped error")
 	appErr := apperror.Wrap(
 		http.StatusBadRequest,
@@ -139,6 +153,7 @@ func TestUnwrap(t *testing.T) {
 		underlying,
 	)
 
+	// Act & Assert
 	assert.True(t, errors.Is(appErr, underlying), "errors.Is should find the wrapped error")
 	assert.Equal(t, underlying, errors.Unwrap(appErr))
 }
