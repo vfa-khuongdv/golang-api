@@ -1,6 +1,6 @@
 module github.com/vfa-khuongdv/golang-cms
 
-go 1.25.2
+go 1.26
 
 require (
 	github.com/gin-gonic/gin v1.10.0
