@@ -33,10 +33,6 @@ func InitValidator() {
 	}
 }
 
-func init() {
-	InitValidator()
-}
-
 func ValidateNotBlank(fl validator.FieldLevel) bool {
 	if fl.Field().Kind() != reflect.String {
 		return false

@@ -40,13 +40,13 @@ func (handler *authHandlerImpl) Login(ctx *gin.Context) {
 }
 
 func (handler *authHandlerImpl) Logout(ctx *gin.Context) {
-	userID, exists := ctx.Get("UserID")
-	if !exists {
+	userID, err := utils.GetUserIDFromContext(ctx)
+	if err != nil {
 		utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Unauthorized"))
 		return
 	}
 
-	if err := handler.authService.Logout(ctx.Request.Context(), userID.(uint)); err != nil {
+	if err := handler.authService.Logout(ctx.Request.Context(), userID); err != nil {
 		logger.WithEvent(ctx.Request.Context(), logger.EventLogout).Errorf("Logout failed for user ID %d: %v", userID, err)
 		utils.RespondWithError(ctx, err)
 		return

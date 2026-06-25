@@ -404,7 +404,7 @@ func TestRefreshTokenRepository(t *testing.T) {
 
 		sqlDB, err := db.DB()
 		require.NoError(t, err)
-		sqlDB.Close()
+		_ = sqlDB.Close()
 
 		err = repo.DeleteByUserID(context.Background(), 1)
 		assert.Error(t, err)

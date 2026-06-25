@@ -3,7 +3,7 @@ package mailer
 import (
 	"errors"
 
-	"gopkg.in/gomail.v2"
+	mail "github.com/wneessen/go-mail"
 )
 
 type EmailSender interface {
@@ -18,9 +18,8 @@ type GomailSenderConfig struct {
 	Password string
 }
 
-// Interface for mocking DialAndSend
 type DialAndSender interface {
-	DialAndSend(m ...*gomail.Message) error
+	DialAndSend(msgs ...*mail.Msg) error
 }
 
 type GomailSender struct {
@@ -29,10 +28,19 @@ type GomailSender struct {
 }
 
 func NewGomailSender(config GomailSenderConfig) *GomailSender {
-	dialer := gomail.NewDialer(config.Host, config.Port, config.Username, config.Password)
+	client, err := mail.NewClient(
+		config.Host,
+		mail.WithPort(config.Port),
+		mail.WithSMTPAuth(mail.SMTPAuthLogin),
+		mail.WithUsername(config.Username),
+		mail.WithPassword(config.Password),
+	)
+	if err != nil {
+		return nil
+	}
 	return &GomailSender{
 		Config: config,
-		Dialer: dialer,
+		Dialer: client,
 	}
 }
 
@@ -47,15 +55,17 @@ func (s *GomailSender) Send(to []string, subject, plainText, html string) error 
 		return errors.New("either plain text or HTML content must be provided")
 	}
 
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.Config.From)
-	m.SetHeader("To", to...)
-	m.SetHeader("Subject", subject)
-	if plainText != "" {
-		m.SetBody("text/plain", plainText)
+	m := mail.NewMsg()
+	if err := m.From(s.Config.From); err != nil {
+		return err
 	}
+	if err := m.To(to...); err != nil {
+		return err
+	}
+	m.Subject(subject)
+	m.SetBodyString(mail.TypeTextPlain, plainText)
 	if html != "" {
-		m.AddAlternative("text/html", html)
+		m.AddAlternativeString(mail.TypeTextHTML, html)
 	}
 
 	if err := s.Dialer.DialAndSend(m); err != nil {
