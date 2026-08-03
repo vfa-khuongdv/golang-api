@@ -61,6 +61,7 @@ func TestErrorConstructors(t *testing.T) {
 			assert.Equal(t, tt.wantHTTP, err.HttpStatusCode, "HttpStatusCode")
 			assert.Equal(t, tt.wantCode, err.Code, "Code")
 			assert.Equal(t, msg, err.Message, "Message")
+			assert.Nil(t, err.Err, "Err should be nil for constructor-created errors")
 		})
 	}
 }

@@ -2,7 +2,6 @@ package middlewares
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -137,7 +136,7 @@ func TestFilterSensitiveHeaders(t *testing.T) {
 	})
 }
 
-func TestLogMiddleware_MarshalLogEntryError(t *testing.T) {
+func TestLogMiddleware_LogsRequest(t *testing.T) {
 	// Arrange
 	gin.SetMode(gin.TestMode)
 	var buf syncBuffer
@@ -146,21 +145,13 @@ func TestLogMiddleware_MarshalLogEntryError(t *testing.T) {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 	defer logrus.SetOutput(prevOutput)
 
-	originalMarshal := marshalLogEntry
-	marshalLogEntry = func(_ any) ([]byte, error) {
-		return nil, errors.New("marshal failed")
-	}
-	defer func() {
-		marshalLogEntry = originalMarshal
-	}()
-
 	router := gin.New()
 	router.Use(LogMiddleware())
-	router.GET("/marshal-error", func(c *gin.Context) {
+	router.GET("/ok", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/marshal-error", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
 	resp := httptest.NewRecorder()
 
 	// Act

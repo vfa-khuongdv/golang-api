@@ -120,6 +120,10 @@ func censorStruct(data any, maskFields []string) any {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
 
+		if !censoredStruct.Field(i).CanSet() {
+			continue // Skip unexported fields
+		}
+
 		if containsSensitiveKey(maskFields, fieldType.Name) {
 			// Field needs to be masked
 			if field.Kind() == reflect.Pointer {

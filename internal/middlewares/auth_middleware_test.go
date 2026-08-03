@@ -49,6 +49,14 @@ func TestAuthMiddleware(t *testing.T) {
 			expectNext:         false,
 		},
 		{
+			name:               "lowercase bearer scheme is rejected",
+			authHeader:         "bearer valid-token",
+			mockSetup:          func(m *mocks.MockJWTService) {},
+			expectedStatusCode: http.StatusUnauthorized,
+			expectedUserID:     nil,
+			expectNext:         false,
+		},
+		{
 			name:       "valid token with successful validation",
 			authHeader: "Bearer valid-token",
 			mockSetup: func(m *mocks.MockJWTService) {

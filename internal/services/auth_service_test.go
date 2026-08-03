@@ -128,7 +128,10 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, resp)
+				assert.Equal(t, "mocked-access-token", resp.AccessToken.Token)
+				assert.NotZero(t, resp.AccessToken.ExpiresAt)
 				assert.Equal(t, "mocked-refresh-token", resp.RefreshToken.Token)
+				assert.NotZero(t, resp.RefreshToken.ExpiresAt)
 			}
 		})
 	}
@@ -261,6 +264,10 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)
+				assert.Equal(t, "new-access-token", result.AccessToken.Token)
+				assert.NotZero(t, result.AccessToken.ExpiresAt)
+				assert.Equal(t, "new-refresh-token", result.RefreshToken.Token)
+				assert.NotZero(t, result.RefreshToken.ExpiresAt)
 			}
 		})
 	}
@@ -363,7 +370,11 @@ func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
 	assert.Equal(s.T(), 5, user.FailedAttempts)
-	assert.NotNil(s.T(), user.LockedUntil)
+	if s.NotNil(user.LockedUntil) {
+		// LockedUntil should be ~ now + LockoutDurationMinutes
+		expected := time.Now().Add(time.Duration(services.LockoutDurationMinutes) * time.Minute).Unix()
+		assert.InDelta(s.T(), expected, *user.LockedUntil, 60)
+	}
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {

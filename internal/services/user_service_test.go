@@ -16,26 +16,16 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 type UserServiceTestSuite struct {
 	suite.Suite
-	db      *gorm.DB
 	repo    *mocks.MockUserRepository
 	mailer  *mocks.MockMailerService
 	service services.UserService
 }
 
 func (s *UserServiceTestSuite) SetupTest() {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	s.Require().NoError(err)
-	s.Require().NotNil(db)
-
-	err = db.AutoMigrate(&models.User{})
-	s.Require().NoError(err)
-	s.db = db
 	s.repo = new(mocks.MockUserRepository)
 	s.mailer = new(mocks.MockMailerService)
 	s.service = services.NewUserService(s.repo, s.mailer)
@@ -89,7 +79,13 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 		}
 
 		s.repo.On("GetByID", mock.Anything, userID).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+			return u.Name == "John Doe" &&
+				u.Address != nil && *u.Address == "123 Main St" &&
+				u.Gender == int16(1) &&
+				u.Birthday.Equal(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)) &&
+				u.Password == "newpassword123"
+		})).Return(nil).Once()
 
 		// Act
 		err := s.service.UpdateProfile(context.Background(), userID, &input)
@@ -133,6 +129,7 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		// Assert
 		s.NoError(err)
 		s.NotNil(user.ResetToken)
+		s.Len(*user.ResetToken, 32)
 		s.NotNil(user.ResetExpiredAt)
 	})
 

@@ -621,4 +621,22 @@ func TestCensorSensitiveData(t *testing.T) {
 		assert.Equal(t, 1712345678, nested["expires_at"]) // int unchanged
 		assert.Equal(t, "user", result["username"])
 	})
+
+	t.Run("Struct with unexported field does not panic", func(t *testing.T) {
+		type testStruct struct {
+			Password string
+			hidden   string // unexported field
+		}
+
+		// Regression: previously censorStruct panicked calling Interface() on an
+		// unexported field. Now it skips unsettable fields (they are not copied,
+		// so they fall back to their zero value).
+		input := testStruct{Password: "secret123", hidden: "keep-me"}
+		result := utils.CensorSensitiveData(input, []string{"Password"})
+
+		got, ok := result.(testStruct)
+		assert.True(t, ok)
+		assert.Equal(t, "secr*****", got.Password)
+		assert.Empty(t, got.hidden)
+	})
 }

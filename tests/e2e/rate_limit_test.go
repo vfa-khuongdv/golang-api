@@ -45,6 +45,9 @@ func TestForgotPasswordRateLimit(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/api/v1/forgot-password", strings.NewReader(payload))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
+
+		assert.NotEqual(t, http.StatusTooManyRequests, w.Code,
+			"Request %d should not be rate limited yet", i+1)
 	}
 
 	w := httptest.NewRecorder()
@@ -53,4 +56,5 @@ func TestForgotPasswordRateLimit(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+	assert.Equal(t, "0", w.Header().Get("X-RateLimit-Remaining"))
 }

@@ -224,6 +224,24 @@ func TestCORSMiddleware(t *testing.T) {
 		assert.Equal(t, "Origin", resp.Header().Get("Vary"))
 	})
 
+	t.Run("Default Origin Rejects Non-Localhost", func(t *testing.T) {
+		// Arrange - No environment variable set, so only localhost:5173 is allowed
+		_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
+
+		router := setupRouter()
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set("Origin", "https://evil.com")
+		resp := httptest.NewRecorder()
+
+		// Act
+		router.ServeHTTP(resp, req)
+
+		// Assert
+		assert.Equal(t, http.StatusOK, resp.Code)
+		assert.Empty(t, resp.Header().Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, resp.Header().Get("Vary"))
+	})
+
 	t.Run("POST Request - CORS Headers Applied", func(t *testing.T) {
 		// Arrange
 		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))

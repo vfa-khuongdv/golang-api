@@ -37,23 +37,41 @@ func TestSetDefaults(t *testing.T) {
 		assert.Equal(t, 45*time.Minute, cfg.ConnMaxLifetime)
 		assert.Equal(t, 10*time.Minute, cfg.ConnMaxIdleTime)
 	})
+
+	t.Run("ApplyDefaultsOnlyForMissingFields", func(t *testing.T) {
+		cfg := DatabaseConfig{
+			MaxOpenConns: 120,
+		}
+		setDefaults(&cfg)
+
+		assert.Equal(t, 120, cfg.MaxOpenConns)
+		assert.Equal(t, DEFAULT_MAX_IDLE_CONNS, cfg.MaxIdleConns)
+		assert.Equal(t, DEFAULT_CONN_MAX_LIFETIME, cfg.ConnMaxLifetime)
+		assert.Equal(t, DEFAULT_CONN_MAX_IDLE_TIME, cfg.ConnMaxIdleTime)
+	})
 }
 
 func TestPingDB(t *testing.T) {
-	gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	require.NoError(t, err)
-
-	sqlDB, err := gdb.DB()
-	require.NoError(t, err)
-
 	t.Run("PingSuccess", func(t *testing.T) {
-		err := pingDB(sqlDB)
+		gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+		require.NoError(t, err)
+
+		sqlDB, err := gdb.DB()
+		require.NoError(t, err)
+
+		err = pingDB(sqlDB)
 		assert.NoError(t, err)
 	})
 
 	t.Run("PingFailureWhenClosed", func(t *testing.T) {
+		gdb, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+		require.NoError(t, err)
+
+		sqlDB, err := gdb.DB()
+		require.NoError(t, err)
+
 		require.NoError(t, sqlDB.Close())
-		err := pingDB(sqlDB)
+		err = pingDB(sqlDB)
 		assert.Error(t, err)
 	})
 }
@@ -164,6 +182,8 @@ func TestInitDB_InternalBranches(t *testing.T) {
 	})
 
 	t.Run("OpenGormConnectionDefaultFunc", func(t *testing.T) {
+		// gorm.Open with the mysql driver eagerly validates the DSN here, so an
+		// invalid DSN returns an error but still a usable *gorm.DB instance.
 		db, err := originalOpen("invalid-dsn")
 		assert.NotNil(t, db)
 		_ = err

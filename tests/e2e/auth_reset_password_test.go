@@ -71,7 +71,7 @@ func TestAuthResetPassword(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		assert.NotEqual(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		var errResp ErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)

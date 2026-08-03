@@ -96,6 +96,7 @@ func TestLogin(t *testing.T) {
 		}
 		var actualBody map[string]any
 		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.Equal(t, expectedBody["code"], actualBody["code"])
 		assert.Equal(t, expectedBody["message"], actualBody["message"])
 
@@ -188,6 +189,13 @@ func TestLogin(t *testing.T) {
 				expectedFields: []apperror.FieldError{
 					{Field: "password", Message: "password is required"},
 				},
+			},
+			{
+				name:           "MalformedJSON",
+				reqBody:        `{invalid json`,
+				expectedCode:   float64(4001),
+				expectedMsg:    "invalid character 'i' looking for beginning of object key string",
+				expectedFields: nil,
 			},
 		}
 
@@ -358,6 +366,13 @@ func TestRefreshToken(t *testing.T) {
 					{Field: "access_token", Message: "access_token is required"},
 				},
 			},
+			{
+				name:           "MalformedJSON",
+				reqBody:        `{invalid json`,
+				expectedCode:   float64(4001),
+				expectedMsg:    "invalid character 'i' looking for beginning of object key string",
+				expectedFields: nil,
+			},
 		}
 
 		for _, tc := range tests {
@@ -408,6 +423,7 @@ func TestLogout(t *testing.T) {
 		handler.Logout(c)
 
 		assert.Equal(t, http.StatusOK, w.Code)
+		assert.JSONEq(t, `{"message":"Logged out successfully"}`, w.Body.String())
 		mockService.AssertExpectations(t)
 	})
 
@@ -422,6 +438,9 @@ func TestLogout(t *testing.T) {
 		handler.Logout(c)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		var actualBody map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
+		assert.Equal(t, float64(apperror.ErrUnauthorized), actualBody["code"])
 		mockService.AssertExpectations(t)
 	})
 

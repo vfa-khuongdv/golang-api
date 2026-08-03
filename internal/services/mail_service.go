@@ -47,10 +47,17 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		Username: config.Username,
 		Password: config.Password,
 	})
+	if sender == nil {
+		return apperror.NewInternalServerError("Failed to initialize mail sender")
+	}
 
 	tmpl, err := parseForgotTemplate()
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
+	}
+
+	if user.ResetToken == nil {
+		return apperror.NewInternalServerError("user reset token is nil")
 	}
 
 	url := configs.GetEnv("FRONTEND_URL", "") + "/reset-password?token=" + *user.ResetToken

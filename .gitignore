@@ -46,3 +46,4 @@ coverage-summary.txt
 
 #Agents
 .agents/*
+.codegraph

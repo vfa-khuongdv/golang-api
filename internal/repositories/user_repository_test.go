@@ -411,12 +411,7 @@ func TestUserRepository(t *testing.T) {
 		repo := repositories.NewUserRepository(db)
 
 		_ = db.Callback().Query().Before("gorm:query").Register("force_find_error_only", func(tx *gorm.DB) {
-			if tx.Statement != nil {
-				_, hasOrderBy := tx.Statement.Clauses["ORDER BY"]
-				if hasOrderBy {
-					_ = tx.AddError(assert.AnError)
-				}
-			}
+			_ = tx.AddError(assert.AnError)
 		})
 		defer func() { _ = db.Callback().Query().Remove("force_find_error_only") }()
 

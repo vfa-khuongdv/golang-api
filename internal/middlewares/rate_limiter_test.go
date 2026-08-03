@@ -23,11 +23,15 @@ func TestRateLimiter(t *testing.T) {
 		})
 
 		// Act & Assert
+		expectedRemaining := []string{"4", "3", "2", "1", "0"}
 		for i := 0; i < 5; i++ {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
 			router.ServeHTTP(w, req)
 			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, "5", w.Header().Get("X-RateLimit-Limit"))
+			assert.Equal(t, expectedRemaining[i], w.Header().Get("X-RateLimit-Remaining"))
+			assert.NotEmpty(t, w.Header().Get("X-RateLimit-Reset"))
 		}
 	})
 
@@ -56,6 +60,9 @@ func TestRateLimiter(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, http.StatusTooManyRequests, w3.Code)
+		assert.Equal(t, "2", w3.Header().Get("X-RateLimit-Limit"))
+		assert.Equal(t, "0", w3.Header().Get("X-RateLimit-Remaining"))
+		assert.NotEmpty(t, w3.Header().Get("X-RateLimit-Reset"))
 	})
 
 	t.Run("Different IPs have separate limits", func(t *testing.T) {

@@ -60,6 +60,9 @@ func TestUsersGetProfile(t *testing.T) {
 		assert.Equal(t, birthday.Format("2006-01-02"), response.Birthday.Format("2006-01-02"))
 		assert.Equal(t, address, *response.Address)
 		assert.Equal(t, int16(1), response.Gender)
+
+		// Password hash must never be exposed in profile responses.
+		assert.Empty(t, response.Password)
 	})
 
 	t.Run("Get Profile - Unauthorized without Token", func(t *testing.T) {

@@ -70,6 +70,10 @@ func TestAuthRefreshToken(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.NotEmpty(t, response.AccessToken.Token)
+		// Refresh tokens are rotated on every refresh: the new token must be
+		// present and different from the one that was sent.
+		assert.NotEmpty(t, response.RefreshToken.Token)
+		assert.NotEqual(t, refreshToken, response.RefreshToken.Token)
 	})
 
 	t.Run("Refresh Token - Invalid Token", func(t *testing.T) {
@@ -220,4 +224,59 @@ func TestAuthRefreshToken(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, apperror.ErrUnauthorized, errResp.Code)
 	})
+}
+
+func TestAuthRefreshToken_ExpiredAccessToken(t *testing.T) {
+	// Separate test function so it gets its own router (and thus its own
+	// rate limiter), keeping the request count per limiter under the limit.
+	router, db := setupTestRouter()
+
+	password := "password123"
+	hashedPassword, _ := utils.HashPassword(password)
+	user := models.User{
+		Name:     "Test User Refresh Expired",
+		Email:    "test_refresh_expired@example.com",
+		Password: hashedPassword,
+		Gender:   1,
+	}
+	result := db.Create(&user)
+	require.NoError(t, result.Error)
+
+	loginPayload := map[string]string{
+		"email":    "test_refresh_expired@example.com",
+		"password": password,
+	}
+	payloadBytes, _ := json.Marshal(loginPayload)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var loginResponse dto.LoginResponse
+	err := json.Unmarshal(w.Body.Bytes(), &loginResponse)
+	require.NoError(t, err)
+
+	// Use a valid refresh token with an expired (but correctly signed) access
+	// token. RefreshToken validates the access token ignoring expiration, so
+	// this is the designed success path.
+	expiredAccess := generateExpiredToken(user.ID)
+	refreshPayload := map[string]string{
+		"refresh_token": loginResponse.RefreshToken.Token,
+		"access_token":  expiredAccess,
+	}
+	payloadBytes, _ = json.Marshal(refreshPayload)
+
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response dto.LoginResponse
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+	assert.NotEmpty(t, response.AccessToken.Token)
+	assert.NotEmpty(t, response.RefreshToken.Token)
 }

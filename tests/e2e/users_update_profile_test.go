@@ -19,31 +19,37 @@ import (
 func TestUsersUpdateProfile(t *testing.T) {
 	router, db := setupTestRouter()
 
-	// Create test user
-	password := "password123"
-	hashedPassword, _ := utils.HashPassword(password)
-	birthday := time.Date(1990, 1, 15, 0, 0, 0, 0, time.UTC)
-	address := "123 Original Street"
-	testUser := models.User{
-		Name:     "Original Name",
-		Email:    "testuser@example.com",
-		Password: hashedPassword,
-		Birthday: &birthday,
-		Address:  &address,
-		Gender:   1,
-	}
-	db.Create(&testUser)
-
-	// Generate access token for test user
 	jwtService, err := services.NewJWTService()
 	if err != nil {
 		t.Fatalf("Failed to create JWT service: %v", err)
 	}
-	tokenResult, err := jwtService.GenerateAccessToken(testUser.ID)
-	require.NoError(t, err)
-	accessToken := tokenResult.Token
+
+	// Each subtest gets its own user, so no subtest depends on a previous
+	// subtest having mutated the shared user first.
+	createUser := func(t *testing.T, email string) (models.User, string) {
+		t.Helper()
+		hashedPassword, _ := utils.HashPassword("password123")
+		birthday := time.Date(1990, 1, 15, 0, 0, 0, 0, time.UTC)
+		address := "123 Original Street"
+		user := models.User{
+			Name:     "Original Name",
+			Email:    email,
+			Password: hashedPassword,
+			Birthday: &birthday,
+			Address:  &address,
+			Gender:   1,
+		}
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("failed to create user: %v", err)
+		}
+		tokenResult, err := jwtService.GenerateAccessToken(user.ID)
+		require.NoError(t, err)
+		return user, tokenResult.Token
+	}
 
 	t.Run("Update Profile - Name Only", func(t *testing.T) {
+		testUser, accessToken := createUser(t, "nameonly@example.com")
+
 		payload := map[string]interface{}{
 			"name": "Updated Profile Name",
 		}
@@ -70,6 +76,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Birthday Only", func(t *testing.T) {
+		testUser, accessToken := createUser(t, "birthdayonly@example.com")
+
 		newBirthday := "1995-08-20"
 		payload := map[string]interface{}{
 			"birthday": newBirthday,
@@ -92,6 +100,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Address Only", func(t *testing.T) {
+		testUser, accessToken := createUser(t, "addressonly@example.com")
+
 		newAddress := "456 New Profile Street"
 		payload := map[string]interface{}{
 			"address": newAddress,
@@ -114,6 +124,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Gender Only", func(t *testing.T) {
+		testUser, accessToken := createUser(t, "genderonly@example.com")
+
 		payload := map[string]interface{}{
 			"gender": 2,
 		}
@@ -135,6 +147,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Multiple Fields", func(t *testing.T) {
+		testUser, accessToken := createUser(t, "multiple@example.com")
+
 		newBirthday := "2000-01-01"
 		newAddress := "789 Multi Update Avenue"
 		payload := map[string]interface{}{
@@ -158,11 +172,14 @@ func TestUsersUpdateProfile(t *testing.T) {
 		var updatedUser models.User
 		db.First(&updatedUser, testUser.ID)
 		assert.Equal(t, "Multi Update Name", updatedUser.Name)
+		assert.Equal(t, newBirthday, updatedUser.Birthday.Format("2006-01-02"))
 		assert.Equal(t, newAddress, *updatedUser.Address)
 		assert.Equal(t, int16(3), updatedUser.Gender)
 	})
 
 	t.Run("Update Profile - Invalid Gender", func(t *testing.T) {
+		_, accessToken := createUser(t, "invalidgender@example.com")
+
 		payload := map[string]interface{}{
 			"gender": 5, // Invalid: must be 1, 2, or 3
 		}
@@ -184,6 +201,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Invalid Birthday Format", func(t *testing.T) {
+		_, accessToken := createUser(t, "invalidbirthday@example.com")
+
 		payload := map[string]interface{}{
 			"birthday": "invalid-date",
 		}
@@ -205,6 +224,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Blank Name", func(t *testing.T) {
+		_, accessToken := createUser(t, "blankname@example.com")
+
 		payload := map[string]interface{}{
 			"name": "   ", // Blank name
 		}
@@ -226,6 +247,8 @@ func TestUsersUpdateProfile(t *testing.T) {
 	})
 
 	t.Run("Update Profile - Empty Body", func(t *testing.T) {
+		_, accessToken := createUser(t, "emptybody@example.com")
+
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBuffer([]byte(`{}`)))
 		req.Header.Set("Content-Type", "application/json")

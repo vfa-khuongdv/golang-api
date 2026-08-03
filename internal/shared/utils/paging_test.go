@@ -39,6 +39,9 @@ func TestPaging(t *testing.T) {
 			{totalRows: 0, limit: 10, expected: 0},
 			{totalRows: 10, limit: 0, expected: 0},
 			{totalRows: 10, limit: -1, expected: 0},
+			{totalRows: 5, limit: 1, expected: 5},
+			{totalRows: -5, limit: 10, expected: 1},
+			{totalRows: 10, limit: 3, expected: 4},
 		}
 
 		for _, tt := range tests {

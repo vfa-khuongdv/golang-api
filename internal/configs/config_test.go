@@ -10,6 +10,25 @@ import (
 )
 
 func TestLoad(t *testing.T) {
+	// Save and restore the environment variables Load() depends on so the
+	// subtests don't leak mutations into the rest of the test process.
+	envKeys := []string{"PORT", "DB_USERNAME", "DB_PASSWORD", "DB_DATABASE", "JWT_KEY"}
+	original := make(map[string]string, len(envKeys))
+	for _, k := range envKeys {
+		if v, ok := os.LookupEnv(k); ok {
+			original[k] = v
+		}
+	}
+	t.Cleanup(func() {
+		for _, k := range envKeys {
+			if v, ok := original[k]; ok {
+				_ = os.Setenv(k, v)
+			} else {
+				_ = os.Unsetenv(k)
+			}
+		}
+	})
+
 	t.Run("Load - With .env file", func(t *testing.T) {
 		originalDir, err := os.Getwd()
 		require.NoError(t, err)

@@ -20,35 +20,41 @@ func (m *MockDialer) DialAndSend(msgs ...*mail.Msg) error {
 }
 
 func TestGomailSender_Send(t *testing.T) {
-	config := mailer.GomailSenderConfig{
-		From:     "test@example.com",
-		Host:     "smtp.example.com",
-		Port:     587,
-		Username: "user",
-		Password: "pass",
-	}
-	mockDialer := new(MockDialer)
-	sender := &mailer.GomailSender{
-		Config: config,
-		Dialer: mockDialer,
+	newSender := func() (*MockDialer, *mailer.GomailSender) {
+		mockDialer := new(MockDialer)
+		sender := &mailer.GomailSender{
+			Config: mailer.GomailSenderConfig{
+				From:     "test@example.com",
+				Host:     "smtp.example.com",
+				Port:     587,
+				Username: "user",
+				Password: "pass",
+			},
+			Dialer: mockDialer,
+		}
+		return mockDialer, sender
 	}
 
 	t.Run("should return error if no recipients", func(t *testing.T) {
+		_, sender := newSender()
 		err := sender.Send([]string{}, "Subject", "text", "html")
 		assert.EqualError(t, err, "recipient list cannot be empty")
 	})
 
 	t.Run("should return error if subject is empty", func(t *testing.T) {
+		_, sender := newSender()
 		err := sender.Send([]string{"a@b.com"}, "", "text", "html")
 		assert.EqualError(t, err, "email subject cannot be empty")
 	})
 
 	t.Run("should return error if both plainText and html are empty", func(t *testing.T) {
+		_, sender := newSender()
 		err := sender.Send([]string{"a@b.com"}, "Subject", "", "")
 		assert.EqualError(t, err, "either plain text or HTML content must be provided")
 	})
 
 	t.Run("should send successfully", func(t *testing.T) {
+		mockDialer, sender := newSender()
 		mockDialer.On("DialAndSend", mock.Anything).Return(nil).Once()
 
 		err := sender.Send([]string{"a@b.com"}, "Subject", "Hello", "<b>Hi</b>")
@@ -57,13 +63,42 @@ func TestGomailSender_Send(t *testing.T) {
 		mockDialer.AssertExpectations(t)
 	})
 
+	t.Run("should send successfully with html only", func(t *testing.T) {
+		mockDialer, sender := newSender()
+		mockDialer.On("DialAndSend", mock.Anything).Return(nil).Once()
+
+		err := sender.Send([]string{"a@b.com"}, "Subject", "", "<b>Hi</b>")
+
+		assert.NoError(t, err)
+		mockDialer.AssertExpectations(t)
+	})
+
+	t.Run("should send to multiple recipients", func(t *testing.T) {
+		mockDialer, sender := newSender()
+		mockDialer.On("DialAndSend", mock.Anything).Return(nil).Once()
+
+		err := sender.Send([]string{"a@b.com", "c@d.com", "e@f.com"}, "Subject", "text", "")
+
+		assert.NoError(t, err)
+		mockDialer.AssertExpectations(t)
+	})
+
 	t.Run("should return error from dialer", func(t *testing.T) {
+		mockDialer, sender := newSender()
 		mockDialer.On("DialAndSend", mock.Anything).Return(errors.New("smtp error")).Once()
 
 		err := sender.Send([]string{"a@b.com"}, "Subject", "text", "")
 
 		assert.EqualError(t, err, "smtp error")
 		mockDialer.AssertExpectations(t)
+	})
+
+	t.Run("validation errors do not call the dialer", func(t *testing.T) {
+		mockDialer, sender := newSender()
+
+		err := sender.Send([]string{}, "Subject", "text", "")
+		assert.Error(t, err)
+		mockDialer.AssertNotCalled(t, "DialAndSend", mock.Anything)
 	})
 }
 

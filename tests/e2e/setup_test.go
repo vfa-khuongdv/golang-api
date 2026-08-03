@@ -49,11 +49,18 @@ func setupTestRouter() (*gin.Engine, *gorm.DB) {
 	// Set Gin to Test Mode
 	gin.SetMode(gin.TestMode)
 
-	// Initialize in-memory SQLite database
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// Initialize in-memory SQLite database.
+	// SQLite :memory: databases live inside a single connection, so the pool
+	// must be capped at 1 or concurrent access will see an empty DB.
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		panic("failed to connect to test database")
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		panic("failed to get sql.DB for test database")
+	}
+	sqlDB.SetMaxOpenConns(1)
 
 	// Migrate the schema
 	err = db.AutoMigrate(

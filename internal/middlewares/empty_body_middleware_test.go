@@ -2,6 +2,7 @@ package middlewares_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,16 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
+
+type errorReadCloser struct{}
+
+func (errorReadCloser) Read(_ []byte) (int, error) {
+	return 0, errors.New("read body failed")
+}
+
+func (errorReadCloser) Close() error {
+	return nil
+}
 
 func TestEmptyBodyMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -89,6 +100,26 @@ func TestEmptyBodyMiddleware(t *testing.T) {
 		})
 
 		req := httptest.NewRequest(http.MethodPost, "/test", bytes.NewBufferString("   \n  \t  "))
+		resp := httptest.NewRecorder()
+
+		// Act
+		router.ServeHTTP(resp, req)
+
+		// Assert
+		assert.Equal(t, http.StatusBadRequest, resp.Code)
+		assert.Contains(t, resp.Body.String(), "Request body cannot be empty")
+	})
+
+	t.Run("rejects body read error", func(t *testing.T) {
+		// Arrange
+		router := gin.New()
+		router.Use(middlewares.EmptyBodyMiddleware())
+		router.POST("/test", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{"message": "OK"})
+		})
+
+		req := httptest.NewRequest(http.MethodPost, "/test", nil)
+		req.Body = errorReadCloser{}
 		resp := httptest.NewRecorder()
 
 		// Act

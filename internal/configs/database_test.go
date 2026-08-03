@@ -11,8 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestInitDB(t *testing.T) {
-	t.Run("InitDB - Success with SQLite for testing", func(t *testing.T) {
+func TestSQLiteDatabaseSmoke(t *testing.T) {
+	t.Run("Open and ping SQLite", func(t *testing.T) {
 		// Create a temporary SQLite database for testing
 		tempFile, err := os.CreateTemp("", "test_db_*.sqlite")
 		require.NoError(t, err)
@@ -21,8 +21,6 @@ func TestInitDB(t *testing.T) {
 		}()
 		_ = tempFile.Close()
 
-		// Mock the GORM Open function by using SQLite instead of MySQL for testing
-		// This tests the core functionality without requiring a MySQL server
 		db, err := gorm.Open(sqlite.Open(tempFile.Name()), &gorm.Config{})
 		require.NoError(t, err)
 		require.NotNil(t, db)
@@ -36,7 +34,7 @@ func TestInitDB(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("InitDB - DatabaseConfig struct creation", func(t *testing.T) {
+	t.Run("DatabaseConfig struct creation", func(t *testing.T) {
 		config := configs.DatabaseConfig{
 			Host:     "localhost",
 			Port:     "3306",
@@ -52,7 +50,7 @@ func TestInitDB(t *testing.T) {
 		assert.Equal(t, "testdb", config.DBName)
 	})
 
-	t.Run("InitDB - Global DB variable test", func(t *testing.T) {
+	t.Run("Global DB variable assignment", func(t *testing.T) {
 		// Reset global DB to nil
 		configs.DB = nil
 		assert.Nil(t, configs.DB)
@@ -65,7 +63,6 @@ func TestInitDB(t *testing.T) {
 		}()
 
 		_ = tempFile.Close()
-		// Test with SQLite (simulating successful database connection)
 		db, err := gorm.Open(sqlite.Open(tempFile.Name()), &gorm.Config{})
 		require.NoError(t, err)
 

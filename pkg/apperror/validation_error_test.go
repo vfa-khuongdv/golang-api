@@ -31,11 +31,11 @@ func TestValidateError(t *testing.T) {
 		expected := "code: 4001, message: Wrapped validation error, fields: [{password Password is too short}]"
 
 		// Act
-		wrappedErr := err.Wrap(400, 4001, "Wrapped validation error")
+		wrappedErr := err.Wrap(400, apperror.ErrValidationFailed, "Wrapped validation error")
 
 		// Assert
 		assert.NotNil(t, wrappedErr)
-		assert.Equal(t, 4001, wrappedErr.Code)
+		assert.Equal(t, apperror.ErrValidationFailed, wrappedErr.Code)
 		assert.Equal(t, "Wrapped validation error", wrappedErr.Message)
 		assert.Equal(t, 1, len(wrappedErr.Fields))
 		assert.Equal(t, expected, wrappedErr.Error())
@@ -52,7 +52,7 @@ func TestValidateError(t *testing.T) {
 		err := apperror.NewValidationError("Validation failed", fieldErrors)
 
 		// Assert
-		assert.Equal(t, 4001, err.Code)
+		assert.Equal(t, apperror.ErrValidationFailed, err.Code)
 		assert.Equal(t, "Validation failed", err.Message)
 		assert.Equal(t, 2, len(err.Fields))
 
@@ -64,5 +64,27 @@ func TestValidateError(t *testing.T) {
 				assert.Equal(t, "Password must be at least 6 characters", fieldError.Message)
 			}
 		}
+	})
+
+	t.Run("NewValidationError with nil fields", func(t *testing.T) {
+		// Act
+		err := apperror.NewValidationError("Validation failed", nil)
+
+		// Assert
+		assert.Equal(t, apperror.ErrValidationFailed, err.Code)
+		assert.Empty(t, err.Fields)
+		assert.Equal(t, "code: 4001, message: Validation failed, fields: []", err.Error())
+	})
+
+	t.Run("NewValidationError with empty message", func(t *testing.T) {
+		// Act
+		err := apperror.NewValidationError("", []apperror.FieldError{
+			{Field: "email", Message: "Email is required"},
+		})
+
+		// Assert
+		assert.Equal(t, apperror.ErrValidationFailed, err.Code)
+		assert.Equal(t, "", err.Message)
+		assert.Equal(t, 1, len(err.Fields))
 	})
 }

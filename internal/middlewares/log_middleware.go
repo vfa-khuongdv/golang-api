@@ -50,8 +50,6 @@ var sensitiveHeaders = map[string]bool{
 	"x-xsrf-token":        true,
 }
 
-var marshalLogEntry = json.Marshal
-
 type LogResponse struct {
 	RequestID  string `json:"request_id,omitempty"`
 	Method     string `json:"method"`

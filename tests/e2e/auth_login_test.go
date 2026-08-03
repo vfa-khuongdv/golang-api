@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
+	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
@@ -177,4 +178,49 @@ func TestAuthLogin(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, apperror.ErrValidationFailed, errResp.Code)
 	})
+}
+
+func TestAuthLoginLockout(t *testing.T) {
+	// Separate test function so it gets its own router (and thus its own
+	// rate limiter), avoiding interference with TestAuthLogin's request count.
+	router, db := setupTestRouter()
+
+	password := "password123"
+	hashedPassword, _ := utils.HashPassword(password)
+	user := models.User{
+		Name:     "Test User Lockout",
+		Email:    "test_lockout@example.com",
+		Password: hashedPassword,
+		Gender:   1,
+	}
+	result := db.Create(&user)
+	require.NoError(t, result.Error)
+
+	loginPayload := map[string]string{
+		"email":    "test_lockout@example.com",
+		"password": "wrongpassword",
+	}
+	payloadBytes, _ := json.Marshal(loginPayload)
+
+	// MaxFailedAttempts is 5; each failed attempt increments FailedAttempts.
+	for i := 0; i < services.MaxFailedAttempts; i++ {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	}
+
+	// The next attempt should hit the account lockout path (429).
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+
+	var errResp ErrorResponse
+	err := json.Unmarshal(w.Body.Bytes(), &errResp)
+	require.NoError(t, err)
+	assert.Equal(t, apperror.ErrAccountLocked, errResp.Code)
 }

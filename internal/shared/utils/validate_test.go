@@ -21,10 +21,6 @@ type mockBindingValidator struct{}
 func (m mockBindingValidator) ValidateStruct(any) error { return nil }
 func (m mockBindingValidator) Engine() any              { return "not-a-validator-engine" }
 
-type TestStruct struct {
-	Field string `validate:"%s=%s"`
-}
-
 func TestValidateBirthday(t *testing.T) {
 	validate := validator.New()
 	_ = validate.RegisterValidation("valid_birthday", utils.ValidateBirthday)
@@ -491,6 +487,11 @@ func TestInitValidator_RegistrationError(t *testing.T) {
 	_ = v.RegisterValidation("valid_birthday", func(fl validator.FieldLevel) bool {
 		return true
 	})
+	// Restore the real validation function once the test finishes so the
+	// global gin binding engine is not left in a mutated state.
+	t.Cleanup(func() {
+		_ = v.RegisterValidation("valid_birthday", utils.ValidateBirthday)
+	})
 
 	// Act (should log error for duplicate registration but not panic)
 	utils.InitValidator()
@@ -512,6 +513,33 @@ func TestValidateNotBlank_NonStringField(t *testing.T) {
 		Field int `validate:"not_blank"`
 	}{})
 	assert.Equal(t, "Field must not be blank", result.Fields[0].Message)
+}
+
+func TestValidateNotBlank_Positive(t *testing.T) {
+	// Arrange
+	validate := validator.New()
+	_ = validate.RegisterValidation("not_blank", utils.ValidateNotBlank)
+
+	t.Run("whitespace-trimmed non-blank passes", func(t *testing.T) {
+		err := validate.Struct(struct {
+			Field string `validate:"not_blank"`
+		}{Field: "  hello  "})
+		assert.NoError(t, err)
+	})
+
+	t.Run("blank fails", func(t *testing.T) {
+		err := validate.Struct(struct {
+			Field string `validate:"not_blank"`
+		}{Field: "   "})
+		assert.Error(t, err)
+	})
+
+	t.Run("empty fails", func(t *testing.T) {
+		err := validate.Struct(struct {
+			Field string `validate:"not_blank"`
+		}{Field: ""})
+		assert.Error(t, err)
+	})
 }
 
 func TestTranslateValidationErrors_CrossFieldValidators(t *testing.T) {

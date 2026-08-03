@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
@@ -391,51 +390,6 @@ func TestGetProfile(t *testing.T) {
 		mailerService.AssertExpectations(t)
 	})
 
-	t.Run("Success get profile from redis cache", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Gender:    1,
-			CreatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-		}
-		// Mock the service to return the cached profile
-		userService.On("GetProfile", mock.Anything, uint(1)).Return(user, nil)
-
-		handler := handlers.NewUserHandler(userService, mailerService)
-
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
-		c.Set("UserID", uint(1))
-
-		// Call the handler
-		handler.GetProfile(c)
-
-		// Assert the response
-		expectedBody := map[string]any{
-			"id":         float64(1),
-			"email":      "email@example.com",
-			"name":       "User",
-			"gender":     float64(1),
-			"created_at": "2023-10-01T00:00:00Z",
-			"updated_at": "2023-10-01T00:00:00Z",
-			"deleted_at": nil,
-		}
-
-		var actualBody map[string]any
-		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
-		// Assert mocks
-		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
-	})
-
 	t.Run("Error Invalid User ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
 		mailerService := new(mocks.MockMailerService)
@@ -495,49 +449,6 @@ func TestGetProfile(t *testing.T) {
 		// Assert mocks
 		userService.AssertExpectations(t)
 		mailerService.AssertExpectations(t)
-	})
-
-	t.Run("Success Get Profile but Error Cache", func(t *testing.T) {
-		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-
-		// Mock the GetUser method to return a user
-		user := &models.User{
-			ID:        1,
-			Email:     "email@example.com",
-			Name:      "User",
-			Gender:    1,
-			CreatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC),
-		}
-		userService.On("GetProfile", mock.Anything, uint(1)).Return(user, nil)
-
-		handler := handlers.NewUserHandler(userService, mailerService)
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
-		c.Set("UserID", uint(1))
-		// Call the GetProfile handler
-		handler.GetProfile(c)
-		// Assert the response
-		assert.Equal(t, http.StatusOK, w.Code)
-		expectedBody := map[string]any{
-			"id":         float64(1),
-			"email":      "email@example.com",
-			"name":       "User",
-			"gender":     float64(1),
-			"created_at": "2023-10-01T00:00:00Z",
-			"updated_at": "2023-10-01T00:00:00Z",
-			"deleted_at": nil,
-		}
-
-		var actualBody map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
-		require.NoError(t, err)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, expectedBody, actualBody)
-
 	})
 }
 
@@ -1213,32 +1124,8 @@ func TestResetPassword(t *testing.T) {
 				},
 			},
 			{
-				name:         "EmptyPassword",
-				reqBody:      `{"token":"valid-token","password":""}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedField: []apperror.FieldError{
-					{
-						Field:   "new_password",
-						Message: "new_password is required",
-					},
-				},
-			},
-			{
-				name:         "PasswordTooShort",
+				name:         "WrongFieldName",
 				reqBody:      `{"token":"valid-token","password":"short"}`,
-				expectedCode: 4001,
-				expectedMsg:  "Validation failed",
-				expectedField: []apperror.FieldError{
-					{
-						Field:   "new_password",
-						Message: "new_password is required",
-					},
-				},
-			},
-			{
-				name:         "PasswordTooLong",
-				reqBody:      `{"token":"valid-token","password":"` + strings.Repeat("a", 256) + `"}`,
 				expectedCode: 4001,
 				expectedMsg:  "Validation failed",
 				expectedField: []apperror.FieldError{
@@ -1532,6 +1419,9 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert the response - should return 400 for JSON parse error
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+		var actualBody map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &actualBody)
+		assert.Equal(t, float64(apperror.ErrValidationFailed), actualBody["code"])
 
 		// Assert mocks
 		userService.AssertExpectations(t)

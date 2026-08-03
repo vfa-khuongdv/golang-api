@@ -13,12 +13,23 @@ import (
 )
 
 func TestLogger(t *testing.T) {
+	prevLevel := logrus.StandardLogger().Level
+	prevFormatter := logrus.StandardLogger().Formatter
+	t.Cleanup(func() {
+		logrus.SetLevel(prevLevel)
+		logrus.SetFormatter(prevFormatter)
+	})
+
 	t.Run("Init", func(t *testing.T) {
 		// Act
 		logger.Init(logger.LogConfig{ServiceName: "test"})
 
 		// Assert
-		assert.NotNil(t, logrus.StandardLogger().Formatter)
+		formatter, ok := logrus.StandardLogger().Formatter.(*logrus.JSONFormatter)
+		assert.True(t, ok, "expected JSONFormatter")
+		if ok {
+			assert.Equal(t, "message", formatter.FieldMap[logrus.FieldKeyMsg])
+		}
 	})
 
 	t.Run("Plain logs", func(t *testing.T) {
@@ -383,6 +394,34 @@ func TestLogger(t *testing.T) {
 
 			// Assert
 			assert.Equal(t, "", result)
+		})
+
+		t.Run("RequestIDFromContext returns empty for non-string value", func(t *testing.T) {
+			// Arrange
+			ctx := context.WithValue(context.Background(), logger.RequestIDKey, 12345)
+
+			// Act
+			result := logger.RequestIDFromContext(ctx)
+
+			// Assert
+			assert.Equal(t, "", result)
+		})
+
+		t.Run("WithContext ignores non-string requestID", func(t *testing.T) {
+			// Arrange
+			hook := test.NewGlobal()
+			logrus.SetLevel(logrus.InfoLevel)
+			defer hook.Reset()
+
+			ctx := context.WithValue(context.Background(), logger.RequestIDKey, 12345)
+
+			// Act
+			logger.WithContext(ctx).Infof("no request id field")
+
+			// Assert
+			require.Len(t, hook.Entries, 1)
+			_, hasRequestID := hook.LastEntry().Data["request_id"]
+			assert.False(t, hasRequestID, "request_id field should not be present for non-string value")
 		})
 	})
 

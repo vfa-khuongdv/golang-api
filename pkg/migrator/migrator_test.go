@@ -100,6 +100,10 @@ func TestNewMigrator_Hooks(t *testing.T) {
 
 func TestOpenSQLConnection_DefaultFunc(t *testing.T) {
 	// Act
+	// Note: on Go 1.26+ sql.Open eagerly invokes the driver's OpenConnector, so
+	// the go-sql-driver returns the DSN error synchronously here. On older Go
+	// versions sql.Open is lazy and this returns nil — the assertion would
+	// then fail, so this test is version-dependent.
 	db, err := openSQLConnection("mysql", "invalid-dsn")
 	if db != nil {
 		_ = db.Close()
@@ -135,6 +139,10 @@ func TestNewMigrator_OpenConnectionError(t *testing.T) {
 
 func TestBuildMySQLDriver_DefaultFunc(t *testing.T) {
 	// Assert
+	// Pins the current default behavior: go-migrate's mysql driver panics when
+	// given a nil *sql.DB (it dereferences it during WithInstance). This is
+	// fragile coupling to driver internals; if the driver is ever updated to
+	// return an error instead, this test should be replaced.
 	assert.Panics(t, func() {
 		_, _ = buildMySQLDriver(&sql.DB{})
 	})
@@ -326,5 +334,5 @@ func TestNewMySQLDSN(t *testing.T) {
 	dsn := NewMySQLDSN(cfg)
 
 	// Assert
-	assert.Contains(t, dsn, "root:pass@tcp(127.0.0.1:3306)/testdb")
+	assert.Equal(t, "root:pass@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=UTC", dsn)
 }

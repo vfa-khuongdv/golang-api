@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
+	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
 
 type mailerServiceTestSuite struct {
@@ -34,9 +35,12 @@ func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 			ResetToken: nil,
 		}
 
-		assert.Panics(t, func() {
-			_ = s.mailerService.SendMailForgotPassword(user)
-		})
+		err := s.mailerService.SendMailForgotPassword(user)
+		assert.Error(t, err)
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrInternalServer, appErr.Code)
+		}
 	})
 }
 

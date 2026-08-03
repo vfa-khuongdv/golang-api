@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,9 +30,22 @@ func TestAuthForgotPassword(t *testing.T) {
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
 
-	t.Run("Forgot Password - Success", func(t *testing.T) {
-		// Note: This test will fail at email sending step due to missing SMTP config,
-		// but we can verify the token was generated in DB before that
+	t.Run("Forgot Password - Token Persisted On Email Failure", func(t *testing.T) {
+		// Force deterministic behavior: with MAIL_FROM unset the sender fails
+		// fast on address parsing (no network), so we always hit the 500 path
+		// and can verify the token was persisted before the send.
+		for _, key := range []string{"MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM"} {
+			prev, had := os.LookupEnv(key)
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatalf("failed to unset %s: %v", key, err)
+			}
+			t.Cleanup(func() {
+				if had {
+					_ = os.Setenv(key, prev)
+				}
+			})
+		}
+
 		payload := map[string]string{
 			"email": "test_forgot@example.com",
 		}
@@ -43,23 +57,18 @@ func TestAuthForgotPassword(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		// The request will fail at email sending (500) due to missing SMTP config
-		// but the token should still be generated in DB
-		if w.Code == http.StatusInternalServerError {
-			// Verify token was generated despite email failure
-			var updatedUser models.User
-			db.First(&updatedUser, user.ID)
-			assert.NotNil(t, updatedUser.ResetToken)
-			assert.NotNil(t, updatedUser.ResetExpiredAt)
+		// Email sending fails (500) but the token should still be generated in DB
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
-			var errResp ErrorResponse
-			err := json.Unmarshal(w.Body.Bytes(), &errResp)
-			require.NoError(t, err)
-			assert.Equal(t, apperror.ErrInternalServer, errResp.Code)
-		} else {
-			// If SMTP is configured, should succeed
-			assert.Equal(t, http.StatusOK, w.Code)
-		}
+		var updatedUser models.User
+		db.First(&updatedUser, user.ID)
+		assert.NotNil(t, updatedUser.ResetToken)
+		assert.NotNil(t, updatedUser.ResetExpiredAt)
+
+		var errResp ErrorResponse
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Equal(t, apperror.ErrInternalServer, errResp.Code)
 	})
 
 	t.Run("Forgot Password - Email Not Found", func(t *testing.T) {

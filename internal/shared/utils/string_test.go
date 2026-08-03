@@ -25,6 +25,11 @@ func TestGenerateRandomString(t *testing.T) {
 		require.Equal(t, length, len(randomStr), "Expected length %d, but got %d", length, len(randomStr))
 	})
 
+	t.Run("zero length returns empty string", func(t *testing.T) {
+		randomStr := utils.GenerateRandomString(0)
+		assert.Empty(t, randomStr)
+	})
+
 	t.Run("checks that consecutive calls return different strings", func(t *testing.T) {
 		str1 := utils.GenerateRandomString(10)
 		str2 := utils.GenerateRandomString(10)

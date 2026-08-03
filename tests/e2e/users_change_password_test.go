@@ -18,29 +18,35 @@ import (
 func TestUsersChangePassword(t *testing.T) {
 	router, db := setupTestRouter()
 
-	// Create test user
-	password := "password123"
-	hashedPassword, _ := utils.HashPassword(password)
-	testUser := models.User{
-		Name:     "Test User",
-		Email:    "testuser@example.com",
-		Password: hashedPassword,
-		Gender:   1,
-	}
-	db.Create(&testUser)
-
-	// Generate access token for test user
 	jwtService, err := services.NewJWTService()
 	if err != nil {
 		t.Fatalf("Failed to create JWT service: %v", err)
 	}
-	tokenResult, err := jwtService.GenerateAccessToken(testUser.ID)
-	require.NoError(t, err)
-	accessToken := tokenResult.Token
+
+	// Each subtest gets its own user seeded with the same password, so no
+	// subtest depends on another mutating the shared password first.
+	createUser := func(t *testing.T, email string) (models.User, string) {
+		t.Helper()
+		hashedPassword, _ := utils.HashPassword("password123")
+		user := models.User{
+			Name:     "Test User",
+			Email:    email,
+			Password: hashedPassword,
+			Gender:   1,
+		}
+		if err := db.Create(&user).Error; err != nil {
+			t.Fatalf("failed to create user: %v", err)
+		}
+		tokenResult, err := jwtService.GenerateAccessToken(user.ID)
+		require.NoError(t, err)
+		return user, tokenResult.Token
+	}
 
 	t.Run("Change Password - Success", func(t *testing.T) {
+		testUser, accessToken := createUser(t, "success@example.com")
+
 		payload := map[string]string{
-			"old_password":     password,
+			"old_password":     "password123",
 			"new_password":     "newpassword123",
 			"confirm_password": "newpassword123",
 		}
@@ -67,6 +73,8 @@ func TestUsersChangePassword(t *testing.T) {
 	})
 
 	t.Run("Change Password - Incorrect Old Password", func(t *testing.T) {
+		_, accessToken := createUser(t, "wrongold@example.com")
+
 		payload := map[string]string{
 			"old_password":     "wrongpassword",
 			"new_password":     "newpassword456",
@@ -90,10 +98,12 @@ func TestUsersChangePassword(t *testing.T) {
 	})
 
 	t.Run("Change Password - New Password Same as Old", func(t *testing.T) {
+		_, accessToken := createUser(t, "sameold@example.com")
+
 		payload := map[string]string{
-			"old_password":     "newpassword123",
-			"new_password":     "newpassword123",
-			"confirm_password": "newpassword123",
+			"old_password":     "password123",
+			"new_password":     "password123",
+			"confirm_password": "password123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -113,8 +123,10 @@ func TestUsersChangePassword(t *testing.T) {
 	})
 
 	t.Run("Change Password - Password Mismatch", func(t *testing.T) {
+		_, accessToken := createUser(t, "mismatch@example.com")
+
 		payload := map[string]string{
-			"old_password":     "newpassword123",
+			"old_password":     "password123",
 			"new_password":     "newpassword456",
 			"confirm_password": "differentpassword",
 		}
@@ -136,8 +148,10 @@ func TestUsersChangePassword(t *testing.T) {
 	})
 
 	t.Run("Change Password - Missing Fields", func(t *testing.T) {
+		_, accessToken := createUser(t, "missingfields@example.com")
+
 		payload := map[string]string{
-			"old_password": "newpassword123",
+			"old_password": "password123",
 			"new_password": "newpassword789",
 		}
 		payloadBytes, _ := json.Marshal(payload)
@@ -158,8 +172,10 @@ func TestUsersChangePassword(t *testing.T) {
 	})
 
 	t.Run("Change Password - Password Too Short", func(t *testing.T) {
+		_, accessToken := createUser(t, "tooshort@example.com")
+
 		payload := map[string]string{
-			"old_password":     "newpassword123",
+			"old_password":     "password123",
 			"new_password":     "12345",
 			"confirm_password": "12345",
 		}
@@ -182,7 +198,7 @@ func TestUsersChangePassword(t *testing.T) {
 
 	t.Run("Change Password - Unauthorized without Token", func(t *testing.T) {
 		payload := map[string]string{
-			"old_password":     "newpassword123",
+			"old_password":     "password123",
 			"new_password":     "anotherpassword",
 			"confirm_password": "anotherpassword",
 		}
@@ -199,7 +215,7 @@ func TestUsersChangePassword(t *testing.T) {
 
 	t.Run("Change Password - Expired Token", func(t *testing.T) {
 		payload := map[string]string{
-			"old_password":     "newpassword123",
+			"old_password":     "password123",
 			"new_password":     "anotherpassword",
 			"confirm_password": "anotherpassword",
 		}

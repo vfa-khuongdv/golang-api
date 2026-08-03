@@ -25,6 +25,17 @@ func TestAppError_Error(t *testing.T) {
 		// Assert
 		assert.Equal(t, expected, result)
 	})
+
+	t.Run("with empty message", func(t *testing.T) {
+		// Arrange
+		appErr := apperror.New(http.StatusBadRequest, apperror.ErrBadRequest, "")
+
+		// Act
+		result := appErr.Error()
+
+		// Assert
+		assert.Equal(t, "code: 1002, message: ", result)
+	})
 }
 
 func TestWrap(t *testing.T) {
@@ -47,6 +58,8 @@ func TestWrap(t *testing.T) {
 	assert.NotNil(t, appErr)
 	assert.Equal(t, apperror.ErrValidationFailed, appErr.Code)
 	assert.Equal(t, "invalid request", appErr.Message)
+	assert.Equal(t, http.StatusBadRequest, appErr.HttpStatusCode)
+	assert.Equal(t, underlying, appErr.Err)
 }
 
 func TestNew(t *testing.T) {
@@ -65,6 +78,8 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, appErr)
 	assert.Equal(t, expectedCode, appErr.Code)
 	assert.Equal(t, expectedMessage, appErr.Message)
+	assert.Equal(t, http.StatusUnauthorized, appErr.HttpStatusCode)
+	assert.Nil(t, appErr.Err)
 }
 
 func TestIsAppError(t *testing.T) {
@@ -89,6 +104,14 @@ func TestIsAppError(t *testing.T) {
 
 		// Act
 		result := apperror.IsAppError(err)
+
+		// Assert
+		assert.False(t, result)
+	})
+
+	t.Run("nil error", func(t *testing.T) {
+		// Act
+		result := apperror.IsAppError(nil)
 
 		// Assert
 		assert.False(t, result)
@@ -118,6 +141,15 @@ func TestToAppError(t *testing.T) {
 
 		// Act
 		result, ok := apperror.ToAppError(err)
+
+		// Assert
+		assert.False(t, ok)
+		assert.Nil(t, result)
+	})
+
+	t.Run("nil error", func(t *testing.T) {
+		// Act
+		result, ok := apperror.ToAppError(nil)
 
 		// Assert
 		assert.False(t, ok)

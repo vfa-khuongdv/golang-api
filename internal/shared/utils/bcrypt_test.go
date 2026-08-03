@@ -1,6 +1,7 @@
 package utils_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,15 +59,31 @@ func TestHashPassword(t *testing.T) {
 	})
 }
 
-func TestBcryptPackageVars(t *testing.T) {
+func TestBcryptLengthLimit(t *testing.T) {
 	t.Run("HashPasswordTooLong", func(t *testing.T) {
-		password := ""
-		for i := 0; i < 80; i++ {
-			password += "a"
-		}
+		password := strings.Repeat("a", 80)
 
 		hashed, err := utils.HashPassword(password)
 		assert.Error(t, err, "HashPassword should return error when password exceeds bcrypt length limit")
+		assert.Empty(t, hashed)
+	})
+
+	t.Run("HashPassword72BytesSucceeds", func(t *testing.T) {
+		// 72 bytes is the bcrypt maximum; it must hash successfully.
+		password := strings.Repeat("a", 72)
+
+		hashed, err := utils.HashPassword(password)
+		require.NoError(t, err)
+		assert.NotEmpty(t, hashed)
+		assert.True(t, utils.CheckPasswordHash(password, hashed))
+	})
+
+	t.Run("HashPassword73BytesFails", func(t *testing.T) {
+		// 73 bytes exceeds the bcrypt limit.
+		password := strings.Repeat("a", 73)
+
+		hashed, err := utils.HashPassword(password)
+		assert.Error(t, err)
 		assert.Empty(t, hashed)
 	})
 }

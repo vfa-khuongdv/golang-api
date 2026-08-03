@@ -11,10 +11,16 @@ import (
 )
 
 type fakeEmailSender struct {
-	sendErr error
+	sendErr    error
+	lastHTML   string
+	lastTo     []string
+	lastFrom   string
+	lastConfig mailer.GomailSenderConfig
 }
 
-func (f *fakeEmailSender) Send(_ []string, _ string, _ string, _ string) error {
+func (f *fakeEmailSender) Send(to []string, _ string, _ string, html string) error {
+	f.lastTo = to
+	f.lastHTML = html
 	return f.sendErr
 }
 
@@ -36,12 +42,16 @@ func TestMailerService_InternalBranches(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://example.com")
 
 	t.Run("Success", func(t *testing.T) {
+		fake := &fakeEmailSender{}
 		newEmailSender = func(_ mailer.GomailSenderConfig) mailer.EmailSender {
-			return &fakeEmailSender{}
+			return fake
 		}
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.NoError(t, err)
+		assert.Equal(t, []string{"user@example.com"}, fake.lastTo)
+		assert.Contains(t, fake.lastHTML, "https://example.com/reset-password?token=reset-token")
+		assert.Contains(t, fake.lastHTML, "User")
 	})
 
 	t.Run("SendErrorStillWrapped", func(t *testing.T) {
