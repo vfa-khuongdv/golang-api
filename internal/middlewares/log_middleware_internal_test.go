@@ -30,6 +30,18 @@ func (sb *syncBuffer) Bytes() []byte {
 	return sb.buf.Bytes()
 }
 
+func waitForLog(t *testing.T, buf *syncBuffer, timeout time.Duration) []byte {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if b := buf.Bytes(); len(b) > 0 {
+			return b
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return buf.Bytes()
+}
+
 func TestCensorQueryParams(t *testing.T) {
 	t.Run("sensitive key masked", func(t *testing.T) {
 		// Arrange
@@ -156,9 +168,8 @@ func TestLogMiddleware_LogsRequest(t *testing.T) {
 
 	// Act
 	router.ServeHTTP(resp, req)
-	time.Sleep(50 * time.Millisecond)
 
 	// Assert
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.NotEmpty(t, buf.Bytes())
+	assert.NotEmpty(t, waitForLog(t, &buf, time.Second))
 }

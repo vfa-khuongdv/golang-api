@@ -25,6 +25,7 @@ func TestJWTService_InternalBranches(t *testing.T) {
 		signJWTToken = func(_ *jwt.Token, _ []byte) (string, error) {
 			return "", errors.New("sign failed")
 		}
+		t.Cleanup(func() { signJWTToken = originalSign })
 
 		result, err := svc.GenerateAccessToken(1)
 		assert.Nil(t, result)
@@ -35,6 +36,7 @@ func TestJWTService_InternalBranches(t *testing.T) {
 		parseJWTWithClaims = func(_ string, _ jwt.Claims, _ jwt.Keyfunc, _ ...jwt.ParserOption) (*jwt.Token, error) {
 			return &jwt.Token{Claims: jwt.MapClaims{}, Valid: true}, nil
 		}
+		t.Cleanup(func() { parseJWTWithClaims = originalParse })
 
 		claims, err := svc.ValidateToken("any")
 		assert.Nil(t, claims)
@@ -45,6 +47,7 @@ func TestJWTService_InternalBranches(t *testing.T) {
 		parseJWTWithClaims = func(_ string, _ jwt.Claims, _ jwt.Keyfunc, _ ...jwt.ParserOption) (*jwt.Token, error) {
 			return &jwt.Token{Claims: jwt.MapClaims{}, Valid: true}, nil
 		}
+		t.Cleanup(func() { parseJWTWithClaims = originalParse })
 
 		claims, err := svc.ValidateTokenIgnoreExpiration("any")
 		assert.Nil(t, claims)

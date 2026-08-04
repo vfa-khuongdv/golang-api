@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -52,6 +53,38 @@ func setupLogCapture() (*syncBuffer, func()) {
 	return &buf, func() { logrus.SetOutput(prevOutput) }
 }
 
+func lastCompleteJSON(b []byte) []byte {
+	for _, line := range bytes.Split(b, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+		var m map[string]interface{}
+		if json.Unmarshal(line, &m) == nil {
+			return line
+		}
+	}
+	return nil
+}
+
+func waitForLog(t *testing.T, buf *syncBuffer, timeout time.Duration) []byte {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	var last []byte
+	for time.Now().Before(deadline) {
+		if cur := lastCompleteJSON(buf.Bytes()); cur != nil {
+			if !bytes.Equal(cur, last) {
+				last = cur
+				time.Sleep(30 * time.Millisecond)
+				continue
+			}
+			return cur
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return last
+}
+
 func TestLogMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -87,10 +120,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(100 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "info", logEntry["level"])
 		assert.Equal(t, "POST", logEntry["method"])
@@ -121,10 +152,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "GET", logEntry["method"])
 		assert.Equal(t, "/ping", logEntry["url"])
@@ -147,10 +176,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, logEntry["request"])
 		reqStr, ok := logEntry["request"].(string)
@@ -173,10 +200,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, middlewares.NotLoggedResponse, logEntry["response"])
 	})
@@ -199,10 +224,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 
 		headers, ok := logEntry["header"].(map[string]interface{})
@@ -241,10 +264,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "POST", logEntry["method"])
 		assert.Equal(t, "/malformed", logEntry["url"])
@@ -267,10 +288,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "plain text request", logEntry["request"])
 		assert.Equal(t, middlewares.NotLoggedResponse, logEntry["response"])
@@ -292,10 +311,9 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.NotEmpty(t, buf.Bytes())
+		assert.NotEmpty(t, waitForLog(t, buf, time.Second))
 	})
 
 	t.Run("concurrent requests handled safely", func(t *testing.T) {
@@ -317,7 +335,7 @@ func TestLogMiddleware(t *testing.T) {
 				bodyBytes, _ := json.Marshal(reqBody)
 				req := httptest.NewRequest(http.MethodPost, "/concurrent", bytes.NewBuffer(bodyBytes))
 				req.Header.Set("Content-Type", "application/json")
-				req.Header.Set("Authorization", "Bearer token-"+string(rune(id)))
+				req.Header.Set("Authorization", "Bearer token-"+fmt.Sprintf("%d", id))
 				w := httptest.NewRecorder()
 				router.ServeHTTP(w, req)
 				done <- true
@@ -326,9 +344,8 @@ func TestLogMiddleware(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			<-done
 		}
-		time.Sleep(200 * time.Millisecond)
 
-		assert.NotEmpty(t, buf.Bytes())
+		assert.NotEmpty(t, waitForLog(t, buf, 2*time.Second))
 	})
 
 	t.Run("PUT and PATCH request bodies are logged", func(t *testing.T) {
@@ -380,10 +397,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(50 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "POST", logEntry["method"])
 		assert.Equal(t, "/empty", logEntry["url"])
@@ -409,10 +424,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(100 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "500", logEntry["status_code"])
 		assert.Equal(t, "error", logEntry["level"])
@@ -440,10 +453,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(100 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "500", logEntry["status_code"])
 		assert.Equal(t, "error", logEntry["level"])
@@ -468,10 +479,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(100 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "500", logEntry["status_code"])
 		assert.Equal(t, "error", logEntry["level"])
@@ -496,10 +505,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(100 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "500", logEntry["status_code"])
 		assert.Equal(t, "error", logEntry["level"])
@@ -528,10 +535,8 @@ func TestLogMiddleware(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		router.ServeHTTP(w, req)
-		time.Sleep(100 * time.Millisecond)
-
 		var logEntry map[string]interface{}
-		err := json.Unmarshal(buf.Bytes(), &logEntry)
+		err := json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry)
 		assert.NoError(t, err)
 		assert.Equal(t, "400", logEntry["status_code"])
 		assert.Equal(t, "warning", logEntry["level"])

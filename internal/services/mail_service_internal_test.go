@@ -46,6 +46,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 		newEmailSender = func(_ mailer.GomailSenderConfig) mailer.EmailSender {
 			return fake
 		}
+		t.Cleanup(func() { newEmailSender = originalSender })
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.NoError(t, err)
@@ -58,16 +59,29 @@ func TestMailerService_InternalBranches(t *testing.T) {
 		newEmailSender = func(_ mailer.GomailSenderConfig) mailer.EmailSender {
 			return &fakeEmailSender{sendErr: errors.New("smtp fail")}
 		}
+		t.Cleanup(func() { newEmailSender = originalSender })
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "error sending email")
 	})
 
+	t.Run("NilEmailSender", func(t *testing.T) {
+		newEmailSender = func(_ mailer.GomailSenderConfig) mailer.EmailSender {
+			return nil
+		}
+		t.Cleanup(func() { newEmailSender = originalSender })
+
+		err := NewMailerService().SendMailForgotPassword(user)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Failed to initialize mail sender")
+	})
+
 	t.Run("TemplateParseError", func(t *testing.T) {
 		parseForgotTemplate = func() (*template.Template, error) {
 			return nil, errors.New("parse failure")
 		}
+		t.Cleanup(func() { parseForgotTemplate = originalParse })
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.Error(t, err)
@@ -78,6 +92,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 		newEmailSender = func(_ mailer.GomailSenderConfig) mailer.EmailSender {
 			return &fakeEmailSender{}
 		}
+		t.Cleanup(func() { newEmailSender = originalSender })
 		parseForgotTemplate = func() (*template.Template, error) {
 			tmpl := template.New("test")
 			tmpl = tmpl.Funcs(template.FuncMap{
@@ -87,6 +102,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 			})
 			return template.Must(tmpl.Parse(`{{fail}}`)), nil
 		}
+		t.Cleanup(func() { parseForgotTemplate = originalParse })
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.Error(t, err)

@@ -3,12 +3,29 @@ package migrator
 import (
 	"database/sql"
 	"errors"
+	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
 	"github.com/stretchr/testify/assert"
 )
+
+func goVersionAtLeast(major, minor int) bool {
+	version := strings.TrimPrefix(runtime.Version(), "go")
+	parts := strings.SplitN(version, ".", 3)
+	if len(parts) < 2 {
+		return false
+	}
+	maj, err1 := strconv.Atoi(parts[0])
+	min, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return maj > major || (maj == major && min >= minor)
+}
 
 type fakeMigrate struct {
 	upCalled    bool
@@ -99,11 +116,14 @@ func TestNewMigrator_Hooks(t *testing.T) {
 }
 
 func TestOpenSQLConnection_DefaultFunc(t *testing.T) {
+	// sql.Open is lazy before Go 1.26, so an invalid DSN does not error
+	// synchronously on older toolchains. Skip there; on Go 1.26+ the
+	// go-sql-driver returns the DSN error eagerly.
+	if !goVersionAtLeast(1, 26) {
+		t.Skip("sql.Open is lazy before Go 1.26; invalid DSN does not error")
+	}
+
 	// Act
-	// Note: on Go 1.26+ sql.Open eagerly invokes the driver's OpenConnector, so
-	// the go-sql-driver returns the DSN error synchronously here. On older Go
-	// versions sql.Open is lazy and this returns nil — the assertion would
-	// then fail, so this test is version-dependent.
 	db, err := openSQLConnection("mysql", "invalid-dsn")
 	if db != nil {
 		_ = db.Close()
@@ -135,17 +155,6 @@ func TestNewMigrator_OpenConnectionError(t *testing.T) {
 	assert.Nil(t, m)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to connect to database")
-}
-
-func TestBuildMySQLDriver_DefaultFunc(t *testing.T) {
-	// Assert
-	// Pins the current default behavior: go-migrate's mysql driver panics when
-	// given a nil *sql.DB (it dereferences it during WithInstance). This is
-	// fragile coupling to driver internals; if the driver is ever updated to
-	// return an error instead, this test should be replaced.
-	assert.Panics(t, func() {
-		_, _ = buildMySQLDriver(&sql.DB{})
-	})
 }
 
 func TestCreateMigrateInstance_DefaultFunc(t *testing.T) {

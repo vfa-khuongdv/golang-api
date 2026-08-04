@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 )
 
@@ -29,8 +28,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("Single Allowed Origin - Success", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -53,8 +51,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("Multiple Allowed Origins - First Origin Success", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://app1.com,https://app2.com,https://app3.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://app1.com,https://app2.com,https://app3.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -72,8 +69,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("Multiple Allowed Origins - Middle Origin Success", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://app1.com,https://app2.com,https://app3.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://app1.com,https://app2.com,https://app3.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -90,8 +86,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("Multiple Allowed Origins - With Spaces", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://app1.com, https://app2.com , https://app3.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://app1.com, https://app2.com , https://app3.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -108,8 +103,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("Wildcard Origin - Allows Any Origin", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "*"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "*")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -127,8 +121,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("Rejected Origin - Not In Allowed List", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -149,8 +142,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("No Origin Header - Rejected", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -168,8 +160,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("OPTIONS Preflight Request - Success", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
@@ -190,8 +181,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("OPTIONS Preflight Request - Rejected Origin", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodOptions, "/test", nil)
@@ -244,8 +234,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 	t.Run("POST Request - CORS Headers Applied", func(t *testing.T) {
 		// Arrange
-		require.NoError(t, os.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com"))
-		defer func() { _ = os.Unsetenv("CORS_ALLOWED_ORIGINS") }()
+		t.Setenv("CORS_ALLOWED_ORIGINS", "https://example.com")
 
 		router := setupRouter()
 		req := httptest.NewRequest(http.MethodPost, "/test", nil)

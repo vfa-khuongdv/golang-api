@@ -127,6 +127,8 @@ func TestAuthMiddleware(t *testing.T) {
 			assert.Equal(t, tt.expectNext, nextCalled)
 			if tt.expectedUserID != nil {
 				assert.Equal(t, tt.expectedUserID, capturedUserID)
+			} else {
+				assert.Nil(t, capturedUserID)
 			}
 			mockJWTService.AssertExpectations(t)
 		})

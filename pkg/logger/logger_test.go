@@ -12,12 +12,21 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
+func withLevel(t *testing.T, level logrus.Level) {
+	t.Helper()
+	prev := logrus.StandardLogger().Level
+	logrus.SetLevel(level)
+	t.Cleanup(func() { logrus.SetLevel(prev) })
+}
+
 func TestLogger(t *testing.T) {
 	prevLevel := logrus.StandardLogger().Level
 	prevFormatter := logrus.StandardLogger().Formatter
+	prevOutput := logrus.StandardLogger().Out
 	t.Cleanup(func() {
 		logrus.SetLevel(prevLevel)
 		logrus.SetFormatter(prevFormatter)
+		logrus.SetOutput(prevOutput)
 	})
 
 	t.Run("Init", func(t *testing.T) {
@@ -36,7 +45,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Info", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			// Act
@@ -52,7 +61,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Infof", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			// Act
@@ -68,7 +77,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Debug", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.DebugLevel)
+			withLevel(t, logrus.DebugLevel)
 			defer hook.Reset()
 
 			// Act
@@ -84,7 +93,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Debugf", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.DebugLevel)
+			withLevel(t, logrus.DebugLevel)
 			defer hook.Reset()
 
 			// Act
@@ -100,7 +109,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Error", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.ErrorLevel)
+			withLevel(t, logrus.ErrorLevel)
 			defer hook.Reset()
 
 			// Act
@@ -116,7 +125,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Errorf", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.ErrorLevel)
+			withLevel(t, logrus.ErrorLevel)
 			defer hook.Reset()
 
 			// Act
@@ -132,7 +141,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Warn", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.WarnLevel)
+			withLevel(t, logrus.WarnLevel)
 			defer hook.Reset()
 
 			// Act
@@ -148,7 +157,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Warnf", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.WarnLevel)
+			withLevel(t, logrus.WarnLevel)
 			defer hook.Reset()
 
 			// Act
@@ -166,7 +175,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Infof with requestID", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "test-req-123")
@@ -185,7 +194,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Errorf with requestID", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.ErrorLevel)
+			withLevel(t, logrus.ErrorLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "test-req-456")
@@ -204,7 +213,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Warnf with requestID", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.WarnLevel)
+			withLevel(t, logrus.WarnLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "test-req-789")
@@ -223,7 +232,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithContext without requestID", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			ctx := context.Background()
@@ -241,7 +250,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithField chaining", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "test-req-chain")
@@ -260,7 +269,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithFields chaining", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "test-req-fields")
@@ -283,7 +292,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Logger.Info", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "req-info")
@@ -302,7 +311,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Logger.Debug", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.DebugLevel)
+			withLevel(t, logrus.DebugLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "req-debug")
@@ -321,7 +330,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Logger.Debugf", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.DebugLevel)
+			withLevel(t, logrus.DebugLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "req-debugf")
@@ -340,7 +349,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Logger.Error", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.ErrorLevel)
+			withLevel(t, logrus.ErrorLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "req-error")
@@ -359,7 +368,7 @@ func TestLogger(t *testing.T) {
 		t.Run("Logger.Warn", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.WarnLevel)
+			withLevel(t, logrus.WarnLevel)
 			defer hook.Reset()
 
 			ctx := logger.WithRequestIDContext(context.Background(), "req-warn")
@@ -410,7 +419,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithContext ignores non-string requestID", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			ctx := context.WithValue(context.Background(), logger.RequestIDKey, 12345)
@@ -452,7 +461,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithField", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			// Act
@@ -468,7 +477,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithFields", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.InfoLevel)
+			withLevel(t, logrus.InfoLevel)
 			defer hook.Reset()
 
 			// Act
@@ -488,7 +497,7 @@ func TestLogger(t *testing.T) {
 		t.Run("WithField Errorf", func(t *testing.T) {
 			// Arrange
 			hook := test.NewGlobal()
-			logrus.SetLevel(logrus.ErrorLevel)
+			withLevel(t, logrus.ErrorLevel)
 			defer hook.Reset()
 
 			// Act
@@ -545,6 +554,11 @@ func TestLogger(t *testing.T) {
 	})
 
 	t.Run("Init with full config", func(t *testing.T) {
+		// Arrange
+		hook := test.NewGlobal()
+		withLevel(t, logrus.InfoLevel)
+		defer hook.Reset()
+
 		// Act
 		logger.Init(logger.LogConfig{
 			ServiceName: "test-service",
@@ -554,5 +568,12 @@ func TestLogger(t *testing.T) {
 
 		// Assert
 		assert.NotNil(t, logrus.StandardLogger().Formatter)
+		entry := hook.LastEntry()
+		if assert.NotNil(t, entry) {
+			assert.Equal(t, "starting", entry.Message)
+			assert.Equal(t, "test-service", entry.Data["service"])
+			assert.Equal(t, "2.0.0", entry.Data["version"])
+			assert.Equal(t, "staging", entry.Data["env"])
+		}
 	})
 }

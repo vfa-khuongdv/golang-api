@@ -49,6 +49,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		setupMocks func()
 		expectErr  bool
 		errCode    int
+		errMsg     string
 	}{
 		{
 			name: "Success",
@@ -108,6 +109,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return((*dto.JwtResult)(nil), errors.New("refresh create failed"))
 			},
 			expectErr: true,
+			errMsg:    "refresh create failed",
 		},
 	}
 
@@ -122,6 +124,9 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			if tt.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, resp)
+				if tt.errMsg != "" {
+					assert.EqualError(t, err, tt.errMsg)
+				}
 				if appErr, ok := err.(*apperror.AppError); ok {
 					assert.Equal(t, tt.errCode, appErr.Code)
 				}
@@ -132,7 +137,11 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				assert.NotZero(t, resp.AccessToken.ExpiresAt)
 				assert.Equal(t, "mocked-refresh-token", resp.RefreshToken.Token)
 				assert.NotZero(t, resp.RefreshToken.ExpiresAt)
+				s.repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
 			}
+			s.repo.AssertExpectations(t)
+			s.refreshTokenService.AssertExpectations(t)
+			s.jwtService.AssertExpectations(t)
 		})
 	}
 }
@@ -269,6 +278,9 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				assert.Equal(t, "new-refresh-token", result.RefreshToken.Token)
 				assert.NotZero(t, result.RefreshToken.ExpiresAt)
 			}
+			s.repo.AssertExpectations(t)
+			s.refreshTokenService.AssertExpectations(t)
+			s.jwtService.AssertExpectations(t)
 		})
 	}
 }
@@ -322,6 +334,33 @@ func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
 
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+		Token:     "token",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}, nil)
+	s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
+		Token:     "refresh",
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	}, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
+	assert.Equal(s.T(), 0, user.FailedAttempts)
+	assert.Nil(s.T(), user.LockedUntil)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
+	email := "expiredlock@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	hashedPassword, _ := utils.HashPassword(password)
+	expiredLock := time.Now().Add(-30 * time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3, LockedUntil: &expiredLock}
 	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{

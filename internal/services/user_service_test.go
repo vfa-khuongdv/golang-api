@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
@@ -149,6 +150,10 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		s.Error(err)
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrDBQuery, appErr.Code)
+		}
 	})
 
 	s.T().Run("UpdateFailure", func(t *testing.T) {
@@ -161,6 +166,10 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		s.Error(err)
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrDBUpdate, appErr.Code)
+		}
 	})
 
 	s.T().Run("SendMailFailure", func(t *testing.T) {
@@ -209,6 +218,20 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 		s.Nil(result)
 		s.Error(err)
+	})
+
+	s.T().Run("TokenExpiryExactlyNowNotExpired", func(t *testing.T) {
+		input := &dto.ResetPasswordInput{Token: "token-3", NewPassword: "new-password"}
+		now := time.Now().Unix()
+		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: &now}
+
+		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+
+		result, err := s.service.ResetPassword(context.Background(), input)
+
+		s.NoError(err)
+		s.NotNil(result)
 	})
 
 	s.T().Run("UpdateFailure", func(t *testing.T) {

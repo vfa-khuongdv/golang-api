@@ -19,6 +19,24 @@ func (m *MockDialer) DialAndSend(msgs ...*mail.Msg) error {
 	return args.Error(0)
 }
 
+func messageTo(recipients ...string) interface{} {
+	return mock.MatchedBy(func(msgs []*mail.Msg) bool {
+		if len(msgs) != 1 {
+			return false
+		}
+		to := msgs[0].GetTo()
+		if len(to) != len(recipients) {
+			return false
+		}
+		for i, r := range recipients {
+			if to[i].Address != r {
+				return false
+			}
+		}
+		return true
+	})
+}
+
 func TestGomailSender_Send(t *testing.T) {
 	newSender := func() (*MockDialer, *mailer.GomailSender) {
 		mockDialer := new(MockDialer)
@@ -55,7 +73,7 @@ func TestGomailSender_Send(t *testing.T) {
 
 	t.Run("should send successfully", func(t *testing.T) {
 		mockDialer, sender := newSender()
-		mockDialer.On("DialAndSend", mock.Anything).Return(nil).Once()
+		mockDialer.On("DialAndSend", messageTo("a@b.com")).Return(nil).Once()
 
 		err := sender.Send([]string{"a@b.com"}, "Subject", "Hello", "<b>Hi</b>")
 
@@ -65,7 +83,7 @@ func TestGomailSender_Send(t *testing.T) {
 
 	t.Run("should send successfully with html only", func(t *testing.T) {
 		mockDialer, sender := newSender()
-		mockDialer.On("DialAndSend", mock.Anything).Return(nil).Once()
+		mockDialer.On("DialAndSend", messageTo("a@b.com")).Return(nil).Once()
 
 		err := sender.Send([]string{"a@b.com"}, "Subject", "", "<b>Hi</b>")
 
@@ -75,7 +93,7 @@ func TestGomailSender_Send(t *testing.T) {
 
 	t.Run("should send to multiple recipients", func(t *testing.T) {
 		mockDialer, sender := newSender()
-		mockDialer.On("DialAndSend", mock.Anything).Return(nil).Once()
+		mockDialer.On("DialAndSend", messageTo("a@b.com", "c@d.com", "e@f.com")).Return(nil).Once()
 
 		err := sender.Send([]string{"a@b.com", "c@d.com", "e@f.com"}, "Subject", "text", "")
 

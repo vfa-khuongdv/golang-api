@@ -101,6 +101,11 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		assert.Equal(t, uint(1), result.UserId)
 		assert.Len(t, result.Token.Token, 60)
 		assert.Greater(t, result.Token.ExpiresAt, int64(0))
+
+		var stored models.RefreshToken
+		assert.NoError(t, db.Where("refresh_token = ?", result.Token.Token).First(&stored).Error)
+		assert.Equal(t, uint(1), stored.UserID)
+		assert.Equal(t, "127.0.0.2", stored.IpAddress)
 	})
 
 	s.T().Run("TokenNotFound", func(t *testing.T) {
@@ -121,7 +126,6 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 	s.T().Run("BeginTxError", func(t *testing.T) {
 		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 		assert.NoError(t, err)
-		db = db.Debug()
 		err = db.AutoMigrate(&models.RefreshToken{})
 		assert.NoError(t, err)
 
@@ -207,6 +211,10 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
 		assert.Error(t, err)
 		assert.Nil(t, result)
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrDBUpdate, appErr.Code)
+		}
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -228,6 +236,10 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
 		assert.Error(t, err)
 		assert.Nil(t, result)
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrDBUpdate, appErr.Code)
+		}
 		mockRepo.AssertExpectations(t)
 	})
 }
