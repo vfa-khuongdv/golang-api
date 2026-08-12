@@ -21,7 +21,7 @@ type User struct {
 	Name          string         `gorm:"column:name;type:varchar(255);not null" json:"name"`
 	Birthday      *time.Time     `gorm:"column:birthday;type:date;default:null" json:"birthday,omitempty"`
 	Address       *string        `gorm:"column:address;type:varchar(255);default:null" json:"address,omitempty"`
-	Gender        int16          `gorm:"column:gender;type:smallint;not null" json:"gender"`
+	Gender        Gender         `gorm:"column:gender;type:smallint;not null" json:"gender"`
 	FailedAttempts int           `gorm:"column:failed_attempts;default:0" json:"-"`
 	LockedUntil   *int64         `gorm:"column:locked_until;default:null" json:"-"`
 	ResetToken    *string        `gorm:"column:reset_token;type:varchar(100);default:null;unique" json:"-"`

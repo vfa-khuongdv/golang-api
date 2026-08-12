@@ -6,8 +6,9 @@ const (
 	ErrNotFound       = 1001 // Resource not found
 	ErrBadRequest     = 1002 // Invalid or bad request
 	ErrUnauthorized   = 1003 // Unauthorized access
-	ErrForbidden      = 1004 // Forbidden access
-	ErrConflict       = 1005 // Conflict error
+	ErrForbidden       = 1004 // Forbidden access
+	ErrConflict        = 1005 // Conflict error
+	ErrTooManyRequests = 1006 // Too many requests
 
 	// Database errors
 	ErrDBConnection = 2000 // Failed to connect to DB

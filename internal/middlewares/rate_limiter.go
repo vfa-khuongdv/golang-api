@@ -107,7 +107,7 @@ func RateLimiter(limit int, window time.Duration) gin.HandlerFunc {
 		if !allowed {
 			utils.RespondWithError(ctx, apperror.New(
 				http.StatusTooManyRequests,
-				429,
+				apperror.ErrTooManyRequests,
 				"Too many requests. Please try again later.",
 			))
 			ctx.Abort()

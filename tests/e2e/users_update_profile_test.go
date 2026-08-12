@@ -143,7 +143,7 @@ func TestUsersUpdateProfile(t *testing.T) {
 		// Verify update in database
 		var updatedUser models.User
 		db.First(&updatedUser, testUser.ID)
-		assert.Equal(t, int16(2), updatedUser.Gender)
+		assert.Equal(t, models.Gender(2), updatedUser.Gender)
 	})
 
 	t.Run("Update Profile - Multiple Fields", func(t *testing.T) {
@@ -174,7 +174,7 @@ func TestUsersUpdateProfile(t *testing.T) {
 		assert.Equal(t, "Multi Update Name", updatedUser.Name)
 		assert.Equal(t, newBirthday, updatedUser.Birthday.Format("2006-01-02"))
 		assert.Equal(t, newAddress, *updatedUser.Address)
-		assert.Equal(t, int16(3), updatedUser.Gender)
+		assert.Equal(t, models.Gender(3), updatedUser.Gender)
 	})
 
 	t.Run("Update Profile - Invalid Gender", func(t *testing.T) {

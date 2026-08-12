@@ -145,7 +145,7 @@ func (service *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, 
 		user.Address = input.Address
 	}
 	if input.Gender != nil {
-		user.Gender = *input.Gender
+		user.Gender = models.Gender(*input.Gender)
 	}
 
 	if input.Birthday != nil {

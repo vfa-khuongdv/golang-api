@@ -31,21 +31,12 @@ func NewMailerService() MailerService {
 }
 
 func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
-
-	var config = mailer.GomailSenderConfig{
+	sender := newEmailSender(mailer.GomailSenderConfig{
 		Host:     configs.GetEnv("MAIL_HOST", "smtp.gmail.com"),
 		Port:     configs.GetEnvAsInt("MAIL_PORT", 587),
 		Username: configs.GetEnv("MAIL_USERNAME", ""),
 		Password: configs.GetEnv("MAIL_PASSWORD", ""),
 		From:     configs.GetEnv("MAIL_FROM", ""),
-	}
-
-	sender := newEmailSender(mailer.GomailSenderConfig{
-		From:     config.From,
-		Host:     config.Host,
-		Port:     config.Port,
-		Username: config.Username,
-		Password: config.Password,
 	})
 	if sender == nil {
 		return apperror.NewInternalServerError("Failed to initialize mail sender")

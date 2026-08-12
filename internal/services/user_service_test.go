@@ -83,7 +83,7 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 		s.repo.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			return u.Name == "John Doe" &&
 				u.Address != nil && *u.Address == "123 Main St" &&
-				u.Gender == int16(1) &&
+				u.Gender == models.Gender(1) &&
 				u.Birthday.Equal(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)) &&
 				u.Password == "newpassword123"
 		})).Return(nil).Once()
