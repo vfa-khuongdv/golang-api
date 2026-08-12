@@ -74,7 +74,7 @@ The project follows a clean architecture and is organized into the following dir
 
 Before getting started, ensure that you have the following installed:
 
-- [Go](https://golang.org/dl/) (Go 1.21 or later; project targets Go 1.25.2)
+- [Go](https://golang.org/dl/) (Go 1.21 or later; project targets Go 1.26)
 - [Docker](https://www.docker.com/products/docker-desktop)
 - [Docker Compose](https://docs.docker.com/compose/)
 - [Make](https://www.gnu.org/software/make/) (Usually pre-installed on macOS and Linux)
@@ -213,7 +213,7 @@ The following environment variables are required for the application. See `.env.
 **JWT Configuration:**
 - `JWT_SECRET` - Secret key for JWT token signing (required)
 - `JWT_EXPIRY` - JWT token expiration in seconds (default: 900 / 15 minutes)
-- `REFRESH_TOKEN_EXPIRY` - Refresh token expiration in seconds (default: 604800 / 7 days)
+- `REFRESH_TOKEN_EXPIRY` - Refresh token expiration in seconds (default: 2592000 / 30 days)
 
 **SMTP/Email Configuration:**
 - `SMTP_HOST` - SMTP server host
