@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -97,6 +98,9 @@ func (s *jwtServiceImpl) GenerateAccessToken(id uint) (*dto.JwtResult, error) {
 // ValidateToken validates a JWT token string and returns the claims if valid
 func (s *jwtServiceImpl) ValidateToken(tokenString string) (*CustomClaims, error) {
 	token, err := parseJWTWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
 		return s.secret, nil
 	})
 
@@ -131,6 +135,9 @@ func (s *jwtServiceImpl) ValidateTokenWithScope(tokenString string, requiredScop
 // Returns error if token signature is invalid, but ignores exp claim
 func (s *jwtServiceImpl) ValidateTokenIgnoreExpiration(tokenString string) (*CustomClaims, error) {
 	token, err := parseJWTWithClaims(tokenString, &CustomClaims{}, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
 		return s.secret, nil
 	}, jwt.WithoutClaimsValidation())
 

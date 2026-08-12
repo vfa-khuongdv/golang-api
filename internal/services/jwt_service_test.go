@@ -1,6 +1,8 @@
 package services_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"strings"
 	"testing"
 	"time"
@@ -185,5 +187,57 @@ func TestJWTService(t *testing.T) {
 		claims, err := svc.ValidateTokenIgnoreExpiration("invalid.token.value")
 		assert.Error(t, err)
 		assert.Nil(t, claims)
+	})
+
+	t.Run("ValidateToken_RejectNonHMACAlg", func(t *testing.T) {
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
+
+		// An RS256 token is the classic alg-confusion attack vector:
+		// the server must reject it even though it looks structurally valid.
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, &services.CustomClaims{
+			ID:    1,
+			Scope: services.TokenScopeAccess,
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+		})
+		signedToken, err := token.SignedString(privateKey)
+		require.NoError(t, err)
+
+		claims, err := svc.ValidateToken(signedToken)
+		assert.Error(t, err)
+		assert.Nil(t, claims)
+		assert.Contains(t, err.Error(), "unexpected signing method")
+	})
+
+	t.Run("ValidateTokenIgnoreExpiration_RejectNonHMACAlg", func(t *testing.T) {
+		svc, err := services.NewJWTService()
+		require.NoError(t, err)
+
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, &services.CustomClaims{
+			ID:    1,
+			Scope: services.TokenScopeAccess,
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+		})
+		signedToken, err := token.SignedString(privateKey)
+		require.NoError(t, err)
+
+		// The lenient path still validates the signature algorithm,
+		// so a non-HMAC token must not slip through either.
+		claims, err := svc.ValidateTokenIgnoreExpiration(signedToken)
+		assert.Error(t, err)
+		assert.Nil(t, claims)
+		assert.Contains(t, err.Error(), "unexpected signing method")
 	})
 }
