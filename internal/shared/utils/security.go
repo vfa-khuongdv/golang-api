@@ -261,10 +261,13 @@ func MaskWithPrefix(s string, prefixLen int) string {
 	if s == "" {
 		return s
 	}
-	if len(s) <= prefixLen {
-		return s[:1] + "*****"
+	// Slice by rune, not byte, so multi-byte UTF-8 characters are never split
+	// and logged as invalid encoding.
+	r := []rune(s)
+	if len(r) <= prefixLen {
+		return string(r[:1]) + "*****"
 	}
-	return s[:prefixLen] + "*****"
+	return string(r[:prefixLen]) + "*****"
 }
 
 // maskString masks a string showing the first 2 characters.

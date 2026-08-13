@@ -172,7 +172,7 @@ func TestUpdateProfile(t *testing.T) {
 				name:           "StringGender",
 				reqBody:        `{"name": "User", "birthday": "2000-01-01", "address": "123 Street", "gender": "male"}`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "json: cannot unmarshal string into Go struct field UpdateProfileInput.gender of type int16",
+				expectedMsg:    "Invalid request body",
 				expectedFields: nil, // specific error case
 			},
 		}

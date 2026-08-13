@@ -194,7 +194,7 @@ func TestLogin(t *testing.T) {
 				name:           "MalformedJSON",
 				reqBody:        `{invalid json`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "invalid character 'i' looking for beginning of object key string",
+				expectedMsg:    "Invalid request body",
 				expectedFields: nil,
 			},
 		}
@@ -370,7 +370,7 @@ func TestRefreshToken(t *testing.T) {
 				name:           "MalformedJSON",
 				reqBody:        `{invalid json`,
 				expectedCode:   float64(4001),
-				expectedMsg:    "invalid character 'i' looking for beginning of object key string",
+				expectedMsg:    "Invalid request body",
 				expectedFields: nil,
 			},
 		}

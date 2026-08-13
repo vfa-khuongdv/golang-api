@@ -94,9 +94,12 @@ func TranslateValidationErrors(err error, obj any) *apperror.ValidationError {
 
 	var ve validator.ValidationErrors
 	if !errors.As(err, &ve) {
+		// Anything that is neither io.EOF nor a validation error is a JSON
+		// decode failure (e.g. malformed body). Return a generic message so
+		// decoder internals are never echoed to clients.
 		return &apperror.ValidationError{
 			Code:    apperror.ErrValidationFailed,
-			Message: err.Error(),
+			Message: "Invalid request body",
 			Fields:  []apperror.FieldError{},
 		}
 	}
