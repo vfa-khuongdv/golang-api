@@ -82,11 +82,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Setup API routes
 	api := router.Group("/api/v1")
 	{
-		// Public routes with rate limiting.
-		// EmptyBodyMiddleware is applied here (not globally) because it would
-		// otherwise reject legitimate body-less POSTs like /logout.
+		// Public routes with rate limiting. Empty request bodies are rejected
+		// centrally by TranslateValidationErrors (io.EOF -> ErrEmptyData), so
+		// body-less POSTs like /logout are unaffected.
 		public := api.Group("/")
-		public.Use(middlewares.RateLimiter(10, time.Minute), middlewares.EmptyBodyMiddleware())
+		public.Use(middlewares.RateLimiter(10, time.Minute))
 		{
 			public.POST("/login", authHandler.Login)
 			public.POST("/refresh-token", authHandler.RefreshToken)
@@ -98,9 +98,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		authenticated.Use(middlewares.AuthMiddleware(jwtService))
 		{
 			authenticated.POST("/logout", authHandler.Logout)
-			authenticated.POST("/change-password", middlewares.EmptyBodyMiddleware(), userHandler.ChangePassword)
+			authenticated.POST("/change-password", userHandler.ChangePassword)
 			authenticated.GET("/profile", userHandler.GetProfile)
-			authenticated.PATCH("/profile", middlewares.EmptyBodyMiddleware(), userHandler.UpdateProfile)
+			authenticated.PATCH("/profile", userHandler.UpdateProfile)
 		}
 	}
 

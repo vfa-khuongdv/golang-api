@@ -12,9 +12,9 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 )
 
-// Regression: /logout is a body-less POST. The EmptyBody middleware is
-// scoped to the public and body-carrying routes, so a plain POST /logout
-// must succeed instead of being rejected with 400.
+// Regression: /logout is a body-less POST. Empty-body rejection is handled
+// centrally in TranslateValidationErrors, so a plain POST /logout (which
+// binds no body) must succeed instead of being rejected with 400.
 func TestLogout(t *testing.T) {
 	router, db := setupTestRouter()
 
@@ -35,7 +35,7 @@ func TestLogout(t *testing.T) {
 
 	t.Run("Logout with valid token and no body", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		// No body on purpose — this was previously rejected by EmptyBodyMiddleware.
+		// No body on purpose — this must not be rejected as an empty request body.
 		req, _ := http.NewRequest("POST", "/api/v1/logout", nil)
 		req.Header.Set("Authorization", "Bearer "+tokenResult.Token)
 

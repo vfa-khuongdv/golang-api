@@ -2,6 +2,7 @@ package utils_test
 
 import (
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -391,6 +392,15 @@ func TestTranslateValidationErrors_InternalBranches(t *testing.T) {
 		result := utils.TranslateValidationErrors(errors.New("plain error"), struct{}{})
 		assert.Equal(t, apperror.ErrValidationFailed, result.Code)
 		assert.Equal(t, "plain error", result.Message)
+		assert.Empty(t, result.Fields)
+	})
+
+	t.Run("EmptyRequestBody", func(t *testing.T) {
+		// An empty/whitespace-only body surfaces as io.EOF from the JSON decoder.
+		// It must map to a clean, dedicated error instead of leaking "EOF".
+		result := utils.TranslateValidationErrors(io.EOF, struct{}{})
+		assert.Equal(t, apperror.ErrEmptyData, result.Code)
+		assert.Equal(t, "Request body cannot be empty", result.Message)
 		assert.Empty(t, result.Fields)
 	})
 
