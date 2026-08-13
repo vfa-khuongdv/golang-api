@@ -179,6 +179,8 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 		{
 			name: "UpdateError",
 			setupMocks: func() {
+				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
+				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 			},
 			expectErr: true,
@@ -217,10 +219,8 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 		{
 			name: "InvalidAccessToken",
 			setupMocks: func() {
-				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
-
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
+				// The invalid access token must fail BEFORE the refresh token is
+				// touched, so no rotation happens and no Update is expected.
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(nil, errors.New("Invalid token signature"))
 			},
 			expectErr: true,
@@ -244,11 +244,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 		{
 			name: "InvalidAccessTokenScope",
 			setupMocks: func() {
-				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: userID, Scope: "other-scope"}
-
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 			},
 			expectErr: true,
@@ -283,6 +279,32 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			s.jwtService.AssertExpectations(t)
 		})
 	}
+}
+
+// Regression: an invalid access token must be rejected BEFORE the refresh
+// token is rotated, so an attacker cannot burn a stolen refresh token by
+// sending it with a garbage access token.
+func (s *AuthServiceTestSuite) TestRefreshTokenSkipsRotationOnInvalidAccessToken() {
+	s.SetupTest()
+
+	oldRefreshToken := "old-refresh-token"
+	oldAccessToken := "garbage-access-token"
+	ipAddress := "127.0.0.1"
+
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(nil, errors.New("Invalid token signature"))
+
+	result, err := s.service.RefreshToken(context.Background(), oldRefreshToken, oldAccessToken, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), result)
+	if appErr, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrUnauthorized, appErr.Code)
+	}
+
+	s.jwtService.AssertExpectations(s.T())
+	s.refreshTokenService.AssertNotCalled(s.T(), "Update", mock.Anything, oldRefreshToken, ipAddress)
+	s.refreshTokenService.AssertExpectations(s.T())
+	s.repo.AssertExpectations(s.T())
 }
 
 // --------------------- LOGOUT TESTS ---------------------

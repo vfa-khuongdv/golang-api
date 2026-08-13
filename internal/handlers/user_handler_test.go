@@ -474,16 +474,16 @@ func TestChangePassword(t *testing.T) {
 		}
 		requestBody := map[string]any{
 			"old_password":     "12345678",
-			"new_password":     "newpassword",
-			"confirm_password": "newpassword",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
 		// Mock the services methods
 		userService.On("ChangePassword", mock.Anything, uint(1), mock.MatchedBy(func(input *dto.ChangePasswordInput) bool {
 			return input.OldPassword == "12345678" &&
-				input.NewPassword == "newpassword" &&
-				input.ConfirmPassword == "newpassword"
+				input.NewPassword == "Newpassword@123" &&
+				input.ConfirmPassword == "Newpassword@123"
 		})).Return(user, nil)
 
 		// Create http request and context
@@ -561,7 +561,7 @@ func TestChangePassword(t *testing.T) {
 				expectedCode: float64(4001),
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
-					{Field: "new_password", Message: "new_password must be at least 6 characters long or numeric"},
+					{Field: "new_password", Message: "new_password must be at least 8 characters and contain uppercase, lowercase, digit, and special character"},
 					{Field: "confirm_password", Message: "confirm_password is required"},
 				},
 			},
@@ -581,6 +581,7 @@ func TestChangePassword(t *testing.T) {
 				expectedCode: float64(4001),
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
+					{Field: "new_password", Message: "new_password must be at least 8 characters and contain uppercase, lowercase, digit, and special character"},
 					{Field: "confirm_password", Message: "confirm_password is required"},
 				},
 			},
@@ -590,6 +591,7 @@ func TestChangePassword(t *testing.T) {
 				expectedCode: float64(4001),
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
+					{Field: "new_password", Message: "new_password must be at least 8 characters and contain uppercase, lowercase, digit, and special character"},
 					{Field: "confirm_password", Message: "confirm_password must be at least 6 characters long or numeric"},
 				},
 			},
@@ -599,6 +601,7 @@ func TestChangePassword(t *testing.T) {
 				expectedCode: float64(4001),
 				expectedMsg:  "Validation failed",
 				expectedFields: []apperror.FieldError{
+					{Field: "new_password", Message: "new_password must be at least 8 characters and contain uppercase, lowercase, digit, and special character"},
 					{Field: "confirm_password", Message: "confirm_password must be at most 255 characters long or numeric"},
 				},
 			},
@@ -646,8 +649,8 @@ func TestChangePassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
-			"new_password":     "newpassword",
-			"confirm_password": "newpassword",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -686,8 +689,8 @@ func TestChangePassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"old_password":     "wrongpassword",
-			"new_password":     "newpassword",
-			"confirm_password": "newpassword",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -727,8 +730,8 @@ func TestChangePassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
-			"new_password":     "123456789",
-			"confirm_password": "differentpassword",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@456",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -766,8 +769,8 @@ func TestChangePassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
-			"new_password":     "newpassword",
-			"confirm_password": "newpassword",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -829,8 +832,8 @@ func TestChangePassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
-			"new_password":     "12345678",
-			"confirm_password": "12345678",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -869,8 +872,8 @@ func TestChangePassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
-			"new_password":     "newpassword",
-			"confirm_password": "newpassword",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -916,7 +919,7 @@ func TestResetPassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"token":        "token",
-			"new_password": "newpassword",
+			"new_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -948,7 +951,7 @@ func TestResetPassword(t *testing.T) {
 		requestBody := map[string]any{
 			"token":        "invalid-token",
 			"password":     "newpassword",
-			"new_password": "newpassword",
+			"new_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -987,7 +990,7 @@ func TestResetPassword(t *testing.T) {
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
-			"new_password": "newpassword",
+			"new_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -1026,7 +1029,7 @@ func TestResetPassword(t *testing.T) {
 		requestBody := map[string]any{
 			"token":        "token",
 			"password":     "newpassword",
-			"new_password": "newpassword",
+			"new_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -1065,7 +1068,7 @@ func TestResetPassword(t *testing.T) {
 		requestBody := map[string]any{
 			"token":        "token",
 			"password":     "newpassword",
-			"new_password": "newpassword",
+			"new_password": "Newpassword@123",
 		}
 		body, _ := json.Marshal(requestBody)
 
@@ -1155,7 +1158,7 @@ func TestResetPassword(t *testing.T) {
 				expectedField: []apperror.FieldError{
 					{
 						Field:   "new_password",
-						Message: "new_password must be at least 6 characters long or numeric",
+						Message: "new_password must be at least 8 characters and contain uppercase, lowercase, digit, and special character",
 					},
 				},
 			},

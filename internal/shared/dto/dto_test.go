@@ -102,7 +102,7 @@ func TestDTOBindingRules(t *testing.T) {
 	t.Run("CreateUserInput gender oneof", func(t *testing.T) {
 		valid := dto.CreateUserInput{
 			Email:    "a@b.com",
-			Password: "secret1",
+			Password: "Secret@1",
 			Name:     "John",
 			Birthday: strPtr("2000-01-01"),
 			Address:  strPtr("HN"),
@@ -114,10 +114,25 @@ func TestDTOBindingRules(t *testing.T) {
 		assert.Error(t, v.Struct(valid))
 	})
 
+	t.Run("CreateUserInput weak password rejected", func(t *testing.T) {
+		in := dto.CreateUserInput{
+			Email:    "a@b.com",
+			Password: "lowercaseonly",
+			Name:     "John",
+			Birthday: strPtr("2000-01-01"),
+			Address:  strPtr("HN"),
+			Gender:   1,
+		}
+		err := v.Struct(in)
+		assert.Error(t, err)
+		// The error must be the password_complexity rule, not a generic one.
+		assert.Contains(t, err.Error(), "password_complexity")
+	})
+
 	t.Run("CreateUserInput invalid birthday", func(t *testing.T) {
 		in := dto.CreateUserInput{
 			Email:    "a@b.com",
-			Password: "secret1",
+			Password: "Secret@1",
 			Name:     "John",
 			Birthday: strPtr("2000-13-01"),
 			Address:  strPtr("HN"),

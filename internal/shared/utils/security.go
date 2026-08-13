@@ -254,19 +254,24 @@ func maskValue(value any) any {
 }
 
 // MaskWithPrefix shows the first N characters then replaces the rest with "*****".
-// For strings shorter than N, the entire string is shown.
+// For strings shorter than or equal to N, only the first character is shown and
+// the remainder is masked, so the full value is never revealed.
 // Example: MaskWithPrefix("eyJhbGciOiJIUzI1NiJ9", 4) → "eyJh*****"
 func MaskWithPrefix(s string, prefixLen int) string {
-	if len(s) <= prefixLen {
+	if s == "" {
 		return s
+	}
+	if len(s) <= prefixLen {
+		return s[:1] + "*****"
 	}
 	return s[:prefixLen] + "*****"
 }
 
-// maskString masks a string showing the first 4 characters.
-// For strings shorter than 4 characters, the entire string is shown.
+// maskString masks a string showing the first 2 characters.
+// The short prefix keeps short secrets (e.g. 6-char passwords) from leaking too
+// much of their value into logs.
 func maskString(s string) string {
-	return MaskWithPrefix(s, 4)
+	return MaskWithPrefix(s, 2)
 }
 
 // maskReflectedValue masks values of non-standard types using reflection.

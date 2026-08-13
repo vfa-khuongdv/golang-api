@@ -23,10 +23,10 @@ func TestAuthResetPassword(t *testing.T) {
 	expiredAt := time.Now().Add(time.Hour).Unix()
 
 	user := models.User{
-		Name:      "Test User Reset",
-		Email:     "test_reset@example.com",
-		Password:  hashedPassword,
-		Gender:    1,
+		Name:           "Test User Reset",
+		Email:          "test_reset@example.com",
+		Password:       hashedPassword,
+		Gender:         1,
 		ResetToken:     &token,
 		ResetExpiredAt: &expiredAt,
 	}
@@ -34,7 +34,7 @@ func TestAuthResetPassword(t *testing.T) {
 	require.NoError(t, result.Error)
 
 	t.Run("Reset Password - Success", func(t *testing.T) {
-		newPassword := "newpassword123"
+		newPassword := "Newpassword@123"
 		payload := map[string]string{
 			"token":        token,
 			"new_password": newPassword,
@@ -61,7 +61,7 @@ func TestAuthResetPassword(t *testing.T) {
 	t.Run("Reset Password - Invalid Token", func(t *testing.T) {
 		payload := map[string]string{
 			"token":        "invalid_token",
-			"new_password": "newpassword123",
+			"new_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -81,7 +81,7 @@ func TestAuthResetPassword(t *testing.T) {
 
 	t.Run("Reset Password - Missing Token", func(t *testing.T) {
 		payload := map[string]string{
-			"new_password": "newpassword123",
+			"new_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -160,10 +160,10 @@ func TestAuthResetPassword(t *testing.T) {
 		expiredTime := time.Now().Add(-time.Hour).Unix()
 
 		expiredUser := models.User{
-			Name:      "Expired User",
-			Email:     "expired@example.com",
-			Password:  hashedPassword,
-			Gender:    1,
+			Name:           "Expired User",
+			Email:          "expired@example.com",
+			Password:       hashedPassword,
+			Gender:         1,
 			ResetToken:     &expiredToken,
 			ResetExpiredAt: &expiredTime,
 		}
@@ -171,7 +171,7 @@ func TestAuthResetPassword(t *testing.T) {
 
 		payload := map[string]string{
 			"token":        expiredToken,
-			"new_password": "newpassword123",
+			"new_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 

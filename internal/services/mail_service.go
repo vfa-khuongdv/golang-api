@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"html/template"
 
-	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/configs"
+	"github.com/vfa-khuongdv/golang-cms/internal/models"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"github.com/vfa-khuongdv/golang-cms/pkg/mailer"
 )
 
@@ -60,11 +62,15 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 
 	var htmlBody bytes.Buffer
 	if err := tmpl.Execute(&htmlBody, data); err != nil {
-		return apperror.NewInternalServerError(fmt.Sprintf("error executing template: %+v", err))
+		// Log the details but never echo them to the client.
+		logger.Errorf("Failed to execute forgot-password template: %v", err)
+		return apperror.NewInternalServerError("Failed to generate email content")
 	}
 
 	if err := sender.Send([]string{user.Email}, "Reset your password", "", htmlBody.String()); err != nil {
-		return apperror.NewInternalServerError(fmt.Sprintf("error sending email: %+v", err))
+		// Log the details but never echo them to the client.
+		logger.Errorf("Failed to send forgot-password email to %s: %v", utils.MaskWithPrefix(user.Email, 4), err)
+		return apperror.NewInternalServerError("Failed to send email")
 	}
 	return nil
 

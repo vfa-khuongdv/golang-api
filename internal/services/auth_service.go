@@ -101,12 +101,10 @@ func (service *authServiceImpl) RefreshToken(ctx context.Context, refreshToken, 
 	start := time.Now()
 	logger.WithEvent(ctx, logger.EventTokenRefresh).Infof("Token refresh attempt")
 
-	refreshResult, err := service.refreshTokenService.Update(ctx, refreshToken, ipAddress)
-	if err != nil {
-		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - invalid refresh token")
-		return nil, apperror.NewUnauthorizedError("Invalid refresh token")
-	}
-
+	// Validate the access token FIRST, before touching (rotating) the refresh
+	// token. If an invalid access token were allowed to reach the rotation
+	// step, an attacker who stole a refresh token (but not a valid access
+	// token) could burn it, force-logging-out the legitimate user.
 	claims, err := service.jwtService.ValidateTokenIgnoreExpiration(accessToken)
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - invalid access token")
@@ -116,6 +114,12 @@ func (service *authServiceImpl) RefreshToken(ctx context.Context, refreshToken, 
 	if claims.Scope != TokenScopeAccess {
 		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - invalid scope")
 		return nil, apperror.NewUnauthorizedError("Invalid access token scope")
+	}
+
+	refreshResult, err := service.refreshTokenService.Update(ctx, refreshToken, ipAddress)
+	if err != nil {
+		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - invalid refresh token")
+		return nil, apperror.NewUnauthorizedError("Invalid refresh token")
 	}
 
 	if claims.ID != refreshResult.UserId {
