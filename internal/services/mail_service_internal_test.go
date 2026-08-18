@@ -11,11 +11,9 @@ import (
 )
 
 type fakeEmailSender struct {
-	sendErr    error
-	lastHTML   string
-	lastTo     []string
-	lastFrom   string
-	lastConfig mailer.GomailSenderConfig
+	sendErr  error
+	lastHTML string
+	lastTo   []string
 }
 
 func (f *fakeEmailSender) Send(to []string, _ string, _ string, html string) error {
@@ -34,8 +32,8 @@ func TestMailerService_InternalBranches(t *testing.T) {
 
 	token := "reset-token"
 	user := &models.User{
-		Email: "user@example.com",
-		Name:  "User",
+		Email:      "user@example.com",
+		Name:       "User",
 		ResetToken: &token,
 	}
 
@@ -63,7 +61,9 @@ func TestMailerService_InternalBranches(t *testing.T) {
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "error sending email")
+		assert.Contains(t, err.Error(), "Failed to send email")
+		// The underlying SMTP failure must stay server-side only.
+		assert.NotContains(t, err.Error(), "smtp fail")
 	})
 
 	t.Run("NilEmailSender", func(t *testing.T) {
@@ -106,6 +106,8 @@ func TestMailerService_InternalBranches(t *testing.T) {
 
 		err := NewMailerService().SendMailForgotPassword(user)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "error executing template")
+		assert.Contains(t, err.Error(), "Failed to generate email content")
+		// The template execution error must stay server-side only.
+		assert.NotContains(t, err.Error(), "execution failure")
 	})
 }

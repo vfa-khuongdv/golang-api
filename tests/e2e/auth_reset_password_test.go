@@ -20,21 +20,22 @@ func TestAuthResetPassword(t *testing.T) {
 
 	hashedPassword, _ := utils.HashPassword("oldpassword123")
 	token := "valid_reset_token"
+	hashedToken := utils.HashToken(token)
 	expiredAt := time.Now().Add(time.Hour).Unix()
 
 	user := models.User{
-		Name:      "Test User Reset",
-		Email:     "test_reset@example.com",
-		Password:  hashedPassword,
-		Gender:    1,
-		ResetToken:     &token,
+		Name:           "Test User Reset",
+		Email:          "test_reset@example.com",
+		Password:       hashedPassword,
+		Gender:         1,
+		ResetToken:     &hashedToken,
 		ResetExpiredAt: &expiredAt,
 	}
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
 
 	t.Run("Reset Password - Success", func(t *testing.T) {
-		newPassword := "newpassword123"
+		newPassword := "Newpassword@123"
 		payload := map[string]string{
 			"token":        token,
 			"new_password": newPassword,
@@ -61,7 +62,7 @@ func TestAuthResetPassword(t *testing.T) {
 	t.Run("Reset Password - Invalid Token", func(t *testing.T) {
 		payload := map[string]string{
 			"token":        "invalid_token",
-			"new_password": "newpassword123",
+			"new_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -81,7 +82,7 @@ func TestAuthResetPassword(t *testing.T) {
 
 	t.Run("Reset Password - Missing Token", func(t *testing.T) {
 		payload := map[string]string{
-			"new_password": "newpassword123",
+			"new_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -157,21 +158,22 @@ func TestAuthResetPassword(t *testing.T) {
 
 	t.Run("Reset Password - Expired Token", func(t *testing.T) {
 		expiredToken := "expired_token"
+		hashedExpiredToken := utils.HashToken(expiredToken)
 		expiredTime := time.Now().Add(-time.Hour).Unix()
 
 		expiredUser := models.User{
-			Name:      "Expired User",
-			Email:     "expired@example.com",
-			Password:  hashedPassword,
-			Gender:    1,
-			ResetToken:     &expiredToken,
+			Name:           "Expired User",
+			Email:          "expired@example.com",
+			Password:       hashedPassword,
+			Gender:         1,
+			ResetToken:     &hashedExpiredToken,
 			ResetExpiredAt: &expiredTime,
 		}
 		db.Create(&expiredUser)
 
 		payload := map[string]string{
 			"token":        expiredToken,
-			"new_password": "newpassword123",
+			"new_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 

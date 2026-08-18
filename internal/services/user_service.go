@@ -45,10 +45,12 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 		return apperror.NewDBQueryError("Failed to process forgot password request")
 	}
 
-	token := utils.GenerateRandomString(32)
+	// Generate raw token for email, store only the hash in DB
+	rawToken := utils.GenerateRandomString(32)
+	hashedToken := utils.HashToken(rawToken)
 	expiredAt := time.Now().Add(1 * time.Hour).Unix()
 
-	user.ResetToken = &token
+	user.ResetToken = &hashedToken
 	user.ResetExpiredAt = &expiredAt
 
 	err = service.repo.Update(ctx, user)
@@ -57,7 +59,10 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 		return apperror.NewDBUpdateError("Failed to save reset token")
 	}
 
-	if err := service.mailerService.SendMailForgotPassword(user); err != nil {
+	// Send raw token to user via email (never store raw token in DB)
+	userWithRawToken := *user
+	userWithRawToken.ResetToken = &rawToken
+	if err := service.mailerService.SendMailForgotPassword(&userWithRawToken); err != nil {
 		return err
 	}
 
@@ -65,7 +70,9 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 }
 
 func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.ResetPasswordInput) (*models.User, error) {
-	user, err := service.repo.FindByField(ctx, "reset_token", input.Token)
+	// Hash the input token to compare with stored hash
+	hashedToken := utils.HashToken(input.Token)
+	user, err := service.repo.FindByField(ctx, "reset_token", hashedToken)
 	if err != nil {
 		return nil, apperror.NewNotFoundError("Invalid token")
 	}
@@ -82,6 +89,10 @@ func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.Re
 	user.Password = newPassword
 	user.ResetToken = nil
 	user.ResetExpiredAt = nil
+
+	// Reset failed attempts on successful password reset
+	user.FailedAttempts = 0
+	user.LockedUntil = nil
 
 	err = service.repo.Update(ctx, user)
 	if err != nil {

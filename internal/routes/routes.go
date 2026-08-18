@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,26 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	// Initialize the new Gin router
 	router := gin.New()
+
+	// By default Gin trusts ALL proxies and therefore honors a client-supplied
+	// X-Forwarded-For header, which would let anyone spoof ClientIP() — the key
+	// used by the rate limiter and stored on refresh tokens. Disable proxy
+	// trust unless the operator explicitly opts in via TRUSTED_PROXIES
+	// (comma-separated proxy/LB CIDRs, e.g. "10.0.0.0/8").
+	trustedProxies := configs.GetEnv("TRUSTED_PROXIES", "")
+	if trustedProxies == "" {
+		if err := router.SetTrustedProxies(nil); err != nil {
+			logger.Fatalf("Failed to disable trusted proxies: %v", err)
+		}
+	} else {
+		proxies := strings.Split(trustedProxies, ",")
+		for i := range proxies {
+			proxies[i] = strings.TrimSpace(proxies[i])
+		}
+		if err := router.SetTrustedProxies(proxies); err != nil {
+			logger.Fatalf("Failed to configure trusted proxies %q: %v", trustedProxies, err)
+		}
+	}
 
 	stage := configs.GetEnv("STAGE", "dev")
 
@@ -53,7 +74,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		middlewares.CORSMiddleware(),
 		middlewares.LogMiddleware(),
 		gin.Recovery(),
-		middlewares.EmptyBodyMiddleware(),
 	)
 
 	router.GET("/healthz", handlers.HealthCheck)
@@ -62,7 +82,9 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Setup API routes
 	api := router.Group("/api/v1")
 	{
-		// Public routes with rate limiting
+		// Public routes with rate limiting. Empty request bodies are rejected
+		// centrally by TranslateValidationErrors (io.EOF -> ErrEmptyData), so
+		// body-less POSTs like /logout are unaffected.
 		public := api.Group("/")
 		public.Use(middlewares.RateLimiter(10, time.Minute))
 		{

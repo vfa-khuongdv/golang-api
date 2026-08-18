@@ -70,7 +70,7 @@ func TestContainsSensitiveKey_InternalBranches(t *testing.T) {
 
 func TestMaskValue_InternalBranches(t *testing.T) {
 	t.Run("StringerAndNil", func(t *testing.T) {
-		assert.Equal(t, "secr*****", maskValue(stringerValue{val: "secret"}))
+		assert.Equal(t, "se*****", maskValue(stringerValue{val: "secret"}))
 		assert.Nil(t, maskValue(nil))
 	})
 }
@@ -94,7 +94,7 @@ func TestMaskReflectedValue_InternalBranches(t *testing.T) {
 		}
 
 		out := maskReflectedValue(in).(sample)
-		assert.Equal(t, "john", out.Name) // "john" ≤ 4 chars → shown as-is
+		assert.Equal(t, "jo*****", out.Name)
 		assert.Equal(t, 0, out.Age)
 		assert.False(t, out.Active)
 		assert.Nil(t, out.Meta)

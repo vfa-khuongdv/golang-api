@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"time"
@@ -78,13 +79,27 @@ func ValidateBirthday(fl validator.FieldLevel) bool {
 	return true
 }
 
-// TranslateValidationErrors converts validator.ValidationErrors into a structured ValidationError.
+// TranslateValidationErrors converts binding/validation errors into a structured ValidationError.
 func TranslateValidationErrors(err error, obj any) *apperror.ValidationError {
+	// Empty or whitespace-only request bodies surface as io.EOF from the JSON
+	// decoder. Return a clean, dedicated error instead of leaking "EOF" to
+	// clients (previously handled by the now-removed EmptyBody middleware).
+	if errors.Is(err, io.EOF) {
+		return &apperror.ValidationError{
+			Code:    apperror.ErrEmptyData,
+			Message: "Request body cannot be empty",
+			Fields:  []apperror.FieldError{},
+		}
+	}
+
 	var ve validator.ValidationErrors
 	if !errors.As(err, &ve) {
+		// Anything that is neither io.EOF nor a validation error is a JSON
+		// decode failure (e.g. malformed body). Return a generic message so
+		// decoder internals are never echoed to clients.
 		return &apperror.ValidationError{
 			Code:    apperror.ErrValidationFailed,
-			Message: err.Error(),
+			Message: "Invalid request body",
 			Fields:  []apperror.FieldError{},
 		}
 	}

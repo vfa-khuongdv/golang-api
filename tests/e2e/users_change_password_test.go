@@ -27,7 +27,7 @@ func TestUsersChangePassword(t *testing.T) {
 	// subtest depends on another mutating the shared password first.
 	createUser := func(t *testing.T, email string) (models.User, string) {
 		t.Helper()
-		hashedPassword, _ := utils.HashPassword("password123")
+		hashedPassword, _ := utils.HashPassword("Password@123")
 		user := models.User{
 			Name:     "Test User",
 			Email:    email,
@@ -46,9 +46,9 @@ func TestUsersChangePassword(t *testing.T) {
 		testUser, accessToken := createUser(t, "success@example.com")
 
 		payload := map[string]string{
-			"old_password":     "password123",
-			"new_password":     "newpassword123",
-			"confirm_password": "newpassword123",
+			"old_password":     "Password@123",
+			"new_password":     "Newpassword@123",
+			"confirm_password": "Newpassword@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -69,7 +69,7 @@ func TestUsersChangePassword(t *testing.T) {
 		// Verify password was changed
 		var updatedUser models.User
 		db.First(&updatedUser, testUser.ID)
-		assert.True(t, utils.CheckPasswordHash("newpassword123", updatedUser.Password))
+		assert.True(t, utils.CheckPasswordHash("Newpassword@123", updatedUser.Password))
 	})
 
 	t.Run("Change Password - Incorrect Old Password", func(t *testing.T) {
@@ -77,8 +77,8 @@ func TestUsersChangePassword(t *testing.T) {
 
 		payload := map[string]string{
 			"old_password":     "wrongpassword",
-			"new_password":     "newpassword456",
-			"confirm_password": "newpassword456",
+			"new_password":     "Newpassword@456",
+			"confirm_password": "Newpassword@456",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -101,9 +101,9 @@ func TestUsersChangePassword(t *testing.T) {
 		_, accessToken := createUser(t, "sameold@example.com")
 
 		payload := map[string]string{
-			"old_password":     "password123",
-			"new_password":     "password123",
-			"confirm_password": "password123",
+			"old_password":     "Password@123",
+			"new_password":     "Password@123",
+			"confirm_password": "Password@123",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -126,9 +126,9 @@ func TestUsersChangePassword(t *testing.T) {
 		_, accessToken := createUser(t, "mismatch@example.com")
 
 		payload := map[string]string{
-			"old_password":     "password123",
-			"new_password":     "newpassword456",
-			"confirm_password": "differentpassword",
+			"old_password":     "Password@123",
+			"new_password":     "Newpassword@456",
+			"confirm_password": "Different@456",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -151,8 +151,8 @@ func TestUsersChangePassword(t *testing.T) {
 		_, accessToken := createUser(t, "missingfields@example.com")
 
 		payload := map[string]string{
-			"old_password": "password123",
-			"new_password": "newpassword789",
+			"old_password": "Password@123",
+			"new_password": "Newpassword@789",
 		}
 		payloadBytes, _ := json.Marshal(payload)
 
@@ -175,7 +175,7 @@ func TestUsersChangePassword(t *testing.T) {
 		_, accessToken := createUser(t, "tooshort@example.com")
 
 		payload := map[string]string{
-			"old_password":     "password123",
+			"old_password":     "Password@123",
 			"new_password":     "12345",
 			"confirm_password": "12345",
 		}

@@ -120,17 +120,20 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		user := &models.User{Email: email}
 
 		s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+			// Verify that stored token is a SHA-256 hash (64 hex chars), not plaintext
+			return u.ResetToken != nil && len(*u.ResetToken) == 64
+		})).Return(nil).Once()
 
 		// Act
-		s.mailer.On("SendMailForgotPassword", user).Return(nil).Once()
+		s.mailer.On("SendMailForgotPassword", mock.AnythingOfType("*models.User")).Return(nil).Once()
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		// Assert
 		s.NoError(err)
 		s.NotNil(user.ResetToken)
-		s.Len(*user.ResetToken, 32)
+		s.Len(*user.ResetToken, 64) // SHA-256 hash is 64 hex characters
 		s.NotNil(user.ResetExpiredAt)
 	})
 
@@ -177,8 +180,8 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		user := &models.User{Email: email}
 
 		s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
-		s.mailer.On("SendMailForgotPassword", user).Return(errors.New("send mail failed")).Once()
+		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
+		s.mailer.On("SendMailForgotPassword", mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once()
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
@@ -189,7 +192,9 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 func (s *UserServiceTestSuite) TestResetPassword() {
 	s.T().Run("TokenNotFound", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "invalid-token", NewPassword: "new-password"}
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(&models.User{}, errors.New("not found")).Once()
+		// DB stores hashed token, so we mock with hash of the input token
+		hashedToken := utils.HashToken(input.Token)
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(&models.User{}, errors.New("not found")).Once()
 
 		user, err := s.service.ResetPassword(context.Background(), input)
 
@@ -199,8 +204,9 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 	s.T().Run("TokenExpiredWhenExpiredAtNil", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-1", NewPassword: "new-password"}
-		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: nil}
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		hashedToken := utils.HashToken(input.Token)
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: nil}
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(user, nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
 
@@ -210,9 +216,10 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 	s.T().Run("TokenExpiredByTimestamp", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-2", NewPassword: "new-password"}
+		hashedToken := utils.HashToken(input.Token)
 		expiredAt := time.Now().Add(-1 * time.Minute).Unix()
-		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: &expiredAt}
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &expiredAt}
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(user, nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
 
@@ -222,10 +229,11 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 	s.T().Run("TokenExpiryExactlyNowNotExpired", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-3", NewPassword: "new-password"}
+		hashedToken := utils.HashToken(input.Token)
 		now := time.Now().Unix()
-		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: &now}
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &now}
 
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
@@ -236,10 +244,11 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 	s.T().Run("UpdateFailure", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-4", NewPassword: "new-password"}
+		hashedToken := utils.HashToken(input.Token)
 		notExpired := time.Now().Add(10 * time.Minute).Unix()
-		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: &notExpired}
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
 
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
@@ -250,10 +259,11 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 	s.T().Run("Success", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-5", NewPassword: "new-password"}
+		hashedToken := utils.HashToken(input.Token)
 		notExpired := time.Now().Add(10 * time.Minute).Unix()
-		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: &notExpired}
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
 
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
@@ -263,14 +273,17 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		s.NotEqual(input.NewPassword, result.Password)
 		s.Nil(result.ResetToken)
 		s.Nil(result.ResetExpiredAt)
+		s.Zero(result.FailedAttempts)
+		s.Nil(result.LockedUntil)
 	})
 
 	s.T().Run("HashPasswordFailure", func(t *testing.T) {
 		input := &dto.ResetPasswordInput{Token: "token-6", NewPassword: strings.Repeat("a", 73)}
+		hashedToken := utils.HashToken(input.Token)
 		notExpired := time.Now().Add(10 * time.Minute).Unix()
-		user := &models.User{ID: 1, ResetToken: &input.Token, ResetExpiredAt: &notExpired}
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
 
-		s.repo.On("FindByField", mock.Anything, "reset_token", input.Token).Return(user, nil).Once()
+		s.repo.On("FindByField", mock.Anything, "reset_token", hashedToken).Return(user, nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
 

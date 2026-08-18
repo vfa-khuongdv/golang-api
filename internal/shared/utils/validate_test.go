@@ -1,13 +1,16 @@
 package utils_test
 
 import (
+	"encoding/json"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 )
@@ -388,9 +391,32 @@ func TestToFieldErrors(t *testing.T) {
 
 func TestTranslateValidationErrors_InternalBranches(t *testing.T) {
 	t.Run("NonValidationError", func(t *testing.T) {
+		// Non-validation, non-EOF errors are JSON decode failures; the raw
+		// error string must never reach the client.
 		result := utils.TranslateValidationErrors(errors.New("plain error"), struct{}{})
 		assert.Equal(t, apperror.ErrValidationFailed, result.Code)
-		assert.Equal(t, "plain error", result.Message)
+		assert.Equal(t, "Invalid request body", result.Message)
+		assert.Empty(t, result.Fields)
+	})
+
+	t.Run("MalformedJSON", func(t *testing.T) {
+		// A real json.SyntaxError (malformed body) must map to the generic
+		// message, not leak "invalid character ...".
+		err := json.Unmarshal([]byte("{bad"), &struct{}{})
+		require.Error(t, err)
+
+		result := utils.TranslateValidationErrors(err, struct{}{})
+		assert.Equal(t, apperror.ErrValidationFailed, result.Code)
+		assert.Equal(t, "Invalid request body", result.Message)
+		assert.Empty(t, result.Fields)
+	})
+
+	t.Run("EmptyRequestBody", func(t *testing.T) {
+		// An empty/whitespace-only body surfaces as io.EOF from the JSON decoder.
+		// It must map to a clean, dedicated error instead of leaking "EOF".
+		result := utils.TranslateValidationErrors(io.EOF, struct{}{})
+		assert.Equal(t, apperror.ErrEmptyData, result.Code)
+		assert.Equal(t, "Request body cannot be empty", result.Message)
 		assert.Empty(t, result.Fields)
 	})
 
