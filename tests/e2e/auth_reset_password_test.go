@@ -20,6 +20,7 @@ func TestAuthResetPassword(t *testing.T) {
 
 	hashedPassword, _ := utils.HashPassword("oldpassword123")
 	token := "valid_reset_token"
+	hashedToken := utils.HashToken(token)
 	expiredAt := time.Now().Add(time.Hour).Unix()
 
 	user := models.User{
@@ -27,7 +28,7 @@ func TestAuthResetPassword(t *testing.T) {
 		Email:          "test_reset@example.com",
 		Password:       hashedPassword,
 		Gender:         1,
-		ResetToken:     &token,
+		ResetToken:     &hashedToken,
 		ResetExpiredAt: &expiredAt,
 	}
 	result := db.Create(&user)
@@ -157,6 +158,7 @@ func TestAuthResetPassword(t *testing.T) {
 
 	t.Run("Reset Password - Expired Token", func(t *testing.T) {
 		expiredToken := "expired_token"
+		hashedExpiredToken := utils.HashToken(expiredToken)
 		expiredTime := time.Now().Add(-time.Hour).Unix()
 
 		expiredUser := models.User{
@@ -164,7 +166,7 @@ func TestAuthResetPassword(t *testing.T) {
 			Email:          "expired@example.com",
 			Password:       hashedPassword,
 			Gender:         1,
-			ResetToken:     &expiredToken,
+			ResetToken:     &hashedExpiredToken,
 			ResetExpiredAt: &expiredTime,
 		}
 		db.Create(&expiredUser)
