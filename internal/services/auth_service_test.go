@@ -281,6 +281,46 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 	}
 }
 
+func (s *AuthServiceTestSuite) TestRefreshToken_EmptyAccessToken() {
+	oldRefreshToken := "old-refresh-token"
+	oldAccessToken := ""
+	ipAddress := "127.0.0.1"
+
+	// Edge: an empty access token cannot be validated, so refresh must be
+	// rejected before the refresh token is touched (no rotation).
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(nil, errors.New("Invalid token signature"))
+
+	result, err := s.service.RefreshToken(context.Background(), oldRefreshToken, oldAccessToken, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), result)
+	if appErr, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrUnauthorized, appErr.Code)
+	}
+	s.refreshTokenService.AssertNotCalled(s.T(), "Update", mock.Anything, oldRefreshToken, ipAddress)
+}
+
+func (s *AuthServiceTestSuite) TestRefreshToken_EmptyRefreshToken() {
+	oldRefreshToken := ""
+	oldAccessToken := "old-access-token"
+	ipAddress := "127.0.0.1"
+	userID := uint(1)
+
+	// Edge: an empty refresh token still reaches Update (after the access token
+	// is validated first), which must fail without rotating a new access token.
+	claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
+	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
+	s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
+
+	result, err := s.service.RefreshToken(context.Background(), oldRefreshToken, oldAccessToken, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), result)
+	if appErr, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrUnauthorized, appErr.Code)
+	}
+}
+
 // Regression: an invalid access token must be rejected BEFORE the refresh
 // token is rotated, so an attacker cannot burn a stolen refresh token by
 // sending it with a garbage access token.
@@ -436,6 +476,135 @@ func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
 		expected := time.Now().Add(time.Duration(services.LockoutDurationMinutes) * time.Minute).Unix()
 		assert.InDelta(s.T(), expected, *user.LockedUntil, 60)
 	}
+}
+
+func (s *AuthServiceTestSuite) TestLogin_LockedUntilExactlyNow() {
+	email := "boundary@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	// Boundary: lock expiry exactly at "now". The check is
+	// `time.Now().Unix() < *user.LockedUntil`, so equality must be treated as
+	// UNLOCKED and login proceeds normally.
+	// NOTE: timestamps are second-resolution, so by the time Login runs the lock
+	// is effectively "just expired"; the assertion still guards the equality
+	// boundary (now == lockedUntil must not be locked).
+	hashedPassword, _ := utils.HashPassword(password)
+	lockedUntil := time.Now().Unix()
+	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 0, LockedUntil: &lockedUntil}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+		Token:     "token",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}, nil)
+	s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
+		Token:     "refresh",
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	}, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_EmptyEmail() {
+	email := ""
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	// Edge: an empty email maps to no user, so login must fail with the same
+	// generic invalid-credentials error as a wrong email (no user enumeration).
+	s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), resp)
+	if appErr, ok := err.(*apperror.AppError); ok {
+		assert.Equal(s.T(), apperror.ErrInvalidPassword, appErr.Code)
+	}
+}
+
+func (s *AuthServiceTestSuite) TestLogin_ValidLoginAtMaxFailedAttemptsResets() {
+	email := "maxreset@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	// Boundary: the user already sits exactly at MaxFailedAttempts but supplies
+	// a correct password. FailedAttempts must reset to 0 and LockedUntil cleared.
+	hashedPassword, _ := utils.HashPassword(password)
+	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: services.MaxFailedAttempts}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+		Token:     "token",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}, nil)
+	s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
+		Token:     "refresh",
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	}, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
+	assert.Equal(s.T(), 0, user.FailedAttempts)
+	assert.Nil(s.T(), user.LockedUntil)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
+	email := "maxrelock@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	// Boundary: the user is already at MaxFailedAttempts and fails again. The
+	// account must stay locked (FailedAttempts stays >= max, LockedUntil set).
+	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: services.MaxFailedAttempts}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.Error(s.T(), err)
+	assert.Nil(s.T(), resp)
+	assert.Equal(s.T(), services.MaxFailedAttempts+1, user.FailedAttempts)
+	if s.NotNil(user.LockedUntil) {
+		expected := time.Now().Add(time.Duration(services.LockoutDurationMinutes) * time.Minute).Unix()
+		assert.InDelta(s.T(), expected, *user.LockedUntil, 60)
+	}
+}
+
+func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
+	email := "lockonly@example.com"
+	password := "password123"
+	ipAddress := "127.0.0.1"
+
+	// The reset block triggers on `FailedAttempts > 0 || LockedUntil != nil`.
+	// Here only LockedUntil is set (FailedAttempts == 0), exercising the
+	// lock-only branch: a valid login must still clear the stale lock.
+	hashedPassword, _ := utils.HashPassword(password)
+	expiredLock := time.Now().Add(-10 * time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 0, LockedUntil: &expiredLock}
+	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
+		Token:     "token",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}, nil)
+	s.refreshTokenService.On("Create", mock.Anything, user, ipAddress).Return(&dto.JwtResult{
+		Token:     "refresh",
+		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+	}, nil)
+
+	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
+
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), resp)
+	assert.Equal(s.T(), 0, user.FailedAttempts)
+	assert.Nil(s.T(), user.LockedUntil)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {

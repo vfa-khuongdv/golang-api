@@ -97,6 +97,17 @@ func TestAuthMiddleware(t *testing.T) {
 			expectedUserID:     nil,
 			expectNext:         false,
 		},
+		{
+			name:       "valid token with zero user id",
+			authHeader: "Bearer zero-token",
+			mockSetup: func(m *mocks.MockJWTService) {
+				claims := &services.CustomClaims{ID: 0, Scope: services.TokenScopeAccess}
+				m.On("ValidateTokenWithScope", "zero-token", services.TokenScopeAccess).Return(claims, nil)
+			},
+			expectedStatusCode: http.StatusOK,
+			expectedUserID:     uint(0),
+			expectNext:         true,
+		},
 	}
 
 	for _, tt := range tests {
