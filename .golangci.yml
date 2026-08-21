@@ -1,0 +1,10 @@
+version: "2"
+
+run:
+  timeout: 7m
+
+issues:
+  exclude-dirs:
+    - cmd
+    - docs
+    - tests
