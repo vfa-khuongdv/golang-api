@@ -104,6 +104,29 @@ func TestLogin(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
+	t.Run("Login - Internal Server Error", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		mockService.On("Login", mock.Anything, "email@gmail.com", "testpassword", mock.Anything).Return(nil, apperror.NewInternalServerError("server error"))
+
+		requestBody := map[string]string{
+			"email":    "email@gmail.com",
+			"password": "testpassword",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		handler.Login(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
 	t.Run("Login - Validation Errors", func(t *testing.T) {
 
 		// Create a mock service and handler
@@ -226,6 +249,7 @@ func TestLogin(t *testing.T) {
 
 				// Assert mocks
 				mockService.AssertExpectations(t)
+				mockService.AssertNotCalled(t, "Login")
 
 			})
 		}
@@ -317,6 +341,29 @@ func TestRefreshToken(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
+	t.Run("RefreshToken - Internal Server Error", func(t *testing.T) {
+		mockService := new(mocks.MockAuthService)
+		handler := handlers.NewAuthHandler(mockService)
+
+		mockService.On("RefreshToken", mock.Anything, "testrefreshtoken", "testaccesstoken", mock.Anything).Return(nil, apperror.NewInternalServerError("server error"))
+
+		requestBody := map[string]string{
+			"refresh_token": "testrefreshtoken",
+			"access_token":  "testaccesstoken",
+		}
+		reqBody, _ := json.Marshal(requestBody)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/refresh-token", bytes.NewBuffer(reqBody))
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		handler.RefreshToken(c)
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
 	t.Run("RefreshToken - Validation Errors", func(t *testing.T) {
 		mockService := new(mocks.MockAuthService)
 		handler := handlers.NewAuthHandler(mockService)
@@ -401,6 +448,7 @@ func TestRefreshToken(t *testing.T) {
 
 				// Assert mocks
 				mockService.AssertExpectations(t)
+				mockService.AssertNotCalled(t, "RefreshToken")
 			})
 		}
 	})
