@@ -3,8 +3,9 @@ version: "2"
 run:
   timeout: 7m
 
-issues:
-  exclude-dirs:
-    - cmd
-    - docs
-    - tests
+linters:
+  exclusions:
+    paths:
+      - cmd/
+      - docs/
+      - tests/
