@@ -1,6 +1,6 @@
 module github.com/vfa-khuongdv/golang-cms
 
-go 1.26
+go 1.27
 
 require (
 	github.com/gin-gonic/gin v1.10.0
@@ -8,7 +8,6 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.18.1
-	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
