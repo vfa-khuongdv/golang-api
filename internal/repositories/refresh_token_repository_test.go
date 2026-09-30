@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -384,4 +385,44 @@ func TestRefreshTokenRepository(t *testing.T) {
 		err = repo.DeleteByUserID(context.Background(), 1)
 		assert.Error(t, err)
 	})
+}
+
+func TestRefreshTokenRepository_HardDelete(t *testing.T) {
+	countAll := func(t *testing.T, db *gorm.DB) int64 {
+		var n int64
+		require.NoError(t, db.Unscoped().Model(&models.RefreshToken{}).Count(&n).Error)
+		return n
+	}
+
+	t.Run("DeleteByUserID hard-deletes so logout does not leave rows behind", func(t *testing.T) {
+		db := setupTestDB(t)
+		repo := repositories.NewRefreshTokenRepository(db)
+		require.NoError(t, repo.Create(context.Background(), &models.RefreshToken{RefreshToken: "a", ExpiredAt: time.Now().Unix() + 3600, UserID: 1}))
+		require.NoError(t, repo.Create(context.Background(), &models.RefreshToken{RefreshToken: "b", ExpiredAt: time.Now().Unix() + 3600, UserID: 2}))
+
+		require.NoError(t, repo.DeleteByUserID(context.Background(), 1))
+
+		assert.Equal(t, int64(1), countAll(t, db))
+	})
+}
+
+// A plain SELECT lets two concurrent refreshes with the same token both succeed.
+// The row must be locked (SELECT ... FOR UPDATE) inside the rotation transaction.
+// SQLite ignores FOR UPDATE, so the generated MySQL SQL is inspected instead.
+func TestRefreshTokenRepository_FindByTokenWithTx_LocksRow(t *testing.T) {
+	db, err := gorm.Open(mysql.New(mysql.Config{
+		DSN:                       "u:p@tcp(127.0.0.1:1)/d",
+		SkipInitializeWithVersion: true,
+	}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	require.NoError(t, err)
+
+	var sql string
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register("capture_sql", func(d *gorm.DB) {
+		sql = d.Statement.SQL.String()
+	}))
+
+	repo := repositories.NewRefreshTokenRepository(db)
+	_, _ = repo.FindByTokenWithTx(context.Background(), db, "some-token")
+
+	assert.Contains(t, sql, "FOR UPDATE")
 }
