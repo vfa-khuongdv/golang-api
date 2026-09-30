@@ -203,14 +203,7 @@ Mailpit catches every email the app sends locally, so nothing reaches a real inb
 docker-compose up -d mailpit
 ```
 
-Point the mail settings at Mailpit (leave `mail_username` empty: no SMTP AUTH, STARTTLS only if offered):
-
-```sql
-UPDATE settings SET value = '127.0.0.1' WHERE `key` = 'mail_host';
-UPDATE settings SET value = '1026' WHERE `key` = 'mail_port';
-UPDATE settings SET value = '' WHERE `key` IN ('mail_username', 'mail_password');
-UPDATE settings SET value = 'noreply@example.com' WHERE `key` = 'mail_from';
-```
+The default rows seeded by the migrations already point at Mailpit (`127.0.0.1:1026`, no SMTP AUTH, STARTTLS only if offered), so no extra configuration is needed.
 
 Open `http://localhost:8026` to read the captured emails (e.g. password reset links).
 
@@ -247,19 +240,21 @@ These can be set in the `.env` file or passed as environment variables. A sample
 
 ### Application Settings (`settings` table)
 
-Mail and frontend settings are stored as key/value rows in the `settings` table instead of environment variables. Migrations create the rows with default values; update them directly in the database:
+Mail and frontend settings are stored as key/value rows in the `settings` table instead of environment variables. Migrations create the rows with defaults for local development with [Mailpit](#8-local-mail---mailpit); update them directly in the database for other environments:
 
 | Key             | Description                                        | Default                 |
 |-----------------|----------------------------------------------------|-------------------------|
-| `mail_host`     | SMTP server host                                   | `smtp.gmail.com`        |
-| `mail_port`     | SMTP server port                                   | `587`                   |
+| `mail_host`     | SMTP server host                                   | `127.0.0.1`             |
+| `mail_port`     | SMTP server port                                   | `1026`                  |
 | `mail_username` | SMTP username (empty = no SMTP AUTH, e.g. Mailpit) | (empty)                 |
 | `mail_password` | SMTP password, **stored encrypted** (see below)    | (empty)                 |
-| `mail_from`     | Email address used as sender                       | (empty)                 |
+| `mail_from`     | Email address used as sender                       | `noreply@example.com`   |
 | `frontend_url`  | Frontend base URL used in password reset links     | `http://localhost:5173` |
 
 ```sql
-UPDATE settings SET value = 'noreply@example.com' WHERE `key` = 'mail_from';
+UPDATE settings SET value = 'smtp.gmail.com' WHERE `key` = 'mail_host';
+UPDATE settings SET value = '587' WHERE `key` = 'mail_port';
+UPDATE settings SET value = 'user@example.com' WHERE `key` = 'mail_username';
 ```
 
 `mail_password` must be stored encrypted (AES-256-GCM with `SETTINGS_ENCRYPTION_KEY`); a plaintext value is rejected when sending mail. Leave it empty when the SMTP server needs no password. Generate the encrypted value (the input is read from stdin, so it stays out of shell history):
