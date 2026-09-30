@@ -92,7 +92,7 @@ Templates for each layer: `references/templates.md`.
 
 - Access JWT: 1 hour, `access` scope, HMAC only. Refresh token: 60 random chars, 30 days, stored in DB, rotated on refresh, deleted on logout. Reset token: 1 hour, only its hash is stored.
 - 5 failed logins lock the account for 15 minutes; public auth routes are limited to 10 req/min per IP.
-- Secret settings (`mail_password`) are AES-256-GCM encrypted with `SETTINGS_ENCRYPTION_KEY` (`make encrypt-setting`). Mail/frontend settings live in the `settings` table, not env vars.
+- Secret settings (`mail.password`) are AES-256-GCM encrypted with `SETTINGS_ENCRYPTION_KEY` (`make encrypt-setting`). Mail/frontend settings live in the `settings` table, not env vars.
 - Never log sensitive values; see `docs/logging-standards.md`.
 
 ## Logging

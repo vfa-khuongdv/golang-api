@@ -48,12 +48,12 @@ func encryptForTest(t *testing.T, plaintext string) string {
 
 func validMailSettings(t *testing.T) map[string]string {
 	return map[string]string{
-		"mail_host":     "smtp.example.com",
-		"mail_port":     "587",
-		"mail_username": "user",
-		"mail_password": encryptForTest(t, "secret"),
-		"mail_from":     "noreply@example.com",
-		"frontend_url":  "https://example.com",
+		"mail.host":        "smtp.example.com",
+		"mail.port":        "587",
+		"mail.username":    "user",
+		"mail.password":    encryptForTest(t, "secret"),
+		"mail.from":        "noreply@example.com",
+		"app.frontend_url": "https://example.com",
 	}
 }
 
@@ -165,7 +165,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 	t.Run("InvalidMailPort", func(t *testing.T) {
 		for _, port := range []string{"", "abc", "58 7"} {
 			values := validMailSettings(t)
-			values["mail_port"] = port
+			values["mail.port"] = port
 			repo := &fakeSettingRepository{values: values}
 
 			err := NewMailerService(repo, testEncryptionKey).SendMailForgotPassword(context.Background(), user)
@@ -176,7 +176,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 
 	t.Run("MissingMailPortKey", func(t *testing.T) {
 		values := validMailSettings(t)
-		delete(values, "mail_port")
+		delete(values, "mail.port")
 		repo := &fakeSettingRepository{values: values}
 
 		err := NewMailerService(repo, testEncryptionKey).SendMailForgotPassword(context.Background(), user)
@@ -186,7 +186,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 
 	t.Run("MissingFrontendURL", func(t *testing.T) {
 		values := validMailSettings(t)
-		delete(values, "frontend_url")
+		delete(values, "app.frontend_url")
 		repo := &fakeSettingRepository{values: values}
 
 		err := NewMailerService(repo, testEncryptionKey).SendMailForgotPassword(context.Background(), user)
@@ -196,7 +196,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 
 	t.Run("EmptyFrontendURL", func(t *testing.T) {
 		values := validMailSettings(t)
-		values["frontend_url"] = ""
+		values["app.frontend_url"] = ""
 		repo := &fakeSettingRepository{values: values}
 
 		err := NewMailerService(repo, testEncryptionKey).SendMailForgotPassword(context.Background(), user)
@@ -211,8 +211,8 @@ func TestMailerService_InternalBranches(t *testing.T) {
 		}
 		t.Cleanup(func() { newEmailSender = originalSender })
 		values := validMailSettings(t)
-		values["mail_username"] = ""
-		values["mail_password"] = ""
+		values["mail.username"] = ""
+		values["mail.password"] = ""
 		repo := &fakeSettingRepository{values: values}
 
 		err := NewMailerService(repo, testEncryptionKey).SendMailForgotPassword(context.Background(), user)
@@ -228,7 +228,7 @@ func TestMailerService_InternalBranches(t *testing.T) {
 		}
 		t.Cleanup(func() { newEmailSender = originalSender })
 		values := validMailSettings(t)
-		values["mail_password"] = "secret"
+		values["mail.password"] = "secret"
 		repo := &fakeSettingRepository{values: values}
 
 		err := NewMailerService(repo, testEncryptionKey).SendMailForgotPassword(context.Background(), user)

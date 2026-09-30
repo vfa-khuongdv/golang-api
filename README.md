@@ -45,7 +45,7 @@ The project follows a clean architecture and is organized into the following dir
 ├── README.md                         # Project documentation
 ├── TESTING.md                        # Testing standards
 ├── cmd                               # Command-line entry points
-│   ├── encrypt-setting               # Encrypts secret setting values (e.g. mail_password)
+│   ├── encrypt-setting               # Encrypts secret setting values (e.g. mail.password)
 │   │   └── main.go
 │   ├── seeder                        # Seeder for initial data population
 │   │   └── seeder.go
@@ -257,7 +257,7 @@ The application is configured through the environment variables below. `DB_USERN
 - `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required; the router refuses to start with a shorter key)
 
 **Settings Encryption:**
-- `SETTINGS_ENCRYPTION_KEY` - Key used to encrypt secret rows of the `settings` table such as `mail_password`, at least 32 characters (required). Changing it makes existing encrypted values unreadable, so re-encrypt them afterwards. Generate one with `openssl rand -base64 48`.
+- `SETTINGS_ENCRYPTION_KEY` - Key used to encrypt secret rows of the `settings` table such as `mail.password`, at least 32 characters (required). Changing it makes existing encrypted values unreadable, so re-encrypt them afterwards. Generate one with `openssl rand -base64 48`.
 
 These can be set in the `.env` file or passed as environment variables. A sample `.env.example` file is provided in the repository.
 
@@ -267,20 +267,20 @@ Mail and frontend settings are stored as key/value rows in the `settings` table 
 
 | Key             | Description                                        | Default                 |
 |-----------------|----------------------------------------------------|-------------------------|
-| `mail_host`     | SMTP server host                                   | `127.0.0.1`             |
-| `mail_port`     | SMTP server port                                   | `1026`                  |
-| `mail_username` | SMTP username (empty = no SMTP AUTH, e.g. Mailpit) | (empty)                 |
-| `mail_password` | SMTP password, **stored encrypted** (see below)    | (empty)                 |
-| `mail_from`     | Email address used as sender                       | `noreply@example.com`   |
-| `frontend_url`  | Frontend base URL used in password reset links     | `http://localhost:5173` |
+| `mail.host`     | SMTP server host                                   | `127.0.0.1`             |
+| `mail.port`     | SMTP server port                                   | `1026`                  |
+| `mail.username` | SMTP username (empty = no SMTP AUTH, e.g. Mailpit) | (empty)                 |
+| `mail.password` | SMTP password, **stored encrypted** (see below)    | (empty)                 |
+| `mail.from`     | Email address used as sender                       | `noreply@example.com`   |
+| `app.frontend_url`  | Frontend base URL used in password reset links     | `http://localhost:5173` |
 
 ```sql
-UPDATE settings SET value = 'smtp.gmail.com' WHERE `key` = 'mail_host';
-UPDATE settings SET value = '587' WHERE `key` = 'mail_port';
-UPDATE settings SET value = 'user@example.com' WHERE `key` = 'mail_username';
+UPDATE settings SET value = 'smtp.gmail.com' WHERE `key` = 'mail.host';
+UPDATE settings SET value = '587' WHERE `key` = 'mail.port';
+UPDATE settings SET value = 'user@example.com' WHERE `key` = 'mail.username';
 ```
 
-`mail_password` must be stored encrypted (AES-256-GCM with `SETTINGS_ENCRYPTION_KEY`); a plaintext value is rejected when sending mail. Leave it empty when the SMTP server needs no password. Generate the encrypted value (the input is read from stdin, so it stays out of shell history):
+`mail.password` must be stored encrypted (AES-256-GCM with `SETTINGS_ENCRYPTION_KEY`); a plaintext value is rejected when sending mail. Leave it empty when the SMTP server needs no password. Generate the encrypted value (the input is read from stdin, so it stays out of shell history):
 
 ```bash
 make encrypt-setting            # or: go run ./cmd/encrypt-setting
@@ -289,7 +289,7 @@ make encrypt-setting            # or: go run ./cmd/encrypt-setting
 ```
 
 ```sql
-UPDATE settings SET value = 'enc:v1:3q2+7w...' WHERE `key` = 'mail_password';
+UPDATE settings SET value = 'enc:v1:3q2+7w...' WHERE `key` = 'mail.password';
 ```
 
 ## API Documentation

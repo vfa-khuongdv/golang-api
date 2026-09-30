@@ -35,7 +35,7 @@ var (
 )
 
 // NewMailerService creates a MailerService. encryptionKey decrypts the
-// mail_password setting, which is stored encrypted (see utils.EncryptSecret).
+// mail.password setting, which is stored encrypted (see utils.EncryptSecret).
 func NewMailerService(settingRepo repositories.SettingRepository, encryptionKey string) MailerService {
 	return &mailerServiceImpl{settingRepo: settingRepo, encryptionKey: encryptionKey}
 }

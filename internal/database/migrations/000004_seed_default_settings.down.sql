@@ -1,1 +1,1 @@
-DELETE FROM settings WHERE `key` IN ('mail_host', 'mail_port', 'mail_username', 'mail_password', 'mail_from', 'frontend_url');
+DELETE FROM settings WHERE `key` IN ('mail.host', 'mail.port', 'mail.username', 'mail.password', 'mail.from', 'app.frontend_url');

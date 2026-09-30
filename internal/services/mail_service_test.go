@@ -28,12 +28,12 @@ func (s *mailerServiceTestSuite) SetupTest() {
 func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 	s.T().Run("Nil Token", func(t *testing.T) {
 		s.settingRepo.On("GetValues", mock.Anything, mock.Anything).Return(map[string]string{
-			"mail_host":     "smtp.gmail.com",
-			"mail_port":     "587",
-			"mail_username": "test@example.com",
-			"mail_password": "",
-			"mail_from":     "noreply@example.com",
-			"frontend_url":  "https://example.com",
+			"mail.host":     "smtp.gmail.com",
+			"mail.port":     "587",
+			"mail.username": "test@example.com",
+			"mail.password": "",
+			"mail.from":     "noreply@example.com",
+			"app.frontend_url":  "https://example.com",
 		}, nil).Once()
 
 		user := &models.User{

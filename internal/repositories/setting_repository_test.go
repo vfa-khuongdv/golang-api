@@ -24,46 +24,46 @@ func TestSettingRepository(t *testing.T) {
 		// Arrange
 		db := setupSettingTestDB(t)
 		require.NoError(t, db.Create(&[]models.Setting{
-			{Key: "mail_host", Value: "smtp.example.com"},
-			{Key: "mail_port", Value: "587"},
-			{Key: "frontend_url", Value: "https://example.com"},
+			{Key: "mail.host", Value: "smtp.example.com"},
+			{Key: "mail.port", Value: "587"},
+			{Key: "app.frontend_url", Value: "https://example.com"},
 		}).Error)
 		repo := repositories.NewSettingRepository(db)
 
 		// Act
-		values, err := repo.GetValues(context.Background(), "mail_host", "mail_port")
+		values, err := repo.GetValues(context.Background(), "mail.host", "mail.port")
 
 		// Assert
 		require.NoError(t, err)
-		assert.Equal(t, map[string]string{"mail_host": "smtp.example.com", "mail_port": "587"}, values)
+		assert.Equal(t, map[string]string{"mail.host": "smtp.example.com", "mail.port": "587"}, values)
 	})
 
 	t.Run("GetValues - Missing Keys Are Absent", func(t *testing.T) {
 		// Arrange
 		db := setupSettingTestDB(t)
-		require.NoError(t, db.Create(&models.Setting{Key: "mail_host", Value: "smtp.example.com"}).Error)
+		require.NoError(t, db.Create(&models.Setting{Key: "mail.host", Value: "smtp.example.com"}).Error)
 		repo := repositories.NewSettingRepository(db)
 
 		// Act
-		values, err := repo.GetValues(context.Background(), "mail_host", "unknown_key")
+		values, err := repo.GetValues(context.Background(), "mail.host", "unknown_key")
 
 		// Assert
 		require.NoError(t, err)
-		assert.Equal(t, map[string]string{"mail_host": "smtp.example.com"}, values)
+		assert.Equal(t, map[string]string{"mail.host": "smtp.example.com"}, values)
 	})
 
 	t.Run("GetValues - Empty Value Is Preserved", func(t *testing.T) {
 		// Arrange
 		db := setupSettingTestDB(t)
-		require.NoError(t, db.Create(&models.Setting{Key: "mail_from", Value: ""}).Error)
+		require.NoError(t, db.Create(&models.Setting{Key: "mail.from", Value: ""}).Error)
 		repo := repositories.NewSettingRepository(db)
 
 		// Act
-		values, err := repo.GetValues(context.Background(), "mail_from")
+		values, err := repo.GetValues(context.Background(), "mail.from")
 
 		// Assert
 		require.NoError(t, err)
-		value, ok := values["mail_from"]
+		value, ok := values["mail.from"]
 		assert.True(t, ok)
 		assert.Empty(t, value)
 	})
@@ -75,7 +75,7 @@ func TestSettingRepository(t *testing.T) {
 		repo := repositories.NewSettingRepository(db) // settings table not migrated
 
 		// Act
-		values, err := repo.GetValues(context.Background(), "mail_host")
+		values, err := repo.GetValues(context.Background(), "mail.host")
 
 		// Assert
 		assert.Error(t, err)

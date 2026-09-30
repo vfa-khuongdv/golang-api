@@ -30,16 +30,16 @@ func TestAuthForgotPassword(t *testing.T) {
 	require.NoError(t, result.Error)
 
 	t.Run("Forgot Password - Token Persisted On Email Failure", func(t *testing.T) {
-		// Force deterministic behavior: with mail_from empty the sender fails
+		// Force deterministic behavior: with mail.from empty the sender fails
 		// fast on address parsing (no network), so we always hit the 500 path
 		// and can verify the token was persisted before the send.
 		require.NoError(t, db.Create(&[]models.Setting{
-			{Key: "mail_host", Value: "smtp.example.com"},
-			{Key: "mail_port", Value: "587"},
-			{Key: "mail_username", Value: ""},
-			{Key: "mail_password", Value: ""},
-			{Key: "mail_from", Value: ""},
-			{Key: "frontend_url", Value: "http://localhost:5173"},
+			{Key: "mail.host", Value: "smtp.example.com"},
+			{Key: "mail.port", Value: "587"},
+			{Key: "mail.username", Value: ""},
+			{Key: "mail.password", Value: ""},
+			{Key: "mail.from", Value: ""},
+			{Key: "app.frontend_url", Value: "http://localhost:5173"},
 		}).Error)
 
 		payload := map[string]string{

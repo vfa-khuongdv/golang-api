@@ -1,4 +1,4 @@
-// Command encrypt-setting encrypts a secret setting value (e.g. mail_password)
+// Command encrypt-setting encrypts a secret setting value (e.g. mail.password)
 // with SETTINGS_ENCRYPTION_KEY so it can be stored in the settings table.
 //
 // The value is read from stdin so it does not end up in shell history:
