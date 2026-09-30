@@ -41,3 +41,27 @@ go run cmd/seeder/seeder.go
 ```
 
 > See `.github/skills/golang-cms-architecture/references/commands.md` for full command reference.
+
+## Before Committing
+
+```bash
+go test ./... --cover            # all tests pass (CI fails below 70% total coverage)
+go fmt ./... && go vet ./...
+golangci-lint run ./...
+go build -o ./bin/server ./cmd/server/main.go
+```
+
+`make pre-push` runs fmt, vet, lint, and test.
+
+## Never
+
+- Ignore errors silently or mix concerns between layers
+- Use global variables or hardcode config values
+- Store passwords in plain text or log sensitive data
+- Test multiple things in one test, or write code before a failing test
+
+## Debugging Tips
+
+- `go test ./internal/handlers -run TestName -v` runs a single test; add `-race` for race conditions
+- Swagger is at `/swagger` when the server runs with `STAGE` other than `prod`
+- See `tests/mocks/` for mocks and `tests/e2e/setup_test.go` for the e2e test setup
