@@ -136,7 +136,7 @@ Do not write production code without a failing test first. Patterns, mocks, e2e 
 - **Secrets**: `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY` (32+ characters) come from the environment. Secret `settings` rows (`mail_password`) are AES-256-GCM encrypted (`utils.EncryptSecret`, `make encrypt-setting`). Mail and frontend settings live in the `settings` table, not env vars.
 - **Input**: validate with `binding` tags on DTOs; use GORM parameterized queries; never log raw sensitive values (`utils.MaskWithPrefix`; the log middleware masks bodies and headers).
 - **CORS**: `CORS_ALLOWED_ORIGINS` (exact origins, default `http://localhost:5173`); credentials are allowed, so never use `*` in production.
-- **Proxies**: `TRUSTED_PROXIES` is empty by default so `X-Forwarded-For` cannot spoof the client IP used by the rate limiter; set it to the proxy's CIDR (never `0.0.0.0/0`) when behind a load balancer or reverse proxy (ALB, nginx, Cloudflare). Left empty behind a proxy, all clients share the proxy's IP and the rate limiter throttles every user together.
+- **Proxies**: `TRUSTED_PROXIES` defaults to `0.0.0.0/0` so the client IP (rate limiter key) is read from `X-Forwarded-For` behind an ALB or reverse proxy without configuring its IP. The trade-off is that a client can spoof that header and dodge the per-IP rate limit; set the proxy CIDR to prevent it, or set an empty value when the app is exposed directly with no proxy. Trusting nothing behind a proxy makes all clients share the proxy's IP and throttles every user together.
 
 ## Deployment
 
