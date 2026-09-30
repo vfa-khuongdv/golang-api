@@ -38,7 +38,7 @@ docs/                                 swagger.json (hand-written), logging-stand
 
 - Depend on interfaces; constructors of repos/services return interfaces, handlers return the concrete struct.
 - Every service and repository method takes `context.Context` first. Handlers pass `ctx.Request.Context()`; repos use `db.WithContext(ctx)`.
-- Keep interfaces small (1-3 methods).
+- Keep new interfaces small and focused. `UserRepository` and `UserService` are already larger than ideal; put new behavior in its own interface instead of growing them.
 
 ## Conventions
 
@@ -102,4 +102,6 @@ Templates for each layer: `references/templates.md`.
 
 ## Don't
 
-Ignore errors, use globals, mix layers, hardcode config, store plaintext passwords, log sensitive data, write code before a failing test.
+- Store plaintext passwords or log sensitive values: logs and responses leave the trust boundary.
+- Hardcode config: it belongs in env vars or the `settings` table so it changes without a deploy.
+- Add package-level mutable state: dependencies come through constructors so they stay mockable (existing exceptions: `configs.DB`, test hooks such as `newEmailSender`).

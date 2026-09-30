@@ -42,7 +42,7 @@ Add a matching SQL migration (`*.up.sql` and `*.down.sql`) in `internal/database
 ### 7. Mocks and Tests
 - Add mocks for new interfaces in `tests/mocks`
 - Unit tests for each layer, plus an e2e test in `tests/e2e`
-- Target coverage: 85%+
+- Meet the per-layer coverage targets in `SKILL.md`
 
 ### 8. Docs
 - Update `docs/swagger.json` and the endpoint list in `README.md`
@@ -59,7 +59,7 @@ Add a matching SQL migration (`*.up.sql` and `*.down.sql`) in `internal/database
 - [ ] Context passed through all layers?
 - [ ] Errors handled with apperror?
 - [ ] JSON tags in snake_case?
-- [ ] Interfaces small (1-3 methods)?
+- [ ] New interfaces small and focused?
 - [ ] Migration added for schema changes?
 - [ ] `docs/swagger.json` and README updated?
 - [ ] Dependencies injected?

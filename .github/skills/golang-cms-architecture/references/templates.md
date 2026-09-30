@@ -60,7 +60,11 @@ func (svc *exampleServiceImpl) CreateExample(ctx context.Context, input *dto.Cre
     // Input format is already validated by the `binding` tags in the handler;
     // services enforce business rules.
     existing, err := svc.exampleRepo.FindByField(ctx, "name", input.Name)
-    if err == nil && existing != nil {
+    if err != nil {
+        if appErr, ok := apperror.ToAppError(err); !ok || appErr.Code != apperror.ErrNotFound {
+            return nil, apperror.NewDBQueryError("Failed to check existing example")
+        }
+    } else if existing != nil {
         return nil, apperror.NewConflictError("Name already exists")
     }
 
