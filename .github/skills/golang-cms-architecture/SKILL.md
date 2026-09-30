@@ -215,10 +215,12 @@ func TestUserService(t *testing.T) {
 
 ## Adding New Features
 
+**TDD:** write the failing test first (red), make it pass with minimal code (green), then refactor. This applies to every layer below and to bug fixes.
+
 1. **Model** → Define domain model with GORM/JSON tags
-2. **Repository** → Define interface, implement GORM ops, write tests (90%+)
-3. **Service** → Business logic, validation, orchestrate repos, write tests (85%+)
-4. **Handler** → Parse requests, call service, return responses, write tests (95%+)
+2. **Repository** → Define interface, implement GORM ops, write the failing tests first (90%+)
+3. **Service** → Business logic, validation, orchestrate repos, write the failing tests first (85%+)
+4. **Handler** → Parse requests, call service, return responses, write the failing tests first (95%+)
 5. **Routes** → Register handler in routes.go
 6. **Migration** → Add `*.up.sql` / `*.down.sql` files in `internal/database/migrations`
 7. **Docs** → Update `docs/swagger.json` and the README endpoint list
@@ -237,7 +239,7 @@ make dev                # Start with hot reload
 
 ## Important Implementation Rules
 
-**DO:** Dependency injection, explicit errors, apperror package, context.Context, logger.WithContext(ctx), tests immediately, snake_case JSON tags
+**DO:** Dependency injection, explicit errors, apperror package, context.Context, logger.WithContext(ctx), tests first (TDD), snake_case JSON tags
 
 **DON'T:** Ignore errors, global variables, mix concerns, hardcode config, plain text passwords, log sensitive info, complex test setup
 

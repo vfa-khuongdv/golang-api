@@ -441,6 +441,16 @@ func (service *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, 
 
 ## Testing Guidelines
 
+### TDD: Test First
+
+Write the test before the code. For every feature and bug fix:
+
+1. **Red** - write a failing test and run it to confirm it fails for the expected reason (for a bug, a test that reproduces it)
+2. **Green** - write the minimum code to make it pass
+3. **Refactor** - improve the code while the tests stay green
+
+Do not write production code without a failing test first.
+
 ### Test Organization
 
 All tests should follow the **Testify** framework with proper grouping:

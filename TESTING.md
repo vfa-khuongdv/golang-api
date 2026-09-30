@@ -614,6 +614,7 @@ The project does not currently contain benchmarks or load tests; add them next t
 ## Best Practices Summary
 
 ✅ **DO:**
+- Write the failing test first (TDD: red → green → refactor), then the code
 - Group related tests under parent test functions
 - Use `require` for critical assertions
 - Use `assert` for value checks

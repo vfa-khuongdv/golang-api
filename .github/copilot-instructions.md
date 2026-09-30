@@ -153,7 +153,7 @@ func TestUserService(t *testing.T) {
 - Use dependency injection
 - Handle all errors explicitly
 - Use apperror for all errors
-- Write tests immediately after code
+- **Write the failing test first (TDD: red → green → refactor), then the code**
 - Follow AAA pattern in tests
 - Mock external dependencies only
 - Use meaningful names
@@ -195,10 +195,12 @@ Mail (`mail_*`) and frontend (`frontend_url`) settings live in the `settings` ta
 
 ## When Adding New Features
 
+Follow TDD at every step: write the failing test first, then the code that makes it pass.
+
 1. **Start with the model** - Define domain model with validation tags
-2. **Add repository layer** - Define interface, implement GORM ops, write unit tests
-3. **Add service layer** - Business logic, validate inputs, orchestrate repos
-4. **Add handler layer** - Accept requests, call service, return responses
+2. **Add repository layer** - Write the failing unit test, then define the interface and implement GORM ops
+3. **Add service layer** - Write the failing test with mocked repos, then the business logic
+4. **Add handler layer** - Write the failing handler test, then accept requests, call service, return responses
 5. **Add routes** - Register handler in internal/routes/routes.go
 6. **Add a migration** - New tables/columns go in `internal/database/migrations` (`*.up.sql` and `*.down.sql`)
 7. **Run all tests** - `go test ./... -v --cover` must pass with coverage targets

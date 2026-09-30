@@ -2,6 +2,8 @@
 
 ## Adding a New Feature
 
+Use TDD: for each step below, write the failing test first (red), implement the minimum to pass (green), then refactor.
+
 ### 1. Model (internal/models/)
 ```go
 type Feature struct {
@@ -47,7 +49,7 @@ Add a matching SQL migration (`*.up.sql` and `*.down.sql`) in `internal/database
 
 ## Fixing a Bug
 
-1. Reproduce with test
+1. Reproduce with a failing test (write it before the fix)
 2. Identify layer (handler/service/repository)
 3. Fix in appropriate layer
 4. Verify with test
@@ -73,5 +75,5 @@ Add a matching SQL migration (`*.up.sql` and `*.down.sql`) in `internal/database
 | Ignoring errors | Always handle with apperror |
 | camelCase JSON tags | Use snake_case |
 | Big interfaces | Split into smaller ones |
-| No tests | Add tests immediately |
+| Tests written after code | Write the failing test first (TDD) |
 | Hardcoded config | Use env variables or the `settings` table |
