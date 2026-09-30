@@ -161,6 +161,24 @@ func TestLogMiddleware(t *testing.T) {
 		assert.Equal(t, middlewares.NotLoggedResponse, logEntry["response"])
 	})
 
+	t.Run("health check requests are not logged", func(t *testing.T) {
+		buf, restore := setupLogCapture()
+		defer restore()
+
+		router := gin.New()
+		router.Use(middlewares.LogMiddleware())
+		router.GET("/healthz", func(c *gin.Context) {
+			c.String(http.StatusOK, "ok")
+		})
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		time.Sleep(100 * time.Millisecond)
+		assert.Empty(t, buf.Bytes())
+	})
+
 	t.Run("large request body truncated to 64KB", func(t *testing.T) {
 		buf, restore := setupLogCapture()
 		defer restore()

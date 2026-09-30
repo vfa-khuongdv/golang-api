@@ -27,9 +27,7 @@ var DB *gorm.DB
 
 var (
 	openGormConnection = func(dsn string) (*gorm.DB, error) {
-		return gorm.Open(mysql.Open(dsn), &gorm.Config{
-			PrepareStmt: false,
-		})
+		return gorm.Open(mysql.Open(dsn), gormConfig())
 	}
 	getSQLDBConnection = func(db *gorm.DB) (*sql.DB, error) {
 		return db.DB()
@@ -102,6 +100,16 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 
 	DB = db
 	return db
+}
+
+// gormConfig returns the GORM settings. SkipDefaultTransaction avoids wrapping
+// every single write in BEGIN/COMMIT (two extra round trips to the database);
+// code that needs atomicity opens a transaction explicitly.
+func gormConfig() *gorm.Config {
+	return &gorm.Config{
+		PrepareStmt:            false,
+		SkipDefaultTransaction: true,
+	}
 }
 
 // setDefaults applies safe defaults if values are not provided

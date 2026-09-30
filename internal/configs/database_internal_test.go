@@ -198,3 +198,10 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		assert.NotNil(t, sqlDB)
 	})
 }
+
+func TestGormConfig(t *testing.T) {
+	// The default transaction wraps every single write in BEGIN/COMMIT, adding
+	// two round trips to RDS per write for no benefit.
+	assert.True(t, gormConfig().SkipDefaultTransaction)
+	assert.False(t, gormConfig().PrepareStmt)
+}
