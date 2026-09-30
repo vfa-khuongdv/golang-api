@@ -13,9 +13,10 @@ metadata:
 
 ## Project Overview
 
-This project targets Go 1.25+ (minimum supported version).
-- User authentication with JWT tokens and refresh tokens
-- Multi-factor authentication (MFA) with TOTP
+This project targets Go 1.27+ (see `go.mod`).
+- User authentication with JWT access tokens (1 hour) and rotating refresh tokens (30 days)
+- Account lockout, per-IP rate limiting on public auth routes, and password reset by email
+- Key/value `settings` table for mail and frontend settings (secret values encrypted with AES-256-GCM)
 - Clean architecture: handlers → services → repositories → models
 - Comprehensive testing with testify (assert, require, mock)
 - Standardized error handling via apperror package
@@ -25,6 +26,8 @@ This project targets Go 1.25+ (minimum supported version).
 
 ```
 ├── cmd/                          # Command-line applications
+│   ├── encrypt-setting/          # Encrypts secret settings (make encrypt-setting)
+│   │   └── main.go
 │   ├── server/                   # Main application entry point
 │   │   └── main.go
 │   └── seeder/                   # Database seeder
@@ -32,7 +35,7 @@ This project targets Go 1.25+ (minimum supported version).
 ├── internal/                     # Private application code
 │   ├── configs/                  # Configuration management
 │   ├── database/                 # Database setup
-│   │   ├── migrations/           # Migration files
+│   │   ├── migrations/           # SQL migrations (golang-migrate)
 │   │   └── seeders/              # Seeder implementations
 │   ├── handlers/                 # HTTP handlers/controllers
 │   ├── middlewares/              # HTTP middlewares
@@ -49,9 +52,10 @@ This project targets Go 1.25+ (minimum supported version).
 │   ├── logger/                   # Logging utilities
 │   ├── mailer/                   # Email sending utilities
 │   └── migrator/                 # Database migration utilities
-├── tests/                        # Test utilities and mocks
+├── tests/                        # Shared test support (unit tests sit next to the code)
+│   ├── e2e/                      # End-to-end tests
 │   └── mocks/                    # Mock implementations
-├── docs/                         # Documentation and API specs
+├── docs/                         # Swagger spec and logging standards
 └── Makefile                      # Build and development commands
 ```
 
@@ -75,10 +79,13 @@ All service and repository methods must accept `context.Context` as the first pa
 Always depend on interfaces, not concrete types:
 ```go
 type UserService interface { /* ... */ }
-type userServiceImpl struct { repo UserRepository }
+type userServiceImpl struct {
+    repo          repositories.UserRepository
+    mailerService MailerService
+}
 
-func NewUserService(repo UserRepository) UserService {
-    return &userServiceImpl{repo: repo}
+func NewUserService(repo repositories.UserRepository, mailerService MailerService) UserService {
+    return &userServiceImpl{repo: repo, mailerService: mailerService}
 }
 ```
 
@@ -92,7 +99,7 @@ Handlers pass `ctx.Request.Context()` to services. Services pass to repositories
 
 ### Packages & Files
 - Use lowercase, single-word names: `handlers`, `services`, `repositories`
-- Test files: `user_service_test.go`, `auth_handler_test.go`, `*_integration_test.go`
+- Test files sit next to the code: `user_service_test.go`, `auth_handler_test.go`; use `*_internal_test.go` for tests that need unexported identifiers
 
 ### Functions & Methods
 - Use verb-based names for actions
@@ -102,7 +109,8 @@ Handlers pass `ctx.Request.Context()` to services. Services pass to repositories
 - `New` for constructors: `NewUserService(repo)`
 
 ### Constants
-- All uppercase with underscores: `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT`, `JWT_SECRET`
+- Idiomatic Go CamelCase for new constants: `MaxFailedAttempts`, `SettingMailHost`
+- A few older constants use upper snake case (`LIMIT`, `MAX_BODY_SIZE`); leave them as they are
 - Group related constants together
 
 ### JSON Tags (API Responses)
@@ -135,8 +143,13 @@ Always use the `apperror` package for standardized errors:
 ```go
 import "github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 
-// Validation errors (HTTP 400)
-return nil, apperror.NewValidationError("Email is required")
+// Validation errors (HTTP 400): normally produced in handlers from binding errors
+utils.RespondWithError(c, utils.TranslateValidationErrors(err, input))
+// or built manually:
+// apperror.NewValidationError("Validation failed", []apperror.FieldError{{Field: "email", Message: "email is required"}})
+
+// Bad request (HTTP 400)
+return nil, apperror.NewBadRequestError("Invalid input")
 
 // Not found errors (HTTP 404)
 return nil, apperror.NewNotFoundError("User not found")
@@ -148,25 +161,31 @@ return nil, apperror.NewUnauthorizedError("Invalid credentials")
 return nil, apperror.NewConflictError("Email already exists")
 
 // Server errors (HTTP 500)
-return nil, apperror.NewInternalServerError("Failed to create user: %w", err)
+return nil, apperror.NewInternalServerError("Failed to create user")
+// or keep the cause: apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to create user", err)
 
 ```
 
 **HTTP Status Mapping:**
-- 400: Validation or Bad Request errors
+- 400: Validation, bad request, and password errors
 - 401: Authentication errors
 - 403: Forbidden/Authorization errors
 - 404: Not found errors
+- 409: Conflict errors
+- 429: Account locked / too many requests
 - 500: Server errors
+
+Error codes live in `pkg/apperror/codes.go`. Error bodies are `{"code": ..., "message": ...}`; validation errors add a `fields` array.
 
 Never ignore errors silently. Always handle explicitly.
 
 ## Response API
-- Use utils.RespondWithOK, RespondWithError for consistent API responses
+- Use `utils.RespondWithOK(ctx, statusCode, body)` and `utils.RespondWithError(ctx, err)` for consistent API responses
+- `RespondWithOK` writes `body` as the JSON response as-is (no envelope)
 - Example:
 
 ```go
-utils.RespondWithOK(c, http.StatusCreated, "User created successfully", user)
+utils.RespondWithOK(c, http.StatusOK, gin.H{"message": "Update profile successfully"})
 utils.RespondWithError(c, err)
 ```
 
@@ -178,10 +197,10 @@ func TestUserService(t *testing.T) {
     t.Run("CreateUser - Success", func(t *testing.T) {
         // ARRANGE
         mockRepo := new(mocks.MockUserRepository)
-        mockRepo.On("Create", mock.Anything).Return(&models.User{}, nil)
-        
+        mockRepo.On("GetByID", mock.Anything, uint(1)).Return(&models.User{ID: 1}, nil)
+
         // ACT
-        result, err := services.NewUserService(mockRepo).CreateUser(ctx, input)
+        result, err := services.NewUserService(mockRepo, new(mocks.MockMailerService)).GetProfile(ctx, 1)
         
         // ASSERT
         require.NoError(t, err)
@@ -190,7 +209,7 @@ func TestUserService(t *testing.T) {
 }
 ```
 
-**Coverage targets:** Handlers 95%, Services 85%, Repos 90%, Middlewares 85%, Utils 80%
+**Coverage targets:** Handlers 95%, Services 85%, Repos 90%, Middlewares 85%, Utils 80% (CI fails below 70% total)
 
 > See `references/templates.md` for detailed test examples.
 
@@ -201,7 +220,9 @@ func TestUserService(t *testing.T) {
 3. **Service** → Business logic, validation, orchestrate repos, write tests (85%+)
 4. **Handler** → Parse requests, call service, return responses, write tests (95%+)
 5. **Routes** → Register handler in routes.go
-6. **Validate** → Run tests
+6. **Migration** → Add `*.up.sql` / `*.down.sql` files in `internal/database/migrations`
+7. **Docs** → Update `docs/swagger.json` and the README endpoint list
+8. **Validate** → Run tests
 
 > See `references/workflow.md` for detailed development workflow.
 
@@ -223,15 +244,19 @@ make dev                # Start with hot reload
 ## Logging
 
 Use `logger.WithContext(ctx)` for request-scoped logging (auto-includes request_id).
+Use `logger.WithEvent(ctx, logger.EventLoginFailed)` for business events (adds the `event` field).
 Use plain `logger.Infof()` for startup/seeders.
+See `docs/logging-standards.md` for fields, events, and masking.
 
 > See `references/cheatsheet.md` for full logging patterns.
 
 ## Authentication
 
-- **JWT:** 1 hour default, validated by AuthMiddleware
-- **Refresh Token:** 30 days default, stored in database
-- **Middleware:** Auth, CORS, Log, EmptyBody
+- **JWT:** access token valid for 1 hour, `access` scope, validated by `AuthMiddleware`
+- **Refresh Token:** random 60-character token valid for 30 days, stored in the database, rotated on refresh, deleted on logout
+- **Lockout:** 5 failed logins lock the account for 15 minutes
+- **Rate limit:** 10 requests/minute per IP on login, refresh-token, forgot-password, and reset-password
+- **Middleware:** RequestID, CORS, Log, Recovery (global); RateLimiter (public routes); Auth (authenticated routes). Empty bodies are rejected by `utils.TranslateValidationErrors`
 
 ## Environment Configuration
 
@@ -243,16 +268,19 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USERNAME=root
 DB_PASSWORD=password
-DB_DATABASE=golang_dev
+DB_DATABASE=golang_cms
 
-# JWT
+# JWT (at least 32 characters)
 JWT_KEY=your-32-character-secret-key-here
 
-# Settings encryption
+# Settings encryption (at least 32 characters)
 SETTINGS_ENCRYPTION_KEY=your-32-character-encryption-key-here
 
 # Server
 PORT=3000
+RUN_MIGRATE=true
 ```
+
+`DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `JWT_KEY`, and `SETTINGS_ENCRYPTION_KEY` are required. See `.env.example` and the README for optional variables.
 
 Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment variables; they live in the `settings` table (key/value) and are seeded by migrations. `mail_password` is stored encrypted with `SETTINGS_ENCRYPTION_KEY` (generate the value with `make encrypt-setting`).

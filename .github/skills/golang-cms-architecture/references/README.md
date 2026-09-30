@@ -14,5 +14,8 @@ Quick reference guides for golang-cms development.
 ## External Docs
 
 - `AGENTS.md` - Agent coding guidelines (project root)
+- `README.md` - Setup, environment variables, and API overview
 - `DEVELOPMENT.md` - Development setup and patterns
 - `TESTING.md` - Testing patterns and examples
+- `docs/logging-standards.md` - Logging fields, events, and data masking
+- `docs/swagger.json` - OpenAPI specification (maintained by hand)

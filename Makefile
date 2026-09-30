@@ -32,7 +32,7 @@ install-tools:
 	@echo "Ensuring Go modules are tidy..."
 	@$(GO) mod tidy
 	@echo "Installing tools..."
-	@command -v golangci-lint >/dev/null 2>&1 || { echo "Installing golangci-lint..."; $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2; }
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "Installing golangci-lint..."; $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2; }
 	@command -v air >/dev/null 2>&1 || { echo "Installing Air..."; $(GO) install github.com/cosmtrek/air@latest; }
 	@command -v gotestsum >/dev/null 2>&1 || { echo "Installing gotestsum..."; $(GO) install gotest.tools/gotestsum@latest; }
 	@echo "✅ Tools installed."

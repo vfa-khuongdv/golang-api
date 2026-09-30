@@ -1,6 +1,6 @@
 # Development Guidelines
 
-This document outlines the coding standards, project structure, and best practices for the Golang CMS project.
+This document outlines the coding standards, project structure, and best practices for the Golang CMS project. For setup instructions and the API overview see [README.md](README.md); for testing details see [TESTING.md](TESTING.md).
 
 ## Table of Contents
 
@@ -12,6 +12,13 @@ This document outlines the coding standards, project structure, and best practic
 6. [Testing Guidelines](#testing-guidelines)
 7. [Git Workflow](#git-workflow)
 8. [Documentation](#documentation)
+9. [Performance Guidelines](#performance-guidelines)
+10. [Security Guidelines](#security-guidelines)
+11. [Environment Variables](#environment-variables)
+12. [Deployment](#deployment)
+13. [Tools and Dependencies](#tools-and-dependencies)
+14. [Common Mistakes to Avoid](#common-mistakes-to-avoid)
+15. [Code Review Checklist](#code-review-checklist)
 
 ---
 
@@ -43,6 +50,8 @@ This project follows **Clean Architecture** principles with clear separation of 
 └─────────────────────────────────────────────────────────┘
 ```
 
+Dependencies are wired by hand in `internal/routes/routes.go` (`SetupRouter`): repositories → services → handlers.
+
 ### Benefits
 
 - **Testability**: Each layer can be tested independently with mocks
@@ -59,43 +68,52 @@ This project follows **Clean Architecture** principles with clear separation of 
 ```
 project/
 ├── cmd/                          # Command-line applications
+│   ├── encrypt-setting/          # Encrypts secret setting values (make encrypt-setting)
+│   │   └── main.go
 │   ├── server/                   # Main application entry point
 │   │   └── main.go
 │   └── seeder/                   # Database seeder
 │       └── seeder.go
 ├── internal/                     # Private application code
-│   ├── configs/                  # Configuration management
+│   ├── configs/                  # Environment configuration and DB connection
 │   ├── database/                 # Database setup
-│   │   ├── migrations/           # Migration files
+│   │   ├── migrations/           # SQL migrations (golang-migrate)
 │   │   └── seeders/              # Seeder implementations
 │   ├── handlers/                 # HTTP handlers/controllers
 │   ├── middlewares/              # HTTP middlewares
 │   ├── models/                   # Data models
 │   ├── repositories/             # Data access layer
-│   ├── routes/                   # Route definitions
+│   ├── routes/                   # Router setup and dependency wiring
 │   ├── services/                 # Business logic layer
 │   └── shared/                   # Shared utilities and helpers
-│       └── constants/            # Application constants
-│       └── dto/                  # Data transfer objects for shared use
-│       └── utils/                # Utility functions  for shared use
-├── pkg/                          # Public packages
+│       ├── constants/            # Application constants
+│       ├── dto/                  # Request/response data transfer objects
+│       └── utils/                # Utility functions for shared use
+├── pkg/                          # Reusable packages
 │   ├── apperror/                 # Custom error handling
 │   ├── logger/                   # Logging utilities
-│   ├── mailer/                   # Email sending utilities
+│   ├── mailer/                   # SMTP sender and embedded email templates
 │   └── migrator/                 # Database migration utilities
-├── tests/                        # Test utilities and mocks
+├── tests/                        # Shared test support
+│   ├── e2e/                      # End-to-end tests
 │   └── mocks/                    # Mock implementations
-├── docs/                         # Documentation and API specs
+├── docs/                         # Swagger spec and logging standards
 └── Makefile                      # Build and development commands
 ```
+
+Unit tests are not kept in `tests/`; they sit next to the code (`internal/**/*_test.go`, `pkg/**/*_test.go`).
 
 ### Responsibilities by Layer
 
 #### **Models (internal/models/)**
 - Define data structures
-- Represent database tables
-- Include validation tags
+- Represent database tables (GORM tags) and JSON serialization (`json` tags)
+- Hide internal fields from API responses with `json:"-"` (e.g. `Password`, `ResetToken`)
 - Keep models simple - no business logic
+
+#### **DTOs (internal/shared/dto/)**
+- Define request inputs and response bodies
+- Carry the `binding` validation tags (`required`, `email`, `password_complexity`, ...)
 
 #### **Repositories (internal/repositories/)**
 - Handle all database operations
@@ -106,23 +124,26 @@ project/
 
 #### **Services (internal/services/)**
 - Contain business logic
-- Validate input data
+- Enforce business rules (lockout, token expiry, password rules)
 - Orchestrate between repositories
 - Handle errors appropriately
 - Return clean data to handlers
 
 #### **Handlers (internal/handlers/)**
-- Parse HTTP requests
+- Bind and validate HTTP requests
 - Call appropriate services
 - Return HTTP responses
 - Handle response formatting
 
 #### **Middlewares (internal/middlewares/)**
-- Authentication/authorization
-- Request logging
+- Request ID (`X-Request-ID`)
+- Authentication (JWT access tokens)
 - CORS handling
-- Error handling
+- Request/response logging with sensitive data masking
 - Rate limiting
+
+Panic recovery is provided by Gin's `gin.Recovery()`. Empty request bodies are rejected centrally by `utils.TranslateValidationErrors`, not by a middleware.
+
 ---
 
 ## Naming Conventions
@@ -138,28 +159,29 @@ project/
 
 - **Functions/Methods**: CamelCase, exported starts with uppercase
   ```go
-  func GetUser()           // Exported
+  func GetProfile()        // Exported
   func getUserByEmail()    // Unexported
   ```
 
-- **Constants**: All uppercase with underscores
+- **Constants**: Write new constants in idiomatic Go CamelCase (exported starts with uppercase). A few older constants use upper snake case (`LIMIT`, `DEFAULT_MAX_OPEN_CONNS`, `MAX_BODY_SIZE`); leave them as they are.
   ```go
   const (
-      MAX_RETRY_COUNT = 3
-      DEFAULT_TIMEOUT = 30
+      MaxFailedAttempts      = 5
+      LockoutDurationMinutes = 15
+      SettingMailHost        = "mail_host"
   )
   ```
 
 - **Interfaces**: Descriptive names without `I` prefix (idiomatic Go)
   ```go
   type UserService interface {}      // Correct: no prefix
-  type Reader interface {}            // Standard: io.Reader pattern
-  type UserRepository interface {}    // Correct: descriptive
+  type EmailSender interface {}      // Correct: descriptive
+  type UserRepository interface {}   // Correct: descriptive
   ```
 
 - **Variables**: CamelCase for exported, camelCase for unexported
   ```go
-  var GlobalConfig Config           // Exported
+  var DB *gorm.DB                   // Exported
   var userRepository UserRepository // Unexported
   ```
 
@@ -169,34 +191,36 @@ project/
 - Use singular names for structs
 - Use descriptive field names
 - Use JSON tags for serialization in **snake_case** format for API responses
+- Set the table name explicitly with `TableName()`
 
 ```go
-type User struct {
-    ID        uint      `json:\"id\"`
-    Email     string    `json:\"email\"`
-    Name      string    `json:\"name\"`
-    CreatedAt time.Time `json:\"created_at\"`
-    UpdatedAt time.Time `json:\"updated_at\"`
+type Setting struct {
+    ID        uint      `gorm:"column:id;primaryKey" json:"id"`
+    Key       string    `gorm:"column:key;type:varchar(100);not null;unique" json:"key"`
+    Value     string    `gorm:"column:value;type:text;not null" json:"value"`
+    CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
+    UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
+
+func (Setting) TableName() string { return "settings" }
 ```
 
-**Note:** All JSON field names in API responses must use snake_case (e.g., `created_at`, `user_id`, `is_active`) for consistency with REST API conventions.
+**Note:** All JSON field names in API responses must use snake_case (e.g., `created_at`, `user_id`, `expires_at`) for consistency with REST API conventions.
 
 #### **Interfaces**
 - Describe the contract clearly
 - Use descriptive names without `I` prefix (idiomatic Go)
 - Keep interfaces small and focused
-- Return interface types from constructors, not concrete types
+- Repositories and services return interface types from their constructors; handlers return their concrete struct pointer
+- Every service and repository method takes `context.Context` as its first parameter
 
 ```go
-type UserRepository interface {
-    GetByID(id uint) (*User, error)
-    GetByEmail(email string) (*User, error)
-    Create(user *User) error
+type SettingRepository interface {
+    GetValues(ctx context.Context, keys ...string) (map[string]string, error)
 }
 
-func NewUserRepository(db *gorm.DB) UserRepository {
-    return &userRepositoryImpl{db: db}
+func NewSettingRepository(db *gorm.DB) SettingRepository {
+    return &settingRepositoryImpl{db: db}
 }
 ```
 
@@ -207,9 +231,9 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 - Use `Is`, `Has` for boolean checks
 
 ```go
-func (s *UserService) GetUser(id uint) (*User, error)
-func (s *UserService) CreateUser(data *CreateUserRequest) error
-func (s *UserService) IsValidEmail(email string) bool
+func (s *userServiceImpl) GetProfile(ctx context.Context, userID uint) (*models.User, error)
+func (s *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, input *dto.UpdateProfileInput) error
+func (s *userServiceImpl) ChangePassword(ctx context.Context, userID uint, input *dto.ChangePasswordInput) (*models.User, error)
 ```
 
 #### **Test Functions**
@@ -218,11 +242,11 @@ func (s *UserService) IsValidEmail(email string) bool
 - Use descriptive subtest names
 
 ```go
-func TestUserService(t *testing.T) {
-    t.Run("CreateUser - Success", func(t *testing.T) {
+func TestUserRepository(t *testing.T) {
+    t.Run("GetAll - Success", func(t *testing.T) {
         // test code
     })
-    t.Run("CreateUser - Validation Error", func(t *testing.T) {
+    t.Run("GetAll - Empty", func(t *testing.T) {
         // test code
     })
 }
@@ -237,22 +261,22 @@ func TestUserService(t *testing.T) {
 1. **Depend on Abstractions**
    ```go
    // Good - depends on interface
-   type UserService struct {
-       repo UserRepository
+   type userServiceImpl struct {
+       repo          repositories.UserRepository
+       mailerService MailerService
    }
 
    // Bad - depends on concrete type
-   type UserService struct {
+   type userServiceImpl struct {
        repo *userRepositoryImpl
    }
    ```
 
 2. **Single Responsibility**
    ```go
-   // Good - focused interface
-   type UserRepository interface {
-       GetByID(id uint) (*User, error)
-       Create(user *User) error
+   // Good - focused interface (see repositories.SettingRepository)
+   type SettingRepository interface {
+       GetValues(ctx context.Context, keys ...string) (map[string]string, error)
    }
 
    // Bad - too many responsibilities
@@ -266,12 +290,9 @@ func TestUserService(t *testing.T) {
 
 3. **Interface Segregation**
    ```go
-   // Good - small, specific interfaces
-   type Reader interface {
-       Read() ([]byte, error)
-   }
-   type Writer interface {
-       Write([]byte) error
+   // Good - small, specific interface (see services.MailerService)
+   type MailerService interface {
+       SendMailForgotPassword(ctx context.Context, user *models.User) error
    }
 
    // Bad - large, monolithic interface
@@ -283,27 +304,25 @@ func TestUserService(t *testing.T) {
    }
    ```
 
-### Handler Interface Pattern
+   Some interfaces in the codebase are larger than ideal (`UserRepository`, `UserService`); prefer small interfaces for new code.
+
+### Handler Pattern
+
+Handlers are concrete structs that receive their service dependencies through the constructor. They are not hidden behind an interface; tests call the methods directly.
 
 ```go
-// Define interface
-type UserHandler interface {
-    GetUser(c *gin.Context)
-    CreateUser(c *gin.Context)
-    UpdateUser(c *gin.Context)
-    DeleteUser(c *gin.Context)
-}
-
-// Implement with dependency injection
 type userHandlerImpl struct {
-    userService UserService
-    jwtService  JWTService
+    userService   services.UserService
+    mailerService services.MailerService
 }
 
-func NewUserHandler(userService UserService, jwtService JWTService) UserHandler {
+func NewUserHandler(
+    userService services.UserService,
+    mailerService services.MailerService,
+) *userHandlerImpl {
     return &userHandlerImpl{
-        userService: userService,
-        jwtService:  jwtService,
+        userService:   userService,
+        mailerService: mailerService,
     }
 }
 ```
@@ -314,101 +333,107 @@ func NewUserHandler(userService UserService, jwtService JWTService) UserHandler 
 
 ### Custom Error Structure
 
-Use `apperror` package for consistent error handling:
+Use the `apperror` package (`pkg/apperror`) for consistent error handling:
 
 ```go
 type AppError struct {
-    HttpStatusCode int    `json:"http_status_code"`
-    Code           int    `json:"code"`
-    Message        string `json:"message"`
-    UnderlyingErr  error  `json:"-"`
+    HttpStatusCode int    `json:"-"`       // HTTP status code
+    Code           int    `json:"code"`    // Application error code (see codes.go)
+    Message        string `json:"message"` // Client-facing message
+    Err            error  `json:"-"`       // Underlying error (optional)
 }
 ```
+
+Error codes are grouped in `pkg/apperror/codes.go`: general (1000s), database (2000s), authentication (3000s), and common/cache (4000s).
 
 ### Error Creation
 
 ```go
-// Create new error
-err := apperror.NewInternalError("Database error")
+// Create a new error with an explicit status and code
+err := apperror.New(http.StatusTooManyRequests, apperror.ErrTooManyRequests, "Too many requests")
 
-// Wrap existing error
+// Wrap an existing error
 err := apperror.Wrap(
     http.StatusInternalServerError,
-    apperror.ErrInternal,
+    apperror.ErrInternalServer,
     "Failed to create user",
     originalError,
 )
 
-// Specific error types
-apperror.NewBadRequestError("Invalid input")
-apperror.NewUnauthorizedError("Invalid credentials")
-apperror.NewForbiddenError("Access denied")
-apperror.NewNotFoundError("User not found")
-apperror.NewInvalidPasswordError("Wrong password")
-apperror.NewValidationError("Validation failed")
-apperror.NewInternalError("Server error")
+// Factory helpers (each sets the HTTP status and code)
+apperror.NewBadRequestError("Invalid input")              // 400
+apperror.NewUnauthorizedError("Invalid credentials")      // 401
+apperror.NewForbiddenError("Access denied")               // 403
+apperror.NewNotFoundError("User not found")               // 404
+apperror.NewConflictError("Email already exists")         // 409
+apperror.NewInternalServerError("Server error")           // 500
+apperror.NewInvalidPasswordError("Invalid credentials")   // 400
+apperror.NewAccountLockedError("Account is locked")       // 429
+apperror.NewDBQueryError("Failed to query users")         // 500
+```
+
+Validation failures use a separate type, `apperror.ValidationError`, which carries per-field messages:
+
+```go
+apperror.NewValidationError("Validation failed", []apperror.FieldError{
+    {Field: "email", Message: "email is required"},
+})
 ```
 
 ### Error Handling in Handlers
 
+Bind JSON, translate binding errors into a `ValidationError`, call the service, and respond through the `utils` helpers. `RespondWithError` accepts any error: `ValidationError` → 400 with `fields`, `AppError` → its own status, anything else → 500 "Internal server error".
+
 ```go
-func (h *UserHandler) GetUser(c *gin.Context) {
-    id := c.Param("id")
-    userID, err := strconv.ParseUint(id, 10, 32)
+func (handler *userHandlerImpl) ChangePassword(ctx *gin.Context) {
+    userId, err := utils.GetUserIDFromContext(ctx)
     if err != nil {
-        // Validation error
-        utils.RespondWithError(c, apperror.NewBadRequestError("Invalid user ID"))
+        utils.RespondWithError(ctx, apperror.NewParseError("Invalid UserID"))
         return
     }
 
-    user, err := h.userService.GetUser(uint(userID))
-    if err != nil {
-        // Service returns app errors
-        utils.RespondWithError(c, err)
+    var input dto.ChangePasswordInput
+    if err := ctx.ShouldBindJSON(&input); err != nil {
+        utils.RespondWithError(ctx, utils.TranslateValidationErrors(err, input))
         return
     }
 
-    utils.RespondWithOK(c, http.StatusOK, gin.H{
-        "data": user,
-    })
+    _, err = handler.userService.ChangePassword(ctx.Request.Context(), userId, &input)
+    if err != nil {
+        logger.WithEvent(ctx.Request.Context(), logger.EventPasswordChangeFailed).
+            Errorf("Change password failed for user %d: %v", userId, err)
+        utils.RespondWithError(ctx, err)
+        return
+    }
+
+    utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Change password successfully"})
 }
 ```
 
 ### Error Handling in Services
 
+Services return `*apperror.AppError` values; they never expose raw database errors to the client.
+
 ```go
-func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
-    // Validation
-    if req.Email == "" {
-        return nil, apperror.NewValidationError("Email is required")
+func (service *userServiceImpl) GetProfile(ctx context.Context, userID uint) (*models.User, error) {
+    user, err := service.repo.GetByID(ctx, userID)
+    if err != nil {
+        return nil, apperror.NewNotFoundError("User not found")
     }
-
-    // Check duplicate
-    existing, err := s.repo.FindByEmail(req.Email)
-    if err != nil && !errors.Is(err, sql.ErrNoRows) {
-        return nil, apperror.Wrap(
-            http.StatusInternalServerError,
-            apperror.ErrInternal,
-            "Failed to check existing user",
-            err,
-        )
-    }
-    if existing != nil {
-        return nil, apperror.NewBadRequestError("Email already exists")
-    }
-
-    // Create user
-    user := &User{Email: req.Email}
-    if err := s.repo.Create(user); err != nil {
-        return nil, apperror.Wrap(
-            http.StatusInternalServerError,
-            apperror.ErrInternal,
-            "Failed to create user",
-            err,
-        )
-    }
-
     return user, nil
+}
+
+func (service *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, input *dto.UpdateProfileInput) error {
+    user, err := service.repo.GetByID(ctx, userID)
+    if err != nil {
+        return apperror.NewNotFoundError("User not found")
+    }
+    // ... apply the fields that were provided ...
+    if err := service.repo.Update(ctx, user); err != nil {
+        logger.WithEvent(ctx, logger.EventProfileUpdateFailed).Errorf("Failed to update user profile: %v", err)
+        return apperror.NewDBUpdateError("Failed to update profile")
+    }
+    return nil
 }
 ```
 
@@ -420,50 +445,43 @@ func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
 
 All tests should follow the **Testify** framework with proper grouping:
 
-1. **Group related tests** under a parent test function
+1. **Group related tests** under a parent test function (or a `suite.Suite`)
 2. **Use `require` for critical assertions** that should fail fast
 3. **Use `assert` for value assertions** that should continue
-4. **Mock dependencies** using Testify mock package
+4. **Mock dependencies** using the Testify mocks in `tests/mocks`
+5. **Use external test packages** (`package services_test`, `package handlers_test`, ...) for black-box tests
 
 ### Test Structure
 
 ```go
 func TestUserService(t *testing.T) {
-    // Setup
-    mockRepo := new(mocks.MockUserRepository)
-    service := services.NewUserService(mockRepo)
-
-    // Group related test cases
-    t.Run("CreateUser - Success", func(t *testing.T) {
+    t.Run("GetProfile - Success", func(t *testing.T) {
         // Arrange
-        mockRepo.On("FindByEmail", "test@example.com").Return(nil, sql.ErrNoRows)
-        mockRepo.On("Create", mock.Anything).Return(nil)
+        repo := new(mocks.MockUserRepository)
+        mailer := new(mocks.MockMailerService)
+        service := services.NewUserService(repo, mailer)
+        user := &models.User{ID: 1, Email: "test@example.com"}
+        repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 
         // Act
-        user, err := service.CreateUser(&CreateUserRequest{
-            Email: "test@example.com",
-        })
+        result, err := service.GetProfile(context.Background(), 1)
 
         // Assert
         require.NoError(t, err)
-        assert.NotNil(t, user)
-        assert.Equal(t, "test@example.com", user.Email)
-        mockRepo.AssertExpectations(t)
+        assert.Equal(t, user, result)
+        repo.AssertExpectations(t)
     })
 
-    t.Run("CreateUser - Duplicate Email", func(t *testing.T) {
-        // Arrange
-        existing := &User{ID: 1, Email: "test@example.com"}
-        mockRepo.On("FindByEmail", "test@example.com").Return(existing, nil)
+    t.Run("GetProfile - Not Found", func(t *testing.T) {
+        repo := new(mocks.MockUserRepository)
+        service := services.NewUserService(repo, new(mocks.MockMailerService))
+        repo.On("GetByID", mock.Anything, uint(999)).Return(&models.User{}, errors.New("not found")).Once()
 
-        // Act
-        user, err := service.CreateUser(&CreateUserRequest{
-            Email: "test@example.com",
-        })
+        result, err := service.GetProfile(context.Background(), 999)
 
-        // Assert
         require.Error(t, err)
-        assert.Nil(t, user)
+        assert.Nil(t, result)
+        repo.AssertExpectations(t)
     })
 }
 ```
@@ -482,26 +500,23 @@ func TestUserService(t *testing.T) {
 ### Table-Driven Tests
 
 ```go
-func TestValidateEmail(t *testing.T) {
-    t.Run("Email Validation", func(t *testing.T) {
-        tests := []struct {
-            name      string
-            email     string
-            wantValid bool
-        }{
-            {"Valid email", "user@example.com", true},
-            {"Missing @", "userexample.com", false},
-            {"Missing domain", "user@", false},
-            {"Empty string", "", false},
-        }
+func TestValidatePasswordComplexity(t *testing.T) {
+    tests := []struct {
+        name     string
+        password string
+        wantErr  bool
+    }{
+        {"Valid password", "Secret@1", false},
+        {"No special character", "Secret123", true},
+        {"Too short", "Se@1", true},
+        {"Lowercase only", "lowercaseonly", true},
+    }
 
-        for _, tt := range tests {
-            t.Run(tt.name, func(t *testing.T) {
-                valid := ValidateEmail(tt.email)
-                assert.Equal(t, tt.wantValid, valid)
-            })
-        }
-    })
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // ... validate tt.password and compare with tt.wantErr
+        })
+    }
 }
 ```
 
@@ -510,7 +525,10 @@ func TestValidateEmail(t *testing.T) {
 - **Handlers**: 95%+ (critical for API contracts)
 - **Services**: 85%+ (core business logic)
 - **Repositories**: 90%+ (data access)
+- **Middlewares**: 85%+ (security-related)
 - **Utils**: 80%+ (utility functions)
+
+The CI pipeline (`.github/workflows/build.yml`) fails the build when total coverage of the tested packages (everything except `cmd`, `docs`, and `tests`) drops below 70%.
 
 ---
 
@@ -520,11 +538,13 @@ func TestValidateEmail(t *testing.T) {
 
 ```
 main                           # Production-ready code
-├── feature/feature-name       # New features
-├── bugfix/bug-description     # Bug fixes
-├── hotfix/urgent-issue        # Production hotfixes
+├── feat/feature-name          # New features
+├── fix/bug-description        # Bug fixes
+├── chore/maintenance-task     # Tooling, dependency and version updates
 └── docs/documentation         # Documentation updates
 ```
+
+Open pull requests against `main`. The CI workflow runs lint, unit tests with coverage, and a 70% coverage gate on every pull request.
 
 ### Commit Message Format
 
@@ -555,13 +575,11 @@ feat(auth): implement JWT refresh token
 - Update auth handler to support token refresh
 - Add tests for refresh token flow
 
-fix(user): correct email validation regex
-- Fix edge case in email validation
-- Add test for edge case
+fix(security): hash reset tokens and harden auth flows
+- Store only the hash of the reset token
+- Add tests for the reset flow
 
-test(mfa): add comprehensive MFA tests
-- Add tests for setup and verification
-- Add tests for edge cases
+test(auth): broaden auth unit tests with boundary and edge cases
 ```
 
 ### Pull Request Guidelines
@@ -573,6 +591,8 @@ test(mfa): add comprehensive MFA tests
 5. **Request reviews** - Get feedback before merging
 6. **Resolve conflicts** - Keep branch up to date with main
 
+`make pre-push` (fmt, vet, lint, test) runs the same checks as CI locally. A gitleaks pre-commit hook is configured in `.pre-commit-config.yaml`.
+
 ---
 
 ## Documentation
@@ -583,33 +603,22 @@ test(mfa): add comprehensive MFA tests
 
 ```go
 // Good - explains the reason
-// We use bcrypt cost 12 for security-performance balance
-// Lower costs are vulnerable, higher costs cause user-visible delays
-hashedPassword, err := bcrypt.GenerateFromPassword(
-    []byte(password),
-    12,
-)
+// Validate the access token BEFORE rotating the refresh token. Otherwise an
+// attacker holding only a stolen refresh token could burn it and log the
+// legitimate user out.
+claims, err := service.jwtService.ValidateTokenIgnoreExpiration(accessToken)
 
 // Bad - just repeats the code
-// Hash the password with cost 12
-hashedPassword, err := bcrypt.GenerateFromPassword(
-    []byte(password),
-    12,
-)
+// Validate the access token
+claims, err := service.jwtService.ValidateTokenIgnoreExpiration(accessToken)
 ```
 
 ### Function Documentation
 
 ```go
-// CreateUser creates a new user in the system
-//
-// It validates the request, checks for duplicate emails,
-// and hashes the password before storing.
-//
-// Returns ErrDuplicate if email already exists.
-// Returns ErrValidation if request is invalid.
-// Returns ErrInternal on database errors.
-func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
+// EncryptSecret encrypts plaintext with AES-256-GCM using a key derived from
+// secretKey. The result is "enc:v1:" + base64(nonce || ciphertext).
+func EncryptSecret(secretKey, plaintext string) (string, error) {
     // implementation
 }
 ```
@@ -617,50 +626,18 @@ func (s *UserService) CreateUser(req *CreateUserRequest) (*User, error) {
 ### Package Documentation
 
 ```go
-// Package services provides business logic for the application.
-//
-// It contains the following services:
-// - UserService: User management
-// - AuthService: Authentication and authorization
-// - MFAService: Multi-factor authentication
-package services
-```
-
-### README in Each Package
-
-Add `README.md` to complex packages:
-
-```markdown
-# Services Package
-
-This package contains all business logic for the application.
-
-## Services
-
-### UserService
-Handles user management operations like creation, retrieval, and updates.
-
-### AuthService  
-Handles authentication, login, and token management.
+// Command encrypt-setting encrypts a secret setting value (e.g. mail_password)
+// with SETTINGS_ENCRYPTION_KEY so it can be stored in the settings table.
+package main
 ```
 
 ### API Documentation
 
-Maintain OpenAPI/Swagger documentation for all endpoints:
+The OpenAPI specification is maintained by hand in `docs/swagger.json` (the project does not generate it from code annotations). When you add, change, or remove an endpoint, update `docs/swagger.json` together with the route in `internal/routes/routes.go` and the endpoint list in `README.md`. Swagger UI (`docs/swagger.html`) loads the spec from `/docs/swagger.json` and is only served when `STAGE` is not `prod`.
 
-```go
-// @Summary Get user by ID
-// @Description Get detailed user information
-// @Tags users
-// @Security Bearer
-// @Param id path int true "User ID"
-// @Success 200 {object} User
-// @Failure 404 {object} AppError "User not found"
-// @Router /api/v1/users/{id} [get]
-func (h *UserHandler) GetUser(c *gin.Context) {
-    // implementation
-}
-```
+### Logging Documentation
+
+Follow [docs/logging-standards.md](docs/logging-standards.md) for log fields, event names, and masking of sensitive data.
 
 ---
 
@@ -670,31 +647,20 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 
 1. **Use indexes** on frequently queried columns
 2. **Batch operations** when possible
-3. **Use transactions** for related operations
+3. **Use transactions** for related operations (see `BeginTx` in the repositories and the refresh-token rotation)
 4. **Avoid N+1 queries** - use eager loading
-5. **Pagination** for large result sets
+5. **Pagination** for large result sets (`dto.Pagination`, `utils.ParsePageAndLimit`; the default page size is `constants.LIMIT`)
+
+The connection pool is configured in `internal/configs/database.go` and can be tuned with `DB_MAX_OPEN_CONNS` and `DB_MAX_IDLE_CONNS`.
 
 ### Caching
 
-```go
-// Cache frequently accessed data
-type UserCache struct {
-    users map[uint]*User
-    mu    sync.RWMutex
-}
-
-func (c *UserCache) Get(id uint) (*User, bool) {
-    c.mu.RLock()
-    defer c.mu.RUnlock()
-    user, exists := c.users[id]
-    return user, exists
-}
-```
+The project has no cache layer. If you add one, guard shared state with a mutex (or use a proven library) and use the `ErrCache*` codes in `pkg/apperror` for cache failures.
 
 ### Concurrency
 
 1. **Use channels** for goroutine communication
-2. **Use sync.Mutex** for shared state
+2. **Use sync.Mutex** for shared state (see the in-memory rate limiter)
 3. **Avoid goroutine leaks** - always clean up
 4. **Use context** for cancellation
 
@@ -704,43 +670,39 @@ func (c *UserCache) Get(id uint) (*User, bool) {
 
 ### Authentication
 
-- Use JWT for stateless authentication
-- Include expiration times in tokens
-- Rotate refresh tokens regularly
-- Store sensitive data in environment variables
+- Use JWT for stateless authentication: access tokens are valid for 1 hour and carry an `access` scope; the auth middleware only accepts HMAC-signed tokens with that scope
+- Refresh tokens are random 60-character strings stored in the database (30-day expiry); they are rotated on every refresh and deleted on logout
+- Password reset tokens are valid for 1 hour and only their hash is stored
+- Store sensitive data in environment variables (`JWT_KEY`, `SETTINGS_ENCRYPTION_KEY`, database credentials)
+- Secret rows of the `settings` table (`mail_password`) are encrypted with AES-256-GCM (`utils.EncryptSecret`)
 
 ### Password Security
 
 - Use bcrypt for hashing (never store plaintext)
-- Enforce strong password requirements
-- Implement rate limiting on login attempts
-- Consider 2FA for sensitive operations
+- Enforce strong passwords with the `password_complexity` validator: at least 8 characters with an uppercase letter, a lowercase letter, a digit, and a special character
+- Accounts are locked for 15 minutes after 5 failed logins (`services.MaxFailedAttempts`, `services.LockoutDurationMinutes`)
+- The public auth endpoints are rate limited to 10 requests per minute per client IP (`middlewares.RateLimiter`)
+- Never reveal whether an email exists (login returns "Invalid credentials"; forgot-password always returns the same message)
 
 ### Input Validation
 
-- Validate all user inputs
-- Sanitize before storing in database
-- Use parameterized queries
-- Validate file uploads
+- Validate all user inputs with `binding` tags on DTOs and `utils.TranslateValidationErrors`
+- Use parameterized queries (GORM)
+- Never log raw sensitive values; use `utils.MaskWithPrefix` and the masking done by the log middleware
 
 ### CORS
 
-```go
-config := cors.Config{
-    AllowOrigins:     []string{"https://example.com"},
-    AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-    AllowHeaders:     []string{"Authorization", "Content-Type"},
-    ExposeHeaders:    []string{"Content-Length"},
-    AllowCredentials: true,
-    MaxAge:           12 * time.Hour,
-}
-```
+CORS is handled by `middlewares.CORSMiddleware`, which reads `CORS_ALLOWED_ORIGINS` (comma-separated exact origins, default `http://localhost:5173`) and only echoes the `Origin` header back when it is on the list. Never set it to `*` in production because credentials are allowed.
+
+### Proxies
+
+`TRUSTED_PROXIES` is empty by default, so Gin ignores `X-Forwarded-For` and the client IP cannot be spoofed. Set it to the CIDRs of your reverse proxy or load balancer only when the app runs behind one.
 
 ---
 
 ## Environment Variables
 
-Create `.env.example` file for required variables:
+Copy `.env.example` to `.env` and adjust it. The minimum configuration is:
 
 ```bash
 # Database
@@ -748,7 +710,7 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USERNAME=root
 DB_PASSWORD=password
-DB_DATABASE=golang_dev
+DB_DATABASE=golang_cms
 
 # JWT (must be at least 32 characters)
 JWT_KEY=your-32-character-secret-key-here
@@ -763,6 +725,8 @@ RUN_MIGRATE=true
 STAGE=local
 ```
 
+`DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `JWT_KEY`, and `SETTINGS_ENCRYPTION_KEY` are required; the server exits at startup if one is missing. Optional variables: `APP_SERVICE`, `APP_VERSION`, `CORS_ALLOWED_ORIGINS`, `TRUSTED_PROXIES`, `DB_MAX_OPEN_CONNS`, `DB_MAX_IDLE_CONNS`. See the [README](README.md#environment-variables) for the full list with defaults.
+
 Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment variables; they live in the `settings` table (key/value) and are seeded by migrations. `mail_password` is stored encrypted with `SETTINGS_ENCRYPTION_KEY` (generate the value with `make encrypt-setting`).
 
 ---
@@ -776,33 +740,20 @@ Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment varia
 3. Set resource limits
 4. Use health checks
 
-```dockerfile
-FROM golang:1.25 as builder
-WORKDIR /app
-COPY . .
-RUN go build -o app ./cmd/server
+The repository `Dockerfile` follows these practices: it builds a static binary in a `golang:1.27-alpine` stage, then copies the binary and the `internal/` directory (which contains the migrations) into an `alpine:3.21` image that runs as a non-root `appuser` and exposes port 3000. The `docs/` directory is not copied, so Swagger is not available in the container unless you add it. The image has no `HEALTHCHECK`; to add one, probe `GET /healthz`.
 
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser appuser
-WORKDIR /app
-COPY --from=builder /app/app .
-USER appuser
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
-CMD ["./app"]
-```
+`docker-compose.yml` only provides local dependencies (MySQL, phpMyAdmin, Mailpit), not the application itself.
 
 ### Database Migrations
 
-Always use migration tools:
+Migrations are SQL files in `internal/database/migrations`, applied with golang-migrate:
 
 ```bash
-# Run migrations with seeder
-go run cmd/seeder/seeder.go
-
-# Or enable auto-migration on server start
+# Apply migrations on server start (run from the repository root)
 RUN_MIGRATE=true go run cmd/server/main.go
+
+# Seed sample users (after the tables exist)
+go run cmd/seeder/seeder.go
 ```
 
 ---
@@ -811,21 +762,23 @@ RUN_MIGRATE=true go run cmd/server/main.go
 
 ### Essential Tools
 
-- **Testing**: testify, mockery
+- **Testing**: testify (assert, require, mock, suite); mocks in `tests/mocks` are written by hand
 - **HTTP**: gin-gonic/gin
-- **Database**: GORM
+- **Database**: GORM with MySQL (production) and SQLite (tests)
 - **JWT**: golang-jwt
 - **Validation**: go-playground/validator
 - **Logging**: sirupsen/logrus
+- **Email**: wneessen/go-mail
 - **Config**: joho/godotenv
 - **Database Migration**: golang-migrate
 
 ### Development Tools
 
-- **Linting**: golangci-lint
+- **Linting**: golangci-lint (configured in `.golangci.yml`)
 - **Formatting**: gofmt
-- **Testing**: go test
-- **Benchmarking**: go test -bench
+- **Testing**: go test, gotestsum
+- **Live reload**: Air (`.air.toml`)
+- **Secret scanning**: gitleaks (pre-commit hook)
 
 ---
 
@@ -857,7 +810,7 @@ Before submitting a PR:
 - [ ] Code is DRY (Don't Repeat Yourself)
 - [ ] Performance is considered
 - [ ] Security is considered
-- [ ] Documentation is updated
+- [ ] Documentation is updated (README, `docs/swagger.json`, this file)
 - [ ] Commit messages are clear
 - [ ] No unnecessary comments
 
@@ -874,4 +827,4 @@ Before submitting a PR:
 
 ---
 
-Last Updated: November 21, 2025
+Last Updated: September 30, 2026

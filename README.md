@@ -1,17 +1,20 @@
 # Golang Template REST API
 
-A production-ready Go REST API for a Content Management System (CMS) with user authentication, JWT tokens, and refresh tokens. The project implements clean architecture with clear separation of concerns and comprehensive test coverage. It uses MySQL for persistence, Docker for containerization, and includes database migrations, seeding, and email support.
+A Go REST API for a Content Management System (CMS) with user authentication, JWT access tokens, and refresh tokens. The project implements clean architecture with clear separation of concerns and comprehensive test coverage. It uses Gin and GORM on MySQL, Docker Compose for local dependencies (MySQL, phpMyAdmin, Mailpit), and includes SQL migrations, seeding, and email support.
 
 ## Key Features
 
-- **User Authentication**: JWT-based authentication with access and refresh tokens
-- **Password Management**: Secure password hashing with bcrypt, password reset via email
-- **Email Service**: SMTP integration for sending password reset and other notification emails
-- **API Documentation**: OpenAPI 3.0 specification with Swagger UI
-- **Database Migrations**: Automated schema management with migration support
+- **User Authentication**: JWT access tokens (1 hour) and rotating refresh tokens (30 days, stored in the database)
+- **Account Protection**: Account lockout after 5 failed logins (15 minutes) and a per-IP rate limit (10 requests/minute) on the public auth endpoints
+- **Password Management**: bcrypt hashing, password complexity validation, change password, and password reset via email (only a hash of the reset token is stored)
+- **Email Service**: SMTP integration (go-mail) for password reset emails, configured through the `settings` table
+- **Application Settings**: Key/value `settings` table, with secret values encrypted using AES-256-GCM
+- **API Documentation**: OpenAPI 3.0 specification with Swagger UI (served when `STAGE` is not `prod`)
+- **Database Migrations**: SQL migrations applied with golang-migrate on startup when `RUN_MIGRATE=true`
+- **Structured Logging**: JSON logs with request IDs, event names, and masking of sensitive data (see [docs/logging-standards.md](docs/logging-standards.md))
 - **Clean Architecture**: Clear separation of concerns with handlers, services, repositories, and models layers
-- **Comprehensive Testing**: Unit tests, integration tests, and end-to-end tests with high coverage
-- **Docker Support**: Containerized application and MySQL database with Docker Compose
+- **Testing**: Unit tests colocated with the code (Testify, mocks, in-memory SQLite) plus end-to-end tests
+- **Docker Support**: Docker Compose for MySQL, phpMyAdmin, and Mailpit, and a Dockerfile for the application
 - **Live Reloading**: Air integration for development with hot reload capability
 
 ## Architecture
@@ -22,7 +25,7 @@ The project follows clean architecture principles with the following layers:
 - **Services (Business Logic)**: Implement business rules, validation, error handling, and orchestrate repositories
 - **Repositories (Data Access)**: Handle all database operations using GORM, return domain entities
 - **Models (Domain)**: Define domain objects with GORM and JSON serialization tags
-- **Middlewares**: Handle cross-cutting concerns like authentication, CORS, logging, and error recovery
+- **Middlewares**: Handle cross-cutting concerns like request IDs, authentication, CORS, request logging, rate limiting, and panic recovery
 
 For detailed information on development guidelines and patterns, see [DEVELOPMENT.md](DEVELOPMENT.md).
 For testing standards and best practices, see [TESTING.md](TESTING.md).
@@ -32,49 +35,62 @@ For testing standards and best practices, see [TESTING.md](TESTING.md).
 The project follows a clean architecture and is organized into the following directories:
 
 ```
+├── .air.toml                         # Air (live reload) configuration
+├── .env.example                      # Environment variable template
+├── .github                           # CI workflow, Copilot instructions, and architecture skill
+├── AGENTS.md                         # Guidelines for AI coding agents
+├── DEVELOPMENT.md                    # Development guidelines
 ├── Dockerfile                        # Docker configuration for the application
+├── Makefile                          # Build, test, and development commands
 ├── README.md                         # Project documentation
-├── cmd                               # Command-line interfaces (CLI)
+├── TESTING.md                        # Testing standards
+├── cmd                               # Command-line entry points
+│   ├── encrypt-setting               # Encrypts secret setting values (e.g. mail_password)
+│   │   └── main.go
 │   ├── seeder                        # Seeder for initial data population
 │   │   └── seeder.go
 │   └── server                        # Main entry point for the web server
 │       └── main.go
-├── docker-compose.yml                # Docker Compose configuration for the app and MySQL
-├── docs                              # API documentation
-│   ├── swagger.json                  # OpenAPI 3.0 specification
-│   ├── swagger.html                  # Swagger UI documentation
-│   └── LOGIN_FLOW.md                 # Login flow documentation
+├── docker-compose.yml                # Docker Compose configuration for MySQL, phpMyAdmin, and Mailpit
+├── docs                              # API and logging documentation
+│   ├── logging-standards.md          # Logging standards
+│   ├── swagger.html                  # Swagger UI page
+│   └── swagger.json                  # OpenAPI 3.0 specification
 ├── go.mod                            # Go module dependencies
 ├── go.sum                            # Go module checksums
 ├── internal                          # Core application logic
-│   ├── configs                       # Configuration files for database, environment variables, JWT, etc.
-│   ├── database                      # Database migrations and seeding
-│   ├── dto                           # Data transfer objects for request and response
-│   ├── handlers                      # HTTP request handlers
-│   ├── middlewares                   # Middlewares for authentication and logging
-│   ├── models                        # Data models for the application
+│   ├── configs                       # Environment configuration and database connection
+│   ├── database
+│   │   ├── migrations                # SQL migrations (golang-migrate, *.up.sql / *.down.sql)
+│   │   └── seeders                   # Seed data (users)
+│   ├── handlers                      # HTTP request handlers (auth, user, health)
+│   ├── middlewares                   # Auth, CORS, logging, rate limiting, request ID
+│   ├── models                        # GORM models (User, RefreshToken, Setting)
 │   ├── repositories                  # Repositories for database access
-│   ├── routes                        # Routes and routing logic
-│   ├── services                      # Business logic for authentication, user, etc.
-│   └── shared                        # Shared utilities and helpers used across multiple layers
-│       └── constants                  # Application constants
-│       └── dto                       # Shared data transfer objects
-│       └── utils                      # Utility functions for shared use
-├── pkg                               # External packages
-│   ├── apperror                      # Custom application errors
-│   ├── logger                        # Logger utility
-│   ├── mailer                        # Mailer for sending emails
-│   └── migrator                      # Database migration utility
-├── tests                             # Unit and integration tests
-│   ├── e2e                           # End-to-end tests
-│   └── mocks                         # Mocks for internal package tests
+│   ├── routes                        # Router setup and dependency wiring
+│   ├── services                      # Business logic (auth, JWT, refresh token, user, mail)
+│   └── shared                        # Shared code used across layers
+│       ├── constants                 # Application constants (e.g. settings keys)
+│       ├── dto                       # Request/response data transfer objects
+│       └── utils                     # Helpers (bcrypt, crypto, validation, responses, masking)
+├── pkg                               # Reusable packages
+│   ├── apperror                      # Custom application errors and error codes
+│   ├── logger                        # Structured JSON logger (logrus)
+│   ├── mailer                        # SMTP sender and embedded email templates
+│   └── migrator                      # golang-migrate wrapper
+└── tests                             # Shared test support
+    ├── e2e                           # End-to-end tests (in-memory SQLite)
+    └── mocks                         # Testify mocks for services and repositories
+```
+
+Unit tests live next to the code they test (`*_test.go`).
 ```
 
 ## Prerequisites
 
 Before getting started, ensure that you have the following installed:
 
-- [Go](https://golang.org/dl/) (Go 1.21 or later; project targets Go 1.26)
+- [Go](https://golang.org/dl/) 1.27 or later (see `go.mod`)
 - [Docker](https://www.docker.com/products/docker-desktop)
 - [Docker Compose](https://docs.docker.com/compose/)
 - [Make](https://www.gnu.org/software/make/) (Usually pre-installed on macOS and Linux)
@@ -93,9 +109,10 @@ make install-tools
 
 This will install:
 - golangci-lint (for linting)
-- Migrate CLI (for database migrations)
 - Air (for live reloading)
 - gotestsum (for running tests with better formatting)
+
+It also runs `go mod tidy`. Migrations are applied by the server itself through the golang-migrate library, so the `migrate` CLI is only needed if you want to create new migration files.
 
 ### 2. Clone the repository and setup environment
 
@@ -105,27 +122,29 @@ cd golang-api
 cp .env.example .env
 ```
 
-Edit `.env` with your configuration values (database credentials, JWT secret, etc.). Mail settings live in the `settings` table, see [Application Settings](#application-settings-settings-table).
+Edit `.env` with your configuration values (database credentials, `JWT_KEY`, `SETTINGS_ENCRYPTION_KEY`, etc.). `docker-compose.yml` reads `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` from it. Mail settings live in the `settings` table, see [Application Settings](#application-settings-settings-table).
 
-### 3. Build and run the application using Docker
+### 3. Start the local services with Docker
 
-You can use Docker Compose to set up both the app and the MySQL database:
+Docker Compose runs the dependencies only; the Go server itself is started separately (see [Running the Server](#6-running-the-server)):
 
 ```bash
-docker-compose up --build
+docker-compose up -d
 ```
 
 This will:
 
-- Build the Docker images.
-- Start a MySQL container on port 3306.
-- Start the application container on port 3000.
-- Start a PHPMyAdmin container on port 8080 for database management.
+- Start a MySQL 8.0 container on port 3306 (data is stored in `mysql/db/data`).
+- Start a phpMyAdmin container on port 8080 for database management.
 - Start a Mailpit container that catches outgoing mail (SMTP on 1026, web UI on 8026).
+
+To build and run the application as a container, use the provided `Dockerfile` (`docker build -t golang-cms .`) and pass the environment variables from `.env`.
 
 ### 4. Database Migrations
 
-To create a new migration file, use the following command:
+Schema changes are plain SQL files in `internal/database/migrations`, applied with [golang-migrate](https://github.com/golang-migrate/migrate). The server applies pending migrations on startup when `RUN_MIGRATE=true` (the path is relative, so start the server from the repository root). The current migrations create the `users`, `refresh_tokens`, and `settings` tables and seed the default settings rows.
+
+To create a new migration file, install the [migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) and run:
 
 ```bash
 migrate create -ext sql -dir internal/database/migrations -seq your_migration_name
@@ -137,18 +156,18 @@ migrate create -ext sql -dir internal/database/migrations -seq feedback_table
 ```
 
 This will create two files:
-- XXXXXX_feedback_table.up.sql (for applying the migration)
-- XXXXXX_feedback_table.down.sql (for reverting the migration)
-
-The project uses GORM AutoMigrate which automatically creates/updates tables when the server starts. No manual migration steps are required.
+- `XXXXXX_feedback_table.up.sql` (for applying the migration)
+- `XXXXXX_feedback_table.down.sql` (for reverting the migration)
 
 ### 5. Seeding the Database
 
-To seed the database with initial data (e.g., default users, roles, permissions), run:
+The seeder does not create tables, so start the server once with `RUN_MIGRATE=true` first. Then seed two sample users (`john@example.com` and `jane@example.com`, both with password `password123`):
 
 ```bash
 go run cmd/seeder/seeder.go
 ```
+
+These accounts are for local development only. Running the seeder again logs an error for each user because the emails already exist.
 
 ### 6. Running the Server
 
@@ -162,7 +181,9 @@ make dev
 
 This command will:
 1. Install required tools (if not already installed)
-2. Start the server with Air for live reloading
+2. Start the server with Air for live reloading (configured in `.air.toml`)
+
+The server needs a running MySQL (see step 3) and a valid `.env`.
 
 **Option 2: Using Air Directly**
 
@@ -180,12 +201,11 @@ If you prefer to run the server directly without live-reloading:
 go run cmd/server/main.go
 ```
 
-**Option 4: Start Docker for MySQL first**
-
-If you need to start MySQL via Docker:
+**Option 4: Build a binary**
 
 ```bash
-docker-compose up -d mysql
+make build        # outputs bin/server
+./bin/server
 ```
 
 ### 7. Database Management - PHPMyAdmin
@@ -209,12 +229,12 @@ Open `http://localhost:8026` to read the captured emails (e.g. password reset li
 
 ## Environment Variables
 
-The following environment variables are required for the application. See `.env.example` for a complete template:
+The application is configured through the environment variables below. `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`, `JWT_KEY`, and `SETTINGS_ENCRYPTION_KEY` are required; startup fails if any of them is missing. See `.env.example` for a complete template:
 
 **App Configuration:**
 - `APP_SERVICE` - Service name used in logs (default: golang-cms)
 - `APP_VERSION` - Version reported by `/api/v1/version` and logs (default: dev)
-- `RUN_MIGRATE` - Run database migrations on startup when `true` (default: false)
+- `RUN_MIGRATE` - Run database migrations on startup when `true` (default: false; `.env.example` sets it to `true`)
 
 **Database Configuration:**
 - `DB_HOST` - MySQL database host (default: 127.0.0.1)
@@ -222,19 +242,21 @@ The following environment variables are required for the application. See `.env.
 - `DB_USERNAME` - MySQL database username (required)
 - `DB_PASSWORD` - MySQL database password (required)
 - `DB_DATABASE` - MySQL database name (required)
+- `DB_MAX_OPEN_CONNS` - Maximum open connections in the pool (default: 50)
+- `DB_MAX_IDLE_CONNS` - Maximum idle connections in the pool (default: 10)
 
 **Server Configuration:**
 - `PORT` - Port number for the application server (default: 3000)
-- `GIN_MODE` - Gin mode ("debug" or "release", default: release)
-- `STAGE` - Environment stage ("local", "dev", "prod", default: dev)
-- `CORS_ALLOWED_ORIGINS` - Comma-separated allowed CORS origins (default: http://localhost:5173)
-- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies (default: empty, trust none)
+- `GIN_MODE` - Gin mode ("debug", "release", or "test", default: release)
+- `STAGE` - Environment stage, e.g. "local", "dev", "prod" (default: dev). Also reported as `env` in logs. Swagger UI and `swagger.json` are not served when it is `prod`.
+- `CORS_ALLOWED_ORIGINS` - Comma-separated allowed CORS origins, read on every request (default: http://localhost:5173)
+- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies (default: empty, trust none). Leave empty when the app is exposed directly so `X-Forwarded-For` cannot spoof the client IP used by the rate limiter.
 
 **JWT Configuration:**
-- `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required)
+- `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required; the router refuses to start with a shorter key)
 
 **Settings Encryption:**
-- `SETTINGS_ENCRYPTION_KEY` - Key used to encrypt secret rows of the `settings` table such as `mail_password`, at least 32 characters (required). Changing it makes existing encrypted values unreadable, so re-encrypt them afterwards.
+- `SETTINGS_ENCRYPTION_KEY` - Key used to encrypt secret rows of the `settings` table such as `mail_password`, at least 32 characters (required). Changing it makes existing encrypted values unreadable, so re-encrypt them afterwards. Generate one with `openssl rand -base64 48`.
 
 These can be set in the `.env` file or passed as environment variables. A sample `.env.example` file is provided in the repository.
 
@@ -276,18 +298,29 @@ The API is documented using OpenAPI 3.0 specification. You can access the docume
 - **Swagger UI**: `http://localhost:3000/swagger` or `http://localhost:3000/api-docs`
 - **OpenAPI JSON**: `http://localhost:3000/docs/swagger.json`
 
+These routes are only registered when `STAGE` is not `prod`, and the server must be started from the repository root so it can find the `docs/` files.
+
 ### Main API Endpoints
 
-The server runs on port `3000` by default. All authenticated endpoints require a valid JWT token in the `Authorization` header: `Bearer <token>`
+The server runs on port `3000` by default. All authenticated endpoints require a valid JWT access token in the `Authorization` header: `Bearer <token>`
 
-#### Health Check (Public)
+Every response carries an `X-Request-ID` header (the client's value is reused if sent). Errors are returned as `{"code": <int>, "message": "..."}`; validation errors also include a `fields` array. Error codes are defined in `pkg/apperror/codes.go`.
+
+#### Health and Version (Public)
 - `GET /healthz` - Health status check
+- `GET /api/v1/version` - API version, build time, and uptime
 
 #### Authentication (Public)
+
+These four endpoints share a per-IP rate limit of 10 requests per minute (`429` with `X-RateLimit-*` headers when exceeded). After 5 failed logins an account is locked for 15 minutes.
+
 - `POST /api/v1/login` - User login (returns access and refresh tokens)
-- `POST /api/v1/refresh-token` - Refresh access token using refresh token
-- `POST /api/v1/forgot-password` - Request password reset email
-- `POST /api/v1/reset-password` - Reset password using reset token
+- `POST /api/v1/refresh-token` - Exchange a refresh token and the (possibly expired) access token for a new pair; the refresh token is rotated
+- `POST /api/v1/forgot-password` - Request password reset email (always responds with the same message, whether or not the email exists)
+- `POST /api/v1/reset-password` - Reset password using the emailed token (valid for 1 hour)
+
+#### Session (Authenticated)
+- `POST /api/v1/logout` - Revoke all refresh tokens of the authenticated user
 
 #### User Profile (Authenticated)
 - `GET /api/v1/profile` - Get authenticated user's profile
@@ -303,10 +336,10 @@ make test-coverage
 ```
 
 This command will:
-1. Install required tools (gotestsum, gocov, gocov-html) if not already installed
-2. Run all tests and generate coverage.out
-3. Generate a coverage summary at coverage-summary.txt
-4. Generate an HTML coverage report at coverage.html
+1. Install required tools (golangci-lint, air, gotestsum) if not already installed
+2. Run the tests of the core packages (shared, handlers, middlewares, repositories, services, `pkg`) and generate `coverage.out`
+3. Generate a coverage summary at `coverage-summary.txt`
+4. Generate an HTML coverage report at `coverage.html`
 
 For specific tests, you can still use:
 
@@ -316,23 +349,25 @@ go test -v path/to/test
 
 ### Other Testing Commands
 
-- `make test`: Run all unit tests using gotestsum
-- `make test-e2e`: Run end-to-end tests
-- `make watch-test`: Watch for changes and run tests automatically
+- `make test`: Run all unit tests using gotestsum (excludes `cmd`, `docs`, and `tests`)
+- `make test-e2e`: Run end-to-end tests (`tests/e2e`)
+- `make watch-test`: Watch for changes and run tests automatically (requires [reflex](https://github.com/cespare/reflex))
 
-### Unit Tests Directory
+### Test Layout
 
-The test files are located under the `tests` directory. The tests follow the Go testing conventions.
+Unit tests sit next to the code they test (`internal/**/*_test.go`, `pkg/**/*_test.go`). `tests/e2e` holds end-to-end tests that run the real router against in-memory SQLite, and `tests/mocks` holds the shared Testify mocks. See [TESTING.md](TESTING.md) for details.
 
 ### Development Commands
 
 - `make install-tools`: Install all required development tools
-- `make build`: Build the application binary
+- `make help`: List all targets
+- `make build`: Build the application binary to `bin/server`
+- `make encrypt-setting`: Encrypt a secret setting value (reads from stdin)
 - `make clean`: Remove generated files and binaries
 - `make test`: Run unit tests with gotestsum
 - `make test-e2e`: Run end-to-end tests
 - `make test-coverage`: Run tests with coverage report generation (HTML and summary)
-- `make watch-test`: Watch for changes and run tests automatically
+- `make watch-test`: Watch for changes and run tests automatically (requires reflex)
 - `make lint`: Run linter (golangci-lint)
 - `make fmt`: Format code using go fmt
 - `make vet`: Run go vet static analysis
@@ -349,4 +384,4 @@ The test files are located under the `tests` directory. The tests follow the Go 
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE-MIT](LICENSE-MIT) file for details.

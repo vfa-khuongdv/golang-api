@@ -7,8 +7,9 @@ package repositories
 
 type ExampleRepository interface {
     Create(ctx context.Context, example *models.Example) (*models.Example, error)
+    FindByField(ctx context.Context, field string, value string) (*models.Example, error)
     GetByID(ctx context.Context, id uint) (*models.Example, error)
-    GetAll(ctx context.Context, pagination *utils.Pagination) ([]models.Example, error)
+    GetAll(ctx context.Context, page int, limit int) (*dto.Pagination[*models.Example], error)
     Update(ctx context.Context, example *models.Example) error
     Delete(ctx context.Context, id uint) error
 }
@@ -56,16 +57,22 @@ func NewExampleService(exampleRepo repositories.ExampleRepository) ExampleServic
 }
 
 func (svc *exampleServiceImpl) CreateExample(ctx context.Context, input *dto.CreateExampleInput) (*models.Example, error) {
-    // Validate input
-    if input.Name == "" {
-        return nil, apperror.NewValidationError("Name is required")
+    // Input format is already validated by the `binding` tags in the handler;
+    // services enforce business rules.
+    existing, err := svc.exampleRepo.FindByField(ctx, "name", input.Name)
+    if err == nil && existing != nil {
+        return nil, apperror.NewConflictError("Name already exists")
     }
-    
+
     example := &models.Example{
         Name: input.Name,
     }
-    
-    return svc.exampleRepo.Create(ctx, example)
+
+    created, err := svc.exampleRepo.Create(ctx, example)
+    if err != nil {
+        return nil, apperror.NewDBInsertError("Failed to create example")
+    }
+    return created, nil
 }
 ```
 
@@ -75,7 +82,7 @@ func (svc *exampleServiceImpl) CreateExample(ctx context.Context, input *dto.Cre
 func (h *exampleHandler) CreateExample(c *gin.Context) {
     var input dto.CreateExampleInput
     if err := c.ShouldBindJSON(&input); err != nil {
-        utils.RespondWithError(c, apperror.NewValidationError(err.Error()))
+        utils.RespondWithError(c, utils.TranslateValidationErrors(err, input))
         return
     }
 
@@ -85,7 +92,7 @@ func (h *exampleHandler) CreateExample(c *gin.Context) {
         return
     }
 
-    utils.RespondWithOK(c, http.StatusCreated, "Created successfully", example)
+    utils.RespondWithOK(c, http.StatusCreated, example)
 }
 ```
 
@@ -97,9 +104,10 @@ type CreateExampleInput struct {
     Email string `json:"email" binding:"required,email"`
 }
 
+// Pointer fields distinguish "not provided" from an empty value (see dto.UpdateProfileInput)
 type UpdateExampleInput struct {
-    Name  string `json:"name"`
-    Email string `json:"email" binding:"omitempty,email"`
+    Name  *string `json:"name" binding:"omitempty,min=1,max=255,not_blank"`
+    Email *string `json:"email" binding:"omitempty,email"`
 }
 
 type ExampleResponse struct {
@@ -113,19 +121,20 @@ type ExampleResponse struct {
 
 ## Route Registration
 
+Wire the new layers inside `SetupRouter` in `internal/routes/routes.go` and register the routes on the right group (`public` is rate limited; `authenticated` requires a JWT access token):
+
 ```go
-// In internal/routes/routes.go
-func SetupRoutes(r *gin.Engine, handler *handlers.ExampleHandler) {
-    api := r.Group("/api/v1")
-    {
-        examples := api.Group("/examples")
-        {
-            examples.POST("", handler.CreateExample)
-            examples.GET("/:id", handler.GetExample)
-            examples.PUT("/:id", handler.UpdateExample)
-            examples.DELETE("/:id", handler.DeleteExample)
-        }
-    }
+// In SetupRouter, next to the existing repositories/services/handlers
+exampleRepo := repositories.NewExampleRepository(db)
+exampleService := services.NewExampleService(exampleRepo)
+exampleHandler := handlers.NewExampleHandler(exampleService)
+
+// Inside the `api` group
+authenticated := api.Group("/")
+authenticated.Use(middlewares.AuthMiddleware(jwtService))
+{
+    authenticated.POST("/examples", exampleHandler.CreateExample)
+    authenticated.GET("/examples/:id", exampleHandler.GetExampleByID)
 }
 ```
 
@@ -135,6 +144,7 @@ func SetupRoutes(r *gin.Engine, handler *handlers.ExampleHandler) {
 func TestExampleService_CreateExample(t *testing.T) {
     t.Run("Success", func(t *testing.T) {
         mockRepo := new(mocks.MockExampleRepository)
+        mockRepo.On("FindByField", mock.Anything, "name", "Test").Return((*models.Example)(nil), apperror.NewNotFoundError("not found"))
         mockRepo.On("Create", mock.Anything, mock.Anything).Return(&models.Example{ID: 1}, nil)
         
         svc := services.NewExampleService(mockRepo)
@@ -145,14 +155,18 @@ func TestExampleService_CreateExample(t *testing.T) {
         mockRepo.AssertExpectations(t)
     })
     
-    t.Run("Validation Error - Empty Name", func(t *testing.T) {
+    t.Run("Conflict - Name Exists", func(t *testing.T) {
         mockRepo := new(mocks.MockExampleRepository)
+        mockRepo.On("FindByField", mock.Anything, "name", "Test").Return(&models.Example{ID: 1}, nil)
         svc := services.NewExampleService(mockRepo)
-        
-        _, err := svc.CreateExample(context.Background(), &dto.CreateExampleInput{Name: ""})
-        
+
+        _, err := svc.CreateExample(context.Background(), &dto.CreateExampleInput{Name: "Test"})
+
         require.Error(t, err)
-        assert.Contains(t, err.Error(), "Name is required")
+        appErr, ok := apperror.ToAppError(err)
+        require.True(t, ok)
+        assert.Equal(t, apperror.ErrConflict, appErr.Code)
+        mockRepo.AssertExpectations(t)
     })
 }
 ```
@@ -284,9 +298,10 @@ func TestGetExampleByID(t *testing.T) {
 
 ### Handler Test Key Points
 
-1. **Package**: Must be `handlers_test` (external test package)
-2. **Context setup**: Always use `gin.SetMode(gin.TestMode)` and `utils.InitValidator()` at the start
-3. **Request setup**: Create `httptest.NewRecorder()` FIRST, then `gin.CreateTestContext(w)` with that recorder
-4. **Order**: ARRANGE (mock + request) → ACT (handler call) → ASSERT (verify)
-5. **Mock location**: Setup mocks BEFORE creating the request/context
-6. **Test structure**: One `t.Run` per test case, NOT nested test functions in wrong order
+1. **Package**: Use `handlers_test` (external test package)
+2. **Context setup**: Always use `gin.SetMode(gin.TestMode)` and `utils.InitValidator()` at the start (the latter registers the custom `binding` rules)
+3. **Authenticated handlers**: Set the user like `AuthMiddleware` does: `c.Set("UserID", uint(1))`
+4. **Request setup**: Create `httptest.NewRecorder()` FIRST, then `gin.CreateTestContext(w)` with that recorder
+5. **Order**: ARRANGE (mock + request) → ACT (handler call) → ASSERT (verify)
+6. **Mock location**: Setup mocks BEFORE creating the request/context
+7. **Test structure**: One `t.Run` per test case, NOT nested test functions in wrong order
