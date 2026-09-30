@@ -14,7 +14,7 @@ type (
 		Server   ServerConfig
 		Database DatabaseConfig
 		JWT      JWTConfig
-		Mail     MailConfig
+		Settings SettingsConfig
 		CORS     CORSConfig
 		App      AppConfig
 	}
@@ -29,12 +29,8 @@ type (
 		Secret string
 	}
 
-	MailConfig struct {
-		Host     string
-		Port     int
-		Username string
-		Password string
-		From     string
+	SettingsConfig struct {
+		EncryptionKey string
 	}
 
 	CORSConfig struct {
@@ -70,12 +66,8 @@ func Load() (*Config, error) {
 		JWT: JWTConfig{
 			Secret: strings.TrimSpace(GetEnv("JWT_KEY", "")),
 		},
-		Mail: MailConfig{
-			Host:     GetEnv("MAIL_HOST", "smtp.gmail.com"),
-			Port:     GetEnvAsInt("MAIL_PORT", 587),
-			Username: GetEnv("MAIL_USERNAME", ""),
-			Password: GetEnv("MAIL_PASSWORD", ""),
-			From:     GetEnv("MAIL_FROM", ""),
+		Settings: SettingsConfig{
+			EncryptionKey: strings.TrimSpace(GetEnv("SETTINGS_ENCRYPTION_KEY", "")),
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: strings.Split(GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
@@ -83,7 +75,6 @@ func Load() (*Config, error) {
 		App: AppConfig{
 			ServiceName: GetEnv("APP_SERVICE", "golang-cms"),
 			Version:     GetEnv("APP_VERSION", "dev"),
-			FrontendURL: GetEnv("FRONTEND_URL", ""),
 			RunMigrate:  GetEnv("RUN_MIGRATE", "false") == "true",
 		},
 	}
@@ -112,6 +103,9 @@ func (c *Config) validate() error {
 	}
 	if c.JWT.Secret == "" {
 		missing = append(missing, "JWT_KEY")
+	}
+	if c.Settings.EncryptionKey == "" {
+		missing = append(missing, "SETTINGS_ENCRYPTION_KEY")
 	}
 
 	if len(missing) > 0 {

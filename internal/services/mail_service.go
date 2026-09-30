@@ -2,11 +2,14 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
+	"strconv"
 
-	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
+	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/constants"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
@@ -14,10 +17,13 @@ import (
 )
 
 type MailerService interface {
-	SendMailForgotPassword(user *models.User) error
+	SendMailForgotPassword(ctx context.Context, user *models.User) error
 }
 
-type mailerServiceImpl struct{}
+type mailerServiceImpl struct {
+	settingRepo   repositories.SettingRepository
+	encryptionKey string
+}
 
 var (
 	newEmailSender = func(config mailer.GomailSenderConfig) mailer.EmailSender {
@@ -28,17 +34,53 @@ var (
 	}
 )
 
-func NewMailerService() MailerService {
-	return &mailerServiceImpl{}
+// NewMailerService creates a MailerService. encryptionKey decrypts the
+// mail_password setting, which is stored encrypted (see utils.EncryptSecret).
+func NewMailerService(settingRepo repositories.SettingRepository, encryptionKey string) MailerService {
+	return &mailerServiceImpl{settingRepo: settingRepo, encryptionKey: encryptionKey}
 }
 
-func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
+func (s *mailerServiceImpl) SendMailForgotPassword(ctx context.Context, user *models.User) error {
+	settings, err := s.settingRepo.GetValues(ctx,
+		constants.SettingMailHost,
+		constants.SettingMailPort,
+		constants.SettingMailUsername,
+		constants.SettingMailPassword,
+		constants.SettingMailFrom,
+		constants.SettingFrontendURL,
+	)
+	if err != nil {
+		return err
+	}
+
+	port, err := strconv.Atoi(settings[constants.SettingMailPort])
+	if err != nil {
+		logger.WithContext(ctx).Errorf("Invalid %s setting: %v", constants.SettingMailPort, err)
+		return apperror.NewInternalServerError("Mail settings are not configured")
+	}
+
+	frontendURL := settings[constants.SettingFrontendURL]
+	if frontendURL == "" {
+		logger.WithContext(ctx).Errorf("Missing %s setting", constants.SettingFrontendURL)
+		return apperror.NewInternalServerError("Frontend URL setting is not configured")
+	}
+
+	// An empty password is allowed (e.g. local Mailpit without SMTP AUTH).
+	password := settings[constants.SettingMailPassword]
+	if password != "" {
+		password, err = utils.DecryptSecret(s.encryptionKey, password)
+		if err != nil {
+			logger.WithContext(ctx).Errorf("Failed to decrypt %s setting: %v", constants.SettingMailPassword, err)
+			return apperror.NewInternalServerError("Mail settings are not configured")
+		}
+	}
+
 	sender := newEmailSender(mailer.GomailSenderConfig{
-		Host:     configs.GetEnv("MAIL_HOST", "smtp.gmail.com"),
-		Port:     configs.GetEnvAsInt("MAIL_PORT", 587),
-		Username: configs.GetEnv("MAIL_USERNAME", ""),
-		Password: configs.GetEnv("MAIL_PASSWORD", ""),
-		From:     configs.GetEnv("MAIL_FROM", ""),
+		Host:     settings[constants.SettingMailHost],
+		Port:     port,
+		Username: settings[constants.SettingMailUsername],
+		Password: password,
+		From:     settings[constants.SettingMailFrom],
 	})
 	if sender == nil {
 		return apperror.NewInternalServerError("Failed to initialize mail sender")
@@ -53,7 +95,7 @@ func (s *mailerServiceImpl) SendMailForgotPassword(user *models.User) error {
 		return apperror.NewInternalServerError("user reset token is nil")
 	}
 
-	url := configs.GetEnv("FRONTEND_URL", "") + "/reset-password?token=" + *user.ResetToken
+	url := frontendURL + "/reset-password?token=" + *user.ResetToken
 
 	data := map[string]interface{}{
 		"Name": user.Name,

@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Golang CMS API",
-    "description": "A comprehensive content management system API built with Go, featuring user authentication, multi-factor authentication (MFA), and user management.",
+    "description": "A content management system API built with Go, featuring JWT authentication with refresh tokens, password reset by email, and user profile management.",
     "version": "1.0.0",
     "x-api-version": "v1",
     "contact": {
@@ -12,77 +12,36 @@
   },
   "servers": [
     {
-      "url": "http://localhost:8080",
+      "url": "http://localhost:3000",
       "description": "Development server"
-    },
-    {
-      "url": "https://api.example.com",
-      "description": "Production server"
     }
   ],
   "tags": [
     {
       "name": "Health",
-      "description": "Health check endpoints"
+      "description": "Health check and version endpoints"
     },
     {
       "name": "Authentication",
-      "description": "User authentication endpoints"
+      "description": "Login, token refresh, logout, and password reset"
     },
     {
       "name": "Users",
-      "description": "User management endpoints"
-    },
-    {
-      "name": "MFA",
-      "description": "Multi-Factor Authentication endpoints"
+      "description": "Authenticated user profile and password"
     }
   ],
   "paths": {
-    "/api/v1/version": {
-      "get": {
-        "tags": ["Health"],
-        "summary": "API version info",
-        "description": "Returns the API version, build time, and uptime",
-        "operationId": "versionInfo",
-        "responses": {
-          "200": {
-            "description": "Version information",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "version": {
-                      "type": "string",
-                      "example": "1.0.0"
-                    },
-                    "build_time": {
-                      "type": "string",
-                      "format": "date-time",
-                      "example": "2026-06-15T10:00:00Z"
-                    },
-                    "uptime": {
-                      "type": "string",
-                      "example": "1h30m15s"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/healthz": {
       "get": {
-        "tags": ["Health"],
+        "tags": [
+          "Health"
+        ],
         "summary": "Health check",
-        "description": "Returns the health status of the API",
+        "description": "Returns the health status of the service",
         "operationId": "healthCheck",
         "responses": {
           "200": {
-            "description": "API is healthy",
+            "description": "Service is healthy",
             "content": {
               "application/json": {
                 "schema": {
@@ -100,32 +59,59 @@
         }
       }
     },
+    "/api/v1/version": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "API version info",
+        "description": "Returns the API version, the time the server started, and its uptime",
+        "operationId": "getVersion",
+        "responses": {
+          "200": {
+            "description": "Version information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "build_time": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Server start time (RFC 3339)",
+                      "example": "2026-01-15T10:30:00Z"
+                    },
+                    "uptime": {
+                      "type": "string",
+                      "description": "Go duration string",
+                      "example": "2h45m10.5s"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/login": {
       "post": {
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "User login",
-        "description": "Authenticate user with email and password",
+        "description": "Authenticate a user with email and password. After 5 consecutive failed attempts the account is locked for 15 minutes. Rate limited per client IP.",
         "operationId": "login",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["email", "password"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "example": "user@example.com"
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 255,
-                    "example": "password123"
-                  }
-                }
+                "$ref": "#/components/schemas/LoginRequest"
               }
             }
           }
@@ -142,7 +128,24 @@
             }
           },
           "400": {
-            "description": "Invalid credentials or validation error",
+            "description": "Validation error, or invalid credentials (code 3002)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Account temporarily locked (code 3006), or rate limit exceeded (code 1006)",
             "content": {
               "application/json": {
                 "schema": {
@@ -151,88 +154,158 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized - invalid email or password"
-          },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/refresh-token": {
       "post": {
-        "tags": ["Authentication"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Refresh access token",
-        "description": "Get a new access token using a valid refresh token",
+        "description": "Exchange a refresh token and the (possibly expired) access token for a new access token and a new refresh token. The old refresh token is invalidated. Rate limited per client IP.",
         "operationId": "refreshToken",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["refresh_token"],
-                "properties": {
-                  "refresh_token": {
-                    "type": "string",
-                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  }
-                }
+                "$ref": "#/components/schemas/RefreshTokenRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Token refreshed successfully",
+            "description": "Tokens refreshed",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TokenResponse"
+                  "$ref": "#/components/schemas/LoginResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid refresh token"
+            "description": "Validation error (or empty request body)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized - refresh token expired or invalid"
+            "description": "Invalid access token, invalid refresh token, or tokens belong to different users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Invalid refresh token"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "User not found"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests - per-IP rate limit of 10 requests per minute exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Requests allowed per window"
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Requests left in the current window"
+              },
+              "X-RateLimit-Reset": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Unix time at which the window resets"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/forgot-password": {
       "post": {
-        "tags": ["Users"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Request password reset",
-        "description": "Send a password reset link to the user's email",
+        "description": "Sends a password reset link (valid for 1 hour) to the email address if it belongs to a user. The response is the same whether or not the email exists. Rate limited per client IP.",
         "operationId": "forgotPassword",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["email"],
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "example": "user@example.com"
-                  }
-                }
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Password reset email sent",
+            "description": "Request accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -240,7 +313,7 @@
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Password reset link sent to your email"
+                      "example": "If your email is in our system, you will receive instructions to reset your password"
                     }
                   }
                 }
@@ -248,49 +321,76 @@
             }
           },
           "400": {
-            "description": "Invalid email format"
+            "description": "Validation error (or empty request body)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
           },
-          "404": {
-            "description": "User not found"
+          "429": {
+            "description": "Too many requests - per-IP rate limit of 10 requests per minute exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Requests allowed per window"
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Requests left in the current window"
+              },
+              "X-RateLimit-Reset": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Unix time at which the window resets"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Failed to save the reset token or send the email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Failed to send email"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/reset-password": {
       "post": {
-        "tags": ["Users"],
+        "tags": [
+          "Authentication"
+        ],
         "summary": "Reset user password",
-        "description": "Reset user password using a valid reset token",
+        "description": "Set a new password using the token from the reset email. Also clears any account lockout. Rate limited per client IP.",
         "operationId": "resetPassword",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["token", "password", "new_password"],
-                "properties": {
-                  "token": {
-                    "type": "string",
-                    "example": "reset-token-here"
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 255,
-                    "description": "Current password (for verification)",
-                    "example": "oldpassword123"
-                  },
-                  "new_password": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 255,
-                    "example": "newpassword123"
-                  }
-                }
+                "$ref": "#/components/schemas/ResetPasswordRequest"
               }
             }
           }
@@ -305,7 +405,7 @@
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Password reset successfully"
+                      "example": "Reset password successfully"
                     }
                   }
                 }
@@ -313,17 +413,149 @@
             }
           },
           "400": {
-            "description": "Invalid input or token expired"
+            "description": "Validation error, or token expired (code 3001)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "Invalid token"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests - per-IP rate limit of 10 requests per minute exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Requests allowed per window"
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Requests left in the current window"
+              },
+              "X-RateLimit-Reset": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Unix time at which the window resets"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout",
+        "description": "Revokes all refresh tokens of the authenticated user. No request body is required.",
+        "operationId": "logout",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logged out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Logged out successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Authorization header required"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/profile": {
       "get": {
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "summary": "Get user profile",
         "description": "Retrieve the authenticated user's profile",
         "operationId": "getProfile",
@@ -343,21 +575,70 @@
               }
             }
           },
+          "400": {
+            "description": "Invalid user ID in token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 4000,
+                  "message": "Invalid UserID"
+                }
+              }
+            }
+          },
           "401": {
-            "description": "Unauthorized - missing or invalid token"
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Authorization header required"
+                }
+              }
+            }
           },
           "404": {
-            "description": "User not found"
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "User not found"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
+                }
+              }
+            }
           }
         }
       },
       "patch": {
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "summary": "Update user profile",
-        "description": "Update the authenticated user's profile information",
+        "description": "Update the authenticated user's profile. Only the provided fields are changed.",
         "operationId": "updateProfile",
         "security": [
           {
@@ -369,32 +650,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 45,
-                    "example": "John Doe"
-                  },
-                  "birthday": {
-                    "type": "string",
-                    "format": "date",
-                    "example": "1990-01-15"
-                  },
-                  "address": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "example": "123 Main Street"
-                  },
-                  "gender": {
-                    "type": "integer",
-                    "enum": [1, 2, 3],
-                    "description": "1=Male, 2=Female, 3=Other",
-                    "example": 1
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateProfileRequest"
               }
             }
           }
@@ -409,7 +665,7 @@
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Profile updated successfully"
+                      "example": "Update profile successfully"
                     }
                   }
                 }
@@ -417,20 +673,65 @@
             }
           },
           "400": {
-            "description": "Invalid input"
+            "description": "Validation error (or empty request body)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Unauthorized - missing or invalid token"
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Authorization header required"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "User not found"
+                }
+              }
+            }
           },
           "500": {
-            "description": "Internal server error"
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/change-password": {
       "post": {
-        "tags": ["Users"],
+        "tags": [
+          "Users"
+        ],
         "summary": "Change user password",
         "description": "Change the authenticated user's password",
         "operationId": "changePassword",
@@ -444,28 +745,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": ["old_password", "new_password", "confirm_password"],
-                "properties": {
-                  "old_password": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 255,
-                    "example": "oldpassword123"
-                  },
-                  "new_password": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 255,
-                    "example": "newpassword123"
-                  },
-                  "confirm_password": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 255,
-                    "example": "newpassword123"
-                  }
-                }
+                "$ref": "#/components/schemas/ChangePasswordRequest"
               }
             }
           }
@@ -480,7 +760,7 @@
                   "properties": {
                     "message": {
                       "type": "string",
-                      "example": "Password changed successfully"
+                      "example": "Change password successfully"
                     }
                   }
                 }
@@ -488,475 +768,63 @@
             }
           },
           "400": {
-            "description": "Invalid input or passwords do not match"
-          },
-          "401": {
-            "description": "Unauthorized - incorrect current password or missing token"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/users": {
-      "post": {
-        "tags": ["Users"],
-        "summary": "Create a new user",
-        "description": "Create a new user account (admin only)",
-        "operationId": "createUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateUserRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "User created successfully",
+            "description": "Validation error, old password incorrect (code 3002), passwords do not match (code 3004), or new password equals the old one (code 3005)",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Create user successfully"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input or validation error"
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/users/{id}": {
-      "get": {
-        "tags": ["Users"],
-        "summary": "Get user by ID",
-        "description": "Retrieve a user by their ID",
-        "operationId": "getUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "example": 1
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "404": {
-            "description": "User not found"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      },
-      "patch": {
-        "tags": ["Users"],
-        "summary": "Update user",
-        "description": "Update user information (admin only)",
-        "operationId": "updateUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "example": 1
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 45,
-                    "example": "Jane Doe"
-                  },
-                  "birthday": {
-                    "type": "string",
-                    "format": "date",
-                    "example": "1985-05-20"
-                  },
-                  "address": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "example": "456 Oak Avenue"
-                  },
-                  "gender": {
-                    "type": "integer",
-                    "enum": [1, 2, 3],
-                    "example": 2
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "User updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Update user successfully"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "404": {
-            "description": "User not found"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["Users"],
-        "summary": "Delete user",
-        "description": "Delete a user account (admin only)",
-        "operationId": "deleteUser",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "example": 1
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User deleted successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Delete user successfully"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "404": {
-            "description": "User not found"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/mfa/setup": {
-      "post": {
-        "tags": ["MFA"],
-        "summary": "Initialize MFA setup",
-        "description": "Start the MFA setup process by generating a QR code and secret key",
-        "operationId": "initMfaSetup",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MFA setup initialized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "qr_code": {
-                      "type": "string",
-                      "description": "Base64 encoded QR code image",
-                      "example": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationErrorResponse"
                     },
-                    "secret": {
-                      "type": "string",
-                      "description": "Secret key for manual entry",
-                      "example": "JBSWY3DPEBLW64TMMQ======"
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
                     }
-                  }
+                  ]
                 }
               }
             }
           },
           "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/mfa/verify-setup": {
-      "post": {
-        "tags": ["MFA"],
-        "summary": "Verify MFA setup",
-        "description": "Verify the MFA setup by providing a TOTP code",
-        "operationId": "verifyMfaSetup",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["code"],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 6,
-                    "description": "6-digit TOTP code",
-                    "example": "123456"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "MFA setup verified successfully",
+            "description": "Unauthorized - missing, invalid, or expired access token",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "MFA setup verified successfully"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Authorization header required"
                 }
               }
             }
           },
-          "400": {
-            "description": "Invalid TOTP code"
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/mfa/verify-code": {
-      "post": {
-        "tags": ["MFA"],
-        "summary": "Verify MFA code during login",
-        "description": "Verify the TOTP code when logging in with MFA enabled",
-        "operationId": "verifyMfaCode",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["code"],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "minLength": 6,
-                    "maxLength": 6,
-                    "description": "6-digit TOTP code",
-                    "example": "123456"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "MFA code verified successfully",
+          "404": {
+            "description": "User not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "User not found"
                 }
               }
             }
           },
-          "400": {
-            "description": "Invalid TOTP code"
-          },
           "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/mfa/disable": {
-      "post": {
-        "tags": ["MFA"],
-        "summary": "Disable MFA",
-        "description": "Disable multi-factor authentication for the authenticated user",
-        "operationId": "disableMfa",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MFA disabled successfully",
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "MFA disabled successfully"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1000,
+                  "message": "Internal server error"
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "500": {
-            "description": "Internal server error"
-          }
-        }
-      }
-    },
-    "/api/v1/mfa/status": {
-      "get": {
-        "tags": ["MFA"],
-        "summary": "Get MFA status",
-        "description": "Get the MFA status for the authenticated user",
-        "operationId": "getMfaStatus",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "MFA status retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "mfa_enabled": {
-                      "type": "boolean",
-                      "example": true
-                    },
-                    "setup_verified": {
-                      "type": "boolean",
-                      "example": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized - missing or invalid token"
-          },
-          "500": {
-            "description": "Internal server error"
           }
         }
       }
@@ -964,6 +832,137 @@
   },
   "components": {
     "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "john@example.com"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 255,
+            "example": "password123"
+          }
+        }
+      },
+      "RefreshTokenRequest": {
+        "type": "object",
+        "required": [
+          "refresh_token",
+          "access_token"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token from the last login or refresh"
+          },
+          "access_token": {
+            "type": "string",
+            "description": "Access token from the last login or refresh; it may be expired"
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "john@example.com"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token from the reset email"
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 255,
+            "description": "At least 8 characters with an uppercase letter, a lowercase letter, a digit, and a special character",
+            "example": "NewP@ssw0rd!"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": [
+          "old_password",
+          "new_password",
+          "confirm_password"
+        ],
+        "properties": {
+          "old_password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 255
+          },
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 255,
+            "description": "At least 8 characters with an uppercase letter, a lowercase letter, a digit, and a special character",
+            "example": "NewP@ssw0rd!"
+          },
+          "confirm_password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 255,
+            "description": "Must equal new_password"
+          }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 45,
+            "example": "John Doe"
+          },
+          "birthday": {
+            "type": "string",
+            "format": "date",
+            "description": "YYYY-MM-DD, not in the future",
+            "example": "1990-01-15"
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "example": "123 Main Street"
+          },
+          "gender": {
+            "type": "integer",
+            "enum": [
+              1,
+              2,
+              3
+            ],
+            "description": "1=Male, 2=Female, 3=Other",
+            "example": 1
+          }
+        }
+      },
       "UserResponse": {
         "type": "object",
         "properties": {
@@ -971,22 +970,24 @@
             "type": "integer",
             "example": 1
           },
-          "name": {
-            "type": "string",
-            "example": "John Doe"
-          },
           "email": {
             "type": "string",
             "format": "email",
             "example": "john@example.com"
           },
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
           "birthday": {
             "type": "string",
-            "format": "date",
-            "example": "1990-01-15"
+            "format": "date-time",
+            "description": "Omitted when not set",
+            "example": "1990-01-15T00:00:00Z"
           },
           "address": {
             "type": "string",
+            "description": "Omitted when not set",
             "example": "123 Main Street"
           },
           "gender": {
@@ -997,60 +998,12 @@
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2024-01-15T10:30:00Z"
+            "example": "2026-01-15T10:30:00Z"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
-            "example": "2024-01-20T15:45:00Z"
-          }
-        }
-      },
-      "CreateUserRequest": {
-        "type": "object",
-        "required": ["email", "password", "name", "birthday", "address", "gender", "role_ids"],
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "example": "newuser@example.com"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 6,
-            "maxLength": 255,
-            "example": "password123"
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 45,
-            "example": "Jane Doe"
-          },
-          "birthday": {
-            "type": "string",
-            "format": "date",
-            "example": "1995-06-20"
-          },
-          "address": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
-            "example": "789 Pine Road"
-          },
-          "gender": {
-            "type": "integer",
-            "enum": [1, 2, 3],
-            "description": "1=Male, 2=Female, 3=Other",
-            "example": 2
-          },
-          "role_ids": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "type": "integer"
-            },
-            "example": [1, 2]
+            "example": "2026-01-20T15:45:00Z"
           }
         }
       },
@@ -1058,69 +1011,78 @@
         "type": "object",
         "properties": {
           "access_token": {
-            "type": "string",
-            "description": "JWT access token",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "expires_at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Expiry as Unix timestamp (seconds)",
+                "example": 1767225600
+              }
+            },
+            "description": "JWT access token, valid for 1 hour"
           },
           "refresh_token": {
-            "type": "string",
-            "description": "Refresh token for obtaining new access tokens",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-          },
-          "token_type": {
-            "type": "string",
-            "example": "Bearer"
-          },
-          "expires_in": {
-            "type": "integer",
-            "description": "Token expiration time in seconds",
-            "example": 3600
-          },
-          "mfa_required": {
-            "type": "boolean",
-            "description": "Whether MFA verification is required",
-            "example": false
-          }
-        }
-      },
-      "TokenResponse": {
-        "type": "object",
-        "properties": {
-          "access_token": {
-            "type": "string",
-            "description": "New JWT access token",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-          },
-          "token_type": {
-            "type": "string",
-            "example": "Bearer"
-          },
-          "expires_in": {
-            "type": "integer",
-            "description": "Token expiration time in seconds",
-            "example": 3600
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "expires_at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Expiry as Unix timestamp (seconds)",
+                "example": 1767225600
+              }
+            },
+            "description": "Refresh token, valid for 30 days"
           }
         }
       },
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "error": {
-            "type": "string",
-            "example": "validation_error"
+          "code": {
+            "type": "integer",
+            "description": "Application error code (see pkg/apperror/codes.go)",
+            "example": 1003
           },
           "message": {
             "type": "string",
-            "example": "Invalid input provided"
+            "example": "Unauthorized"
+          }
+        }
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 4001
           },
-          "details": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "example": {
-              "email": "Email is required",
-              "password": "Password must be at least 6 characters"
+          "message": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "example": "email"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "email is required"
+                }
+              }
             }
           }
         }
@@ -1131,7 +1093,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "JWT authorization header using the Bearer scheme"
+        "description": "JWT access token in the Authorization header using the Bearer scheme"
       }
     }
   }

@@ -10,6 +10,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -53,10 +54,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	refreshRepo := repositories.NewRefreshTokenRepository(db)
+	settingRepo := repositories.NewSettingRepository(db)
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
-	mailerService := services.NewMailerService()
+	settingsEncryptionKey := strings.TrimSpace(configs.GetEnv("SETTINGS_ENCRYPTION_KEY", ""))
+	if len(settingsEncryptionKey) < utils.MinSecretKeyLength {
+		logger.Fatalf("SETTINGS_ENCRYPTION_KEY must be at least %d characters", utils.MinSecretKeyLength)
+	}
+	mailerService := services.NewMailerService(settingRepo, settingsEncryptionKey)
 	userService := services.NewUserService(userRepo, mailerService)
 	jwtService, err := services.NewJWTService()
 	if err != nil {

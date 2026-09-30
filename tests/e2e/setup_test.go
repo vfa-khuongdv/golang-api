@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +46,7 @@ func init() {
 // setupTestRouter initializes the router with an in-memory SQLite database
 func setupTestRouter() (*gin.Engine, *gorm.DB) {
 	_ = os.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-e2e-testing-purposes-32-chars")
+	_ = os.Setenv("SETTINGS_ENCRYPTION_KEY", strings.Repeat("e", 40))
 
 	// Set Gin to Test Mode
 	gin.SetMode(gin.TestMode)
@@ -66,6 +68,7 @@ func setupTestRouter() (*gin.Engine, *gorm.DB) {
 	err = db.AutoMigrate(
 		&models.User{},
 		&models.RefreshToken{},
+		&models.Setting{},
 	)
 	if err != nil {
 		panic("failed to migrate test database")

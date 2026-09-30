@@ -1,260 +1,107 @@
 ---
 name: golang-cms-architecture
-description: Complete development guidelines for golang-cms, a Go-based CMS REST API with clean architecture (handlers → services → repositories → models). Use when implementing features, writing tests, or modifying the golang-cms codebase. Covers authentication, JWT tokens, testing patterns with testify, error handling, and naming conventions.
+description: Development guidelines for golang-cms, a Go CMS REST API with clean architecture (handlers → services → repositories → models). Use when implementing features, writing tests, or modifying the golang-cms codebase. Covers authentication, error handling, TDD with testify, logging, and conventions.
 license: MIT
 metadata:
   author: golang-cms
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Golang CMS Architecture & Development Guide
 
-> **Additional Resources**: See `references/` folder for templates, cheatsheet, and workflow guides.
+Go 1.27+, Gin, GORM, MySQL 8 (SQLite in-memory for tests), testify. Commands, setup, env vars and the endpoint list are in `README.md` and the `Makefile`; do not duplicate them here.
 
-## Project Overview
-
-This project targets Go 1.25+ (minimum supported version).
-- User authentication with JWT tokens and refresh tokens
-- Multi-factor authentication (MFA) with TOTP
-- Clean architecture: handlers → services → repositories → models
-- Comprehensive testing with testify (assert, require, mock)
-- Standardized error handling via apperror package
-- Framework: Gin, Database: GORM with MySQL
-
-## Project Structure
+## Structure
 
 ```
-├── cmd/                          # Command-line applications
-│   ├── server/                   # Main application entry point
-│   │   └── main.go
-│   └── seeder/                   # Database seeder
-│       └── seeder.go
-├── internal/                     # Private application code
-│   ├── configs/                  # Configuration management
-│   ├── database/                 # Database setup
-│   │   ├── migrations/           # Migration files
-│   │   └── seeders/              # Seeder implementations
-│   ├── handlers/                 # HTTP handlers/controllers
-│   ├── middlewares/              # HTTP middlewares
-│   ├── models/                   # Data models
-│   ├── repositories/             # Data access layer
-│   ├── routes/                   # Route definitions
-│   ├── services/                 # Business logic layer    
-│   └── shared/                   # Shared utilities and helpers
-│       ├── constants/            # Application constants
-│       ├── dto/                  # Data transfer objects for shared use
-│       └── utils/                # Utility functions  for shared use
-├── pkg/                          # Public packages
-│   ├── apperror/                 # Custom error handling
-│   ├── logger/                   # Logging utilities
-│   ├── mailer/                   # Email sending utilities
-│   └── migrator/                 # Database migration utilities
-├── tests/                        # Test utilities and mocks
-│   └── mocks/                    # Mock implementations
-├── docs/                         # Documentation and API specs
-└── Makefile                      # Build and development commands
+cmd/{server,seeder,encrypt-setting}   entry points
+internal/
+  configs/        env config + DB connection
+  database/       migrations/ (SQL, golang-migrate), seeders/
+  handlers/ services/ repositories/ models/ middlewares/
+  routes/         SetupRouter: wires repos → services → handlers
+  shared/{constants,dto,utils}
+pkg/{apperror,logger,mailer,migrator}
+tests/{e2e,mocks}                     unit tests sit next to the code
+docs/                                 swagger.json (hand-written), logging-standards.md
 ```
 
-## Core Architecture Principles
-
-> See `references/cheatsheet.md` for quick reference on patterns and logging.
-
-### Layer Responsibilities
+## Layers
 
 | Layer | Responsibility |
 |-------|----------------|
-| **Handlers** | Parse requests, call services, return responses |
-| **Services** | Business logic, validation, orchestrate repos |
-| **Repositories** | DB operations using GORM, implement interfaces |
-| **Models** | Domain objects with GORM/JSON tags |
+| Handlers | Bind + validate request, call service, respond |
+| Services | Business rules, orchestrate repositories |
+| Repositories | GORM queries behind interfaces |
+| Models | GORM/JSON tags, no logic |
+| DTOs (`shared/dto`) | Inputs with `binding` tags |
 
-All service and repository methods must accept `context.Context` as the first parameter.
+- Depend on interfaces; constructors of repos/services return interfaces, handlers return the concrete struct.
+- Every service and repository method takes `context.Context` first. Handlers pass `ctx.Request.Context()`; repos use `db.WithContext(ctx)`.
+- Keep new interfaces small and focused. `UserRepository` and `UserService` are already larger than ideal; put new behavior in its own interface instead of growing them.
 
-### Dependency Injection
+## Conventions
 
-Always depend on interfaces, not concrete types:
+- Files/packages lowercase; `Get/Create/Update/Delete` verbs; `New` constructors.
+- JSON tags snake_case. New constants in CamelCase (`MaxFailedAttempts`).
+- Hide internal fields with `json:"-"` (password, reset token).
+
+## Errors and responses
+
 ```go
-type UserService interface { /* ... */ }
-type userServiceImpl struct { repo UserRepository }
-
-func NewUserService(repo UserRepository) UserService {
-    return &userServiceImpl{repo: repo}
+// Handler: bind, translate binding errors, call service, respond
+var input dto.ChangePasswordInput
+if err := ctx.ShouldBindJSON(&input); err != nil {
+    utils.RespondWithError(ctx, utils.TranslateValidationErrors(err, input))
+    return
 }
-```
-
-Keep interfaces small (1-3 methods).
-
-### Context Propagation
-
-Handlers pass `ctx.Request.Context()` to services. Services pass to repositories. Use `db.WithContext(ctx)` before GORM operations.
-
-## Naming Conventions
-
-### Packages & Files
-- Use lowercase, single-word names: `handlers`, `services`, `repositories`
-- Test files: `user_service_test.go`, `auth_handler_test.go`, `*_integration_test.go`
-
-### Functions & Methods
-- Use verb-based names for actions
-- `Get` for retrieval: `GetUser(id)`, `GetUserByEmail(email)`
-- `Create`/`Update`/`Delete` for modifications: `CreateUser(req)`, `DeleteUser(id)`
-- `Is`/`Has` for booleans: `IsValidEmail(email)`, `HasPermission(user, action)`
-- `New` for constructors: `NewUserService(repo)`
-
-### Constants
-- All uppercase with underscores: `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT`, `JWT_SECRET`
-- Group related constants together
-
-### JSON Tags (API Responses)
-- Use snake_case (REST convention): `created_at`, `user_id`, `is_active`, `email`
-- Example:
-  ```go
-  type User struct {
-      ID        uint      `json:"id"`
-      Email     string    `json:"email"`
-      CreatedAt time.Time `json:"created_at"`
-      UpdatedAt time.Time `json:"updated_at"`
-  }
-  ```
-
-### Test Functions & Subtests
-- Format: `TestFunctionName` or grouped under parent: `TestUserService`
-- Use `t.Run()` for organized subtests with descriptive names
-- Example:
-  ```go
-  func TestUserService(t *testing.T) {
-      t.Run("CreateUser - Success", func(t *testing.T) { ... })
-      t.Run("CreateUser - Validation Error", func(t *testing.T) { ... })
-  }
-  ```
-
-## Error Handling
-
-Always use the `apperror` package for standardized errors:
-
-```go
-import "github.com/vfa-khuongdv/golang-cms/pkg/apperror"
-
-// Validation errors (HTTP 400)
-return nil, apperror.NewValidationError("Email is required")
-
-// Not found errors (HTTP 404)
-return nil, apperror.NewNotFoundError("User not found")
-
-// Authentication errors (HTTP 401)
-return nil, apperror.NewUnauthorizedError("Invalid credentials")
-
-// Conflict errors (HTTP 409)
-return nil, apperror.NewConflictError("Email already exists")
-
-// Server errors (HTTP 500)
-return nil, apperror.NewInternalServerError("Failed to create user: %w", err)
-
-```
-
-**HTTP Status Mapping:**
-- 400: Validation or Bad Request errors
-- 401: Authentication errors
-- 403: Forbidden/Authorization errors
-- 404: Not found errors
-- 500: Server errors
-
-Never ignore errors silently. Always handle explicitly.
-
-## Response API
-- Use utils.RespondWithOK, RespondWithError for consistent API responses
-- Example:
-
-```go
-utils.RespondWithOK(c, http.StatusCreated, "User created successfully", user)
-utils.RespondWithError(c, err)
-```
-
-## Testing Standards
-
-Follow AAA pattern with testify:
-```go
-func TestUserService(t *testing.T) {
-    t.Run("CreateUser - Success", func(t *testing.T) {
-        // ARRANGE
-        mockRepo := new(mocks.MockUserRepository)
-        mockRepo.On("Create", mock.Anything).Return(&models.User{}, nil)
-        
-        // ACT
-        result, err := services.NewUserService(mockRepo).CreateUser(ctx, input)
-        
-        // ASSERT
-        require.NoError(t, err)
-        assert.NotNil(t, result)
-    })
+if _, err := svc.ChangePassword(ctx.Request.Context(), userID, &input); err != nil {
+    utils.RespondWithError(ctx, err)
+    return
 }
+utils.RespondWithOK(ctx, http.StatusOK, gin.H{"message": "Change password successfully"})
 ```
 
-**Coverage targets:** Handlers 95%, Services 85%, Repos 90%, Middlewares 85%, Utils 80%
+- Services return `*apperror.AppError`: `NewBadRequestError`, `NewUnauthorizedError`, `NewNotFoundError`, `NewConflictError`, `NewInternalServerError`, `NewDB*Error`, `NewAccountLockedError`, or `apperror.Wrap(status, code, msg, err)` to keep the cause. Codes are in `pkg/apperror/codes.go`.
+- `RespondWithError` handles `ValidationError` (400 + `fields`), `AppError` (its status), and anything else (500).
+- `RespondWithOK(ctx, status, body)` writes `body` as-is, no envelope. Errors are `{"code","message"}`.
+- Never return raw DB errors to clients.
 
-> See `references/templates.md` for detailed test examples.
+## TDD (required)
 
-## Adding New Features
+Write the failing test first (red), make it pass with minimal code (green), then refactor. Applies to every layer and every bug fix (reproduce the bug with a failing test first).
 
-1. **Model** → Define domain model with GORM/JSON tags
-2. **Repository** → Define interface, implement GORM ops, write tests (90%+)
-3. **Service** → Business logic, validation, orchestrate repos, write tests (85%+)
-4. **Handler** → Parse requests, call service, return responses, write tests (95%+)
-5. **Routes** → Register handler in routes.go
-6. **Validate** → Run tests
+- Testify `assert`/`require`/`mock`; group with `t.Run("Name - Case", ...)`; Arrange-Act-Assert.
+- Mocks live in `tests/mocks` (hand-written); add one for each new interface.
+- Repository tests: in-memory SQLite. Handler tests: `gin.CreateTestContext`, `utils.InitValidator()`, `c.Set("UserID", uint(1))`. Flows: `tests/e2e` via `setupTestRouter()`.
+- Coverage targets: handlers 95%, services 85%, repos 90%, middlewares 85%, utils 80%; CI fails below 70% total.
 
-> See `references/workflow.md` for detailed development workflow.
+Templates for each layer: `references/templates.md`.
 
-## Build Commands
+## Adding a feature
 
-```bash
-make build              # Build binary
-make dev                # Start with hot reload
-```
+1. Model (+ SQL migration `*.up.sql`/`*.down.sql` in `internal/database/migrations`)
+2. Repository: failing test → interface + GORM impl
+3. Service: failing test with mocked repos → business logic
+4. DTO + handler: failing test → bind, call, respond
+5. Wire in `routes.go` (`public` group is rate limited; `authenticated` needs a JWT)
+6. e2e test in `tests/e2e`; add mocks for new interfaces
+7. Update `docs/swagger.json` and the README endpoint list
 
-> See `references/commands.md` for full command reference.
+## Security and auth (do not regress)
 
-## Important Implementation Rules
-
-**DO:** Dependency injection, explicit errors, apperror package, context.Context, logger.WithContext(ctx), tests immediately, snake_case JSON tags
-
-**DON'T:** Ignore errors, global variables, mix concerns, hardcode config, plain text passwords, log sensitive info, complex test setup
+- Access JWT: 1 hour, `access` scope, HMAC only. Refresh token: 60 random chars, 30 days, stored in DB, rotated on refresh, deleted on logout. Reset token: 1 hour, only its hash is stored.
+- 5 failed logins lock the account for 15 minutes; public auth routes are limited to 10 req/min per IP.
+- Secret settings (`mail_password`) are AES-256-GCM encrypted with `SETTINGS_ENCRYPTION_KEY` (`make encrypt-setting`). Mail/frontend settings live in the `settings` table, not env vars.
+- Never log sensitive values; see `docs/logging-standards.md`.
 
 ## Logging
 
-Use `logger.WithContext(ctx)` for request-scoped logging (auto-includes request_id).
-Use plain `logger.Infof()` for startup/seeders.
+- Request-scoped: `logger.WithContext(ctx)` (adds `request_id`) or `logger.WithEvent(ctx, logger.EventX)` (adds `event`). Plain `logger.Infof` only for startup/seeders.
+- Add new event names as constants in `pkg/logger/logger.go`.
 
-> See `references/cheatsheet.md` for full logging patterns.
+## Don't
 
-## Authentication
-
-- **JWT:** 1 hour default, validated by AuthMiddleware
-- **Refresh Token:** 30 days default, stored in database
-- **Middleware:** Auth, CORS, Log, EmptyBody
-
-## Environment Configuration
-
-Environment variables (from `.env` or passed to application):
-
-```bash
-# Database
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_USERNAME=root
-DB_PASSWORD=password
-DB_DATABASE=golang_dev
-
-# JWT
-JWT_KEY=your-32-character-secret-key-here
-
-# Email
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=user@example.com
-MAIL_PASSWORD=password
-MAIL_FROM=noreply@example.com
-
-# Server
-PORT=3000
-```
+- Store plaintext passwords or log sensitive values: logs and responses leave the trust boundary.
+- Hardcode config: it belongs in env vars or the `settings` table so it changes without a deploy.
+- Add package-level mutable state: dependencies come through constructors so they stay mockable (existing exceptions: `configs.DB`, test hooks such as `newEmailSender`).

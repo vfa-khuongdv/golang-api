@@ -1,32 +1,40 @@
 package services_test
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
+	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 )
 
 type mailerServiceTestSuite struct {
 	suite.Suite
 	mailerService services.MailerService
+	settingRepo   *mocks.MockSettingRepository
 }
 
 func (s *mailerServiceTestSuite) SetupTest() {
-	s.mailerService = services.NewMailerService()
+	s.settingRepo = new(mocks.MockSettingRepository)
+	s.mailerService = services.NewMailerService(s.settingRepo, strings.Repeat("a", 40))
 }
 
 func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 	s.T().Run("Nil Token", func(t *testing.T) {
-		t.Setenv("MAIL_HOST", "smtp.gmail.com")
-		t.Setenv("MAIL_PORT", "587")
-		t.Setenv("MAIL_USERNAME", "test@example.com")
-		t.Setenv("MAIL_PASSWORD", "testpassword")
-		t.Setenv("MAIL_FROM", "noreply@example.com")
-		t.Setenv("FRONTEND_URL", "https://example.com")
+		s.settingRepo.On("GetValues", mock.Anything, mock.Anything).Return(map[string]string{
+			"mail_host":     "smtp.gmail.com",
+			"mail_port":     "587",
+			"mail_username": "test@example.com",
+			"mail_password": "",
+			"mail_from":     "noreply@example.com",
+			"frontend_url":  "https://example.com",
+		}, nil).Once()
 
 		user := &models.User{
 			ID:    1,
@@ -35,7 +43,7 @@ func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 			ResetToken: nil,
 		}
 
-		err := s.mailerService.SendMailForgotPassword(user)
+		err := s.mailerService.SendMailForgotPassword(context.Background(), user)
 		assert.Error(t, err)
 		var appErr *apperror.AppError
 		if assert.ErrorAs(t, err, &appErr) {

@@ -1,819 +1,152 @@
 # Testing Standards
 
-Comprehensive testing guidelines for the Golang CMS project using Testify framework.
+Testing rules for Golang CMS using [Testify](https://github.com/stretchr/testify) (`assert`, `require`, `mock`, `suite`).
 
-## Table of Contents
+## Rules
 
-1. [Testing Architecture](#testing-architecture)
-2. [Testify Framework](#testify-framework)
-3. [Unit Testing](#unit-testing)
-4. [Integration Testing](#integration-testing)
-5. [Mocking Strategy](#mocking-strategy)
-6. [Test Organization](#test-organization)
-7. [Coverage Goals](#coverage-goals)
+- **TDD**: write the failing test first (red), then the minimum code to pass (green), then refactor. For a bug, first write a test that reproduces it.
+- Arrange-Act-Assert; group cases with `t.Run("Name - Case", ...)`; table-driven tests for many inputs.
+- `require` for checks that must stop the test (errors, nil), `assert` for value checks.
+- Test success and failure paths and boundaries. Keep tests independent; avoid time-based assertions.
+- Mock external dependencies (repositories, services, SMTP), not the code under test.
 
----
-
-## Testing Architecture
-
-### Test Pyramid
+## Layout
 
 ```
-       🧪 E2E Tests (5%)
-      /              \
-     /  Integration   \  (15%)
-    /    Tests         \
-   /___________________ \
-  /                      \     
- /    Unit Tests (80%)    \
-/__________________________\
+internal/**/*_test.go, pkg/**/*_test.go   unit tests next to the code
+  package x_test                          black-box tests (default)
+  *_internal_test.go (package x)          tests that need unexported identifiers
+tests/e2e                                 full-router tests (in-memory SQLite)
+tests/mocks                               shared hand-written Testify mocks
 ```
 
-- **Unit Tests** (80%): Fast, isolated, single function/method
-- **Integration Tests** (15%): Multiple components, external services mocked
-- **E2E Tests** (5%): Full user flows, real database
+| Kind | How |
+|------|-----|
+| Service | Mock repositories/services from `tests/mocks` |
+| Handler | `gin.CreateTestContext`, mocked services, call the handler method directly |
+| Repository | In-memory SQLite (`gorm.Open(sqlite.Open(":memory:"))`) |
+| Middleware | Table-driven with a Gin router and mocked services |
+| End-to-end | Real router via `setupTestRouter()` in `tests/e2e/setup_test.go` |
 
----
+Mocks in `tests/mocks`: `MockUserRepository`, `MockRefreshTokenRepository`, `MockSettingRepository`, `MockAuthService`, `MockUserService`, `MockRefreshTokenService`, `MockJWTService`, `MockMailerService`, `MockDB`/`MockTx`. Add one for every new repository or service interface.
 
-## Testify Framework
+## Commands
 
-### Core Packages
-
-We use three main Testify packages:
-
-#### 1. **assert** - Soft Assertions
-
-```go
-import "github.com/stretchr/testify/assert"
-
-assert.Equal(t, 5, result)           // Continue on failure
-assert.True(t, condition)            // Continue on failure
-assert.NotNil(t, value)              // Continue on failure
+```bash
+make test             # unit tests (excludes cmd, docs, tests)
+make test-e2e         # tests/e2e
+make test-coverage    # coverage.out, coverage-summary.txt, coverage.html (core packages)
+make watch-test       # re-run on change (needs reflex)
+go test ./internal/services -run TestUserService -v
+go test ./... -race
 ```
 
-**When to use:** Value checks that don't stop test execution
+## Coverage
 
-#### 2. **require** - Hard Assertions
+Targets: handlers 95%, services 85%, repositories 90%, middlewares 85%, utils 80%. CI runs the unit tests of every package except `cmd`, `docs` and `tests` and fails below **70%** total. `internal/models`, `internal/routes` and the seeders have no unit tests (routes are covered by e2e).
 
-```go
-import "github.com/stretchr/testify/require"
+## Patterns
 
-require.NoError(t, err)              // Stop on failure
-require.NotNil(t, value)             // Stop on failure
-require.True(t, condition)           // Stop on failure
-```
+### Service
 
-**When to use:** Critical checks that must pass to continue
-
-#### 3. **mock** - Object Mocking
-
-```go
-import "github.com/stretchr/testify/mock"
-
-mockRepo := new(mocks.MockUserRepository)
-mockRepo.On("GetByID", uint(1)).Return(&User{}, nil)
-defer mockRepo.AssertExpectations(t)
-```
-
-**When to use:** Simulating dependencies and external calls
-
-### Common Assertions
-
-```go
-// Equality
-assert.Equal(t, expected, actual)           // Deep equality
-assert.NotEqual(t, unexpected, actual)      // Not equal
-assert.EqualValues(t, expected, actual)     // Convert types
-
-// Nil checks
-assert.Nil(t, value)                        // Should be nil
-assert.NotNil(t, value)                     // Should not be nil
-
-// Boolean
-assert.True(t, value)                       // Should be true
-assert.False(t, value)                      // Should be false
-
-// Collections
-assert.Len(t, collection, 5)                // Check length
-assert.Empty(t, collection)                 // Check empty
-assert.NotEmpty(t, collection)              // Check not empty
-assert.Contains(t, collection, element)     // Element in collection
-
-// String
-assert.Contains(t, "hello world", "world")  // Substring exists
-assert.NotContains(t, "hello", "world")     // Substring missing
-
-// Errors
-assert.Error(t, err)                        // Should have error
-assert.NoError(t, err)                      // Should have no error
-assert.ErrorContains(t, err, "message")     // Error contains message
-
-// Type
-assert.IsType(t, (*User)(nil), result)      // Check type
-assert.Implements(t, (*Reader)(nil), obj)   // Implements interface
-```
-
----
-
-## Unit Testing
-
-### Test Structure (AAA Pattern)
+Every service and repository method takes a `context.Context` first, so mocks match it with `mock.Anything`.
 
 ```go
 package services_test
 
 func TestUserService(t *testing.T) {
-    // Setup phase - creates all necessary objects
-    mockRepo := new(mocks.MockUserRepository)
-    service := services.NewUserService(mockRepo)
-    ctx := context.Background()
+    t.Run("GetProfile - Success", func(t *testing.T) {
+        repo := new(mocks.MockUserRepository)
+        service := services.NewUserService(repo, new(mocks.MockMailerService))
+        user := &models.User{ID: 1, Email: "test@example.com"}
+        repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 
-    t.Run("CreateUser - Success", func(t *testing.T) {
-        // Arrange - set up test data and expectations
-        user := &User{
-            Email: "test@example.com",
-            Name:  "Test User",
-        }
-        mockRepo.On("Create", ctx, mock.MatchedBy(func(u *User) bool {
-            return u.Email == user.Email
-        })).Return(nil).Once()
+        result, err := service.GetProfile(context.Background(), 1)
 
-        // Act - execute the function being tested
-        result, err := service.CreateUser(ctx, user)
-
-        // Assert - verify the results
         require.NoError(t, err)
-        assert.NotNil(t, result)
-        assert.Equal(t, user.Email, result.Email)
-        mockRepo.AssertExpectations(t)
+        assert.Equal(t, user, result)
+        repo.AssertExpectations(t)
     })
 }
 ```
 
-### Handler Testing
+Assert on the error code rather than the message:
+
+```go
+appErr, ok := apperror.ToAppError(err)
+require.True(t, ok)
+assert.Equal(t, apperror.ErrInvalidPassword, appErr.Code)
+```
+
+Service tests can also use `suite.Suite` (see `internal/services/user_service_test.go`): build mocks in `SetupTest`, assert expectations in `TearDownTest`. `NewAuthService(userRepo, refreshTokenService, jwtService)` takes the user repository, refresh token service and JWT service.
+
+### Handler
+
+Handlers are concrete structs. Call `utils.InitValidator()` so the custom binding rules (`password_complexity`, `not_blank`, `valid_birthday`) exist, and set the user like `AuthMiddleware` does.
 
 ```go
 package handlers_test
 
-func TestUserHandler(t *testing.T) {
+func TestGetProfile(t *testing.T) {
     gin.SetMode(gin.TestMode)
+    utils.InitValidator()
 
-    t.Run("GetUser - Success", func(t *testing.T) {
-        // Arrange
-        mockService := new(mocks.MockUserService)
-        expectedUser := &User{
-            ID:    1,
-            Email: "test@example.com",
-            Name:  "Test User",
-        }
-        mockService.On("GetUser", uint(1)).Return(expectedUser, nil)
+    t.Run("Not Found", func(t *testing.T) {
+        userService := new(mocks.MockUserService)
+        handler := handlers.NewUserHandler(userService, new(mocks.MockMailerService))
+        userService.On("GetProfile", mock.Anything, uint(1)).
+            Return((*models.User)(nil), apperror.NewNotFoundError("User not found"))
 
-        handler := handlers.NewUserHandler(mockService)
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
-        c.Request, _ = http.NewRequest("GET", "/api/v1/users/1", nil)
-        c.Params = gin.Params{{Key: "id", Value: "1"}}
+        c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
+        c.Set("UserID", uint(1))
 
-        // Act
-        handler.GetUser(c)
-
-        // Assert
-        require.Equal(t, http.StatusOK, w.Code)
-        var response map[string]interface{}
-        require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-        assert.NotNil(t, response["data"])
-    })
-
-    t.Run("GetUser - Not Found", func(t *testing.T) {
-        mockService := new(mocks.MockUserService)
-        mockService.On("GetUser", uint(999)).Return(
-            nil,
-            apperror.NewNotFoundError("User not found"),
-        )
-
-        handler := handlers.NewUserHandler(mockService)
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        c.Request, _ = http.NewRequest("GET", "/api/v1/users/999", nil)
-        c.Params = gin.Params{{Key: "id", Value: "999"}}
-
-        handler.GetUser(c)
+        handler.GetProfile(c)
 
         require.Equal(t, http.StatusNotFound, w.Code)
+        assert.JSONEq(t, `{"code":1001,"message":"User not found"}`, w.Body.String())
     })
 }
 ```
 
-### Repository Testing
+Responses are plain JSON: `RespondWithOK` writes the body you pass (no `data` envelope); errors are `{"code","message"}` plus `fields` for validation errors. Use the real HTTP method and path of the route.
+
+### Repository
 
 ```go
-package repositories_test
-
-import "context"
-
-func TestUserRepository(t *testing.T) {
-    t.Run("Create", func(t *testing.T) {
-        // Setup in-memory database
-        db := setupTestDB()
-        repo := repositories.NewUserRepository(db)
-        ctx := context.Background()
-
-        // Arrange
-        user := &User{
-            Email: "test@example.com",
-            Name:  "Test",
-        }
-
-        // Act
-        result, err := repo.Create(ctx, user)
-
-        // Assert
-        require.NoError(t, err)
-        assert.Greater(t, result.ID, uint(0))
-        assert.Equal(t, user.Email, result.Email)
-    })
-
-    t.Run("GetByID", func(t *testing.T) {
-        db := setupTestDB()
-        repo := repositories.NewUserRepository(db)
-        ctx := context.Background()
-
-        // Setup - create a user
-        created := &User{Email: "test@example.com"}
-        repo.Create(ctx, created)
-
-        // Act
-        result, err := repo.GetByID(ctx, created.ID)
-
-        // Assert
-        require.NoError(t, err)
-        assert.NotNil(t, result)
-        assert.Equal(t, created.Email, result.Email)
-    })
-
-    t.Run("GetByID - Not Found", func(t *testing.T) {
-        db := setupTestDB()
-        repo := repositories.NewUserRepository(db)
-        ctx := context.Background()
-
-        // Act
-        result, err := repo.GetByID(ctx, 9999)
-
-        // Assert
-        assert.Error(t, err)
-        assert.Nil(t, result)
-    })
-}
-```
-
-### Service Testing
-
-```go
-package services_test
-
-func TestAuthService(t *testing.T) {
-    t.Run("Login - Success", func(t *testing.T) {
-        // Arrange
-        mockUserRepo := new(mocks.MockUserRepository)
-        mockBcryptService := new(mocks.MockBcryptService)
-        mockJWTService := new(mocks.MockJWTService)
-        ctx := context.Background()
-
-        user := &User{
-            ID:       1,
-            Email:    "test@example.com",
-            Password: "hashed_password",
-        }
-
-        mockUserRepo.On("FindByEmail", ctx, "test@example.com").Return(user, nil)
-        mockBcryptService.On("CheckPasswordHash", "password", "hashed_password").
-            Return(true)
-        mockJWTService.On("GenerateAccessToken", uint(1)).
-            Return(&JwtResult{Token: "jwt_token", ExpiresAt: 1000}, nil)
-
-        service := services.NewAuthService(
-            mockUserRepo,
-            mockBcryptService,
-            mockJWTService,
-        )
-
-        // Act
-        result, err := service.Login(ctx, "test@example.com", "password", "127.0.0.1")
-
-        // Assert
-        require.NoError(t, err)
-        assert.NotNil(t, result)
-        assert.Equal(t, "jwt_token", result.Token)
-    })
-
-    t.Run("Login - Invalid Credentials", func(t *testing.T) {
-        mockUserRepo := new(mocks.MockUserRepository)
-        mockBcryptService := new(mocks.MockBcryptService)
-        mockJWTService := new(mocks.MockJWTService)
-        ctx := context.Background()
-
-        user := &User{
-            ID:       1,
-            Email:    "test@example.com",
-            Password: "hashed_password",
-        }
-
-        mockUserRepo.On("FindByEmail", ctx, "test@example.com").Return(user, nil)
-        mockBcryptService.On("CheckPasswordHash", "wrong_password", "hashed_password").
-            Return(false)
-
-        service := services.NewAuthService(
-            mockUserRepo,
-            mockBcryptService,
-            mockJWTService,
-        )
-
-        result, err := service.Login(ctx, "test@example.com", "wrong_password", "127.0.0.1")
-
-        require.Error(t, err)
-        assert.Nil(t, result)
-    })
-}
-```
-
----
-
-## Integration Testing
-
-### Database Integration Tests
-
-```go
-package services_test
-
-func TestUserServiceIntegration(t *testing.T) {
-    // Setup real database (in-memory for tests)
-    db := setupTestDB()
-    defer teardownTestDB(db)
-
-    userRepo := repositories.NewUserRepository(db)
-    bcryptService := services.NewBcryptService()
-    userService := services.NewUserService(userRepo, bcryptService)
-
-    t.Run("Create and Retrieve User", func(t *testing.T) {
-        // Act 1: Create user
-        created, err := userService.CreateUser(&CreateUserRequest{
-            Email:    "test@example.com",
-            Password: "SecurePassword123!",
-            Name:     "Test User",
-        })
-
-        // Assert 1
-        require.NoError(t, err)
-        assert.Greater(t, created.ID, uint(0))
-        assert.Equal(t, "test@example.com", created.Email)
-
-        // Act 2: Retrieve user
-        retrieved, err := userService.GetUser(created.ID)
-
-        // Assert 2
-        require.NoError(t, err)
-        assert.Equal(t, created.Email, retrieved.Email)
-    })
-}
-```
-
-### Multiple Service Integration
-
-```go
-package services_test
-
-func TestAuthServiceIntegration(t *testing.T) {
-    db := setupTestDB()
-    defer teardownTestDB(db)
-
-    // Setup services with real dependencies
-    userRepo := repositories.NewUserRepository(db)
-    refreshTokenRepo := repositories.NewRefreshTokenRepository(db)
-    bcryptService := services.NewBcryptService()
-    jwtService := services.NewJWTService()
-    refreshTokenService := services.NewRefreshTokenService(refreshTokenRepo)
-    authService := services.NewAuthService(
-        userRepo,
-        bcryptService,
-        jwtService,
-        refreshTokenService,
-    )
-
-    t.Run("Complete Auth Flow", func(t *testing.T) {
-        // Create user
-        userService := services.NewUserService(userRepo, bcryptService)
-        user, err := userService.CreateUser(&CreateUserRequest{
-            Email:    "test@example.com",
-            Password: "Password123!",
-            Name:     "Test User",
-        })
-        require.NoError(t, err)
-
-        // Login
-        loginResult, err := authService.Login(
-            "test@example.com",
-            "Password123!",
-        )
-        require.NoError(t, err)
-        assert.NotEmpty(t, loginResult.AccessToken.Token)
-        assert.NotEmpty(t, loginResult.RefreshToken.Token)
-
-        // Verify token
-        claims, err := jwtService.ValidateToken(loginResult.AccessToken.Token)
-        require.NoError(t, err)
-        assert.Equal(t, user.ID, claims.ID)
-    })
-}
-```
-
----
-
-## Mocking Strategy
-
-### Mocking External Dependencies
-
-```go
-// HTTP Client Mock
-type MockHTTPClient struct {
-    mock.Mock
-}
-
-func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
-    args := m.Called(req)
-    if args.Get(0) == nil {
-        return nil, args.Error(1)
-    }
-    return args.Get(0).(*http.Response), args.Error(1)
-}
-
-// Usage
-mockClient := new(MockHTTPClient)
-response := &http.Response{
-    StatusCode: 200,
-    Body:       io.NopCloser(strings.NewReader(`{"id":1}`)),
-}
-mockClient.On("Do", mock.MatchedBy(func(req *http.Request) bool {
-    return req.Method == "GET" && strings.Contains(req.URL.Path, "/users/1")
-})).Return(response, nil)
-```
-
-### Mocking with Arguments
-
-```go
-// Match specific arguments
-mockRepo.On("GetByID", 1).Return(&User{ID: 1}, nil)
-
-// Match argument by type
-mockRepo.On("Create", mock.AnythingOfType("*models.User")).Return(nil)
-
-// Match argument by function
-mockRepo.On("Create", mock.MatchedBy(func(u *User) bool {
-    return u.Email != "" && len(u.Name) > 0
-})).Return(nil)
-
-// Multiple calls with different returns
-mockService.On("Process", "input1").Return("output1", nil)
-mockService.On("Process", "input2").Return("output2", nil)
-
-// Specify call count
-mockRepo.On("Create", mock.Anything).Return(nil).Once()      // Called once
-mockRepo.On("Update", mock.Anything).Return(nil).Times(3)   // Called 3 times
-mockRepo.On("Delete", mock.Anything).Return(nil)            // Called any number of times
-```
-
-### Complete Mock Example
-
-```go
-package services_test
-
-func TestPaymentService(t *testing.T) {
-    t.Run("ProcessPayment - Success", func(t *testing.T) {
-        // Create mocks
-        mockGateway := new(mocks.MockPaymentGateway)
-        mockEmailService := new(mocks.MockEmailService)
-        mockLogger := new(mocks.MockLogger)
-
-        // Setup expectations
-        mockGateway.On(
-            "Charge",
-            mock.MatchedBy(func(req *ChargeRequest) bool {
-                return req.Amount > 0 && req.CardToken != ""
-            }),
-        ).Return(&ChargeResponse{
-            TransactionID: "txn_123",
-            Status:        "success",
-        }, nil)
-
-        mockEmailService.On(
-            "Send",
-            mock.MatchedBy(func(email *Email) bool {
-                return strings.Contains(email.Subject, "Payment")
-            }),
-        ).Return(nil)
-
-        mockLogger.On("Info", mock.MatchedBy(func(msg string) bool {
-            return strings.Contains(msg, "Payment processed")
-        })).Return()
-
-        // Create service with mocks
-        service := services.NewPaymentService(
-            mockGateway,
-            mockEmailService,
-            mockLogger,
-        )
-
-        // Execute
-        result, err := service.ProcessPayment(&PaymentRequest{
-            Amount:    100.00,
-            CardToken: "tok_visa",
-            Email:     "customer@example.com",
-        })
-
-        // Assert
-        require.NoError(t, err)
-        assert.Equal(t, "txn_123", result.TransactionID)
-        assert.Equal(t, "success", result.Status)
-
-        // Verify all mocks were called as expected
-        mockGateway.AssertExpectations(t)
-        mockEmailService.AssertExpectations(t)
-        mockLogger.AssertExpectations(t)
-    })
-}
-```
-
----
-
-## Test Organization
-
-### File Naming
-
-```
-service.go              // Production code
-service_test.go         // Unit tests
-service_integration_test.go  // Integration tests
-```
-
-### Test Package Organization
-
-```
-internal/
-├── services/
-│   ├── user_service.go
-│   ├── user_service_test.go         # Unit tests
-│   ├── user_service_integration_test.go
-│   ├── auth_service.go
-│   └── auth_service_test.go
-├── handlers/
-│   ├── user_handler.go
-│   └── user_handler_test.go
-└── repositories/
-    ├── user_repository.go
-    └── user_repository_test.go
-```
-
-### Grouped Test Functions
-
-```go
-// Old style - multiple separate test functions
-func TestCreateUser(t *testing.T) { }
-func TestGetUser(t *testing.T) { }
-func TestUpdateUser(t *testing.T) { }
-
-// New style - grouped test functions
-func TestUserService(t *testing.T) {
-    t.Run("CreateUser", func(t *testing.T) { })
-    t.Run("GetUser", func(t *testing.T) { })
-    t.Run("UpdateUser", func(t *testing.T) { })
-}
-```
-
-### Shared Test Fixtures
-
-```go
-// Helper function for test setup
-func setupTestDB() *gorm.DB {
-    db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-    db.AutoMigrate(&User{})
+func setupUserTestDB(t *testing.T) *gorm.DB {
+    db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+    require.NoError(t, err)
+    require.NoError(t, db.AutoMigrate(&models.User{})) // only the models the test needs
     return db
 }
-
-// Helper function for test cleanup
-func teardownTestDB(db *gorm.DB) {
-    sqlDB, _ := db.DB()
-    sqlDB.Close()
-}
-
-// Usage in tests
-func TestUserRepository(t *testing.T) {
-    db := setupTestDB()
-    defer teardownTestDB(db)
-    
-    repo := repositories.NewUserRepository(db)
-    // ... test code
-}
 ```
 
----
+### End-to-end
 
-## Coverage Goals
-
-### Target Coverage by Layer
-
-| Layer | Target | Rationale |
-|-------|--------|-----------|
-| Handlers | 95%+ | Critical for API contracts |
-| Services | 85%+ | Core business logic |
-| Repositories | 90%+ | Data access is crucial |
-| Middlewares | 85%+ | Security-related |
-| Utils | 80%+ | General utilities |
-| Models | 0% | Usually just data structures |
-
-### Generate Coverage Report
-
-```bash
-# Generate coverage for all packages
-go test ./... -cover
-
-# Generate detailed coverage report
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-
-# Coverage for specific package
-go test ./internal/services -cover
-
-# Fail if coverage below threshold
-go test ./... -cover -coverprofile=coverage.out
-go tool cover -html=coverage.out
-go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//'
-```
-
-### Measuring Coverage
-
-```bash
-# Show uncovered lines
-go tool cover -func=coverage.out | grep 0$
-
-# HTML report with coverage visualization
-go tool cover -html=coverage.out -o coverage.html
-```
-
----
-
-## Common Test Patterns
-
-### Before/After Pattern
+`setupTestRouter()` sets `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY`, opens a shared in-memory SQLite (one connection), migrates `User`, `RefreshToken` and `Setting`, calls `utils.InitValidator()`, and returns the `*gin.Engine` and `*gorm.DB`. Create data directly with `db`, then send requests through `router.ServeHTTP`:
 
 ```go
-func setupTest(t *testing.T) *TestContext {
-    // Setup database
-    db := setupTestDB()
-    
-    // Setup repositories
-    userRepo := repositories.NewUserRepository(db)
-    
-    // Setup services
-    userService := services.NewUserService(userRepo)
-    
-    return &TestContext{
-        db:          db,
-        userRepo:    userRepo,
-        userService: userService,
-    }
-}
+router, db := setupTestRouter()
+hashed, _ := utils.HashPassword("password123")
+require.NoError(t, db.Create(&models.User{Name: "Test", Email: "t@example.com", Password: hashed, Gender: 1}).Error)
 
-func teardownTest(t *testing.T, ctx *TestContext) {
-    teardownTestDB(ctx.db)
-}
+body, _ := json.Marshal(map[string]string{"email": "t@example.com", "password": "password123"})
+w := httptest.NewRecorder()
+req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
+req.Header.Set("Content-Type", "application/json")
+router.ServeHTTP(w, req)
 
-func TestUserService(t *testing.T) {
-    ctx := setupTest(t)
-    defer teardownTest(t, ctx)
-
-    t.Run("CreateUser", func(t *testing.T) {
-        // Use ctx.userService, ctx.userRepo, etc.
-    })
-}
+assert.Equal(t, http.StatusOK, w.Code)
 ```
 
-### Parametrized Tests
+Current suites cover login, logout, refresh token, forgot/reset password, change password, get/update profile, empty bodies, rate limiting, health and version.
 
-```go
-func TestValidateEmail(t *testing.T) {
-    tests := []struct {
-        name    string
-        email   string
-        isValid bool
-    }{
-        {"Valid email", "user@example.com", true},
-        {"Missing domain", "user@", false},
-        {"No at symbol", "userexample.com", false},
-        {"Empty string", "", false},
-    }
+### Replacing external calls
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            result := ValidateEmail(tt.email)
-            assert.Equal(t, tt.isValid, result)
-        })
-    }
-}
-```
+Some packages expose function variables so tests can swap external calls (`newEmailSender`, `parseForgotTemplate` in `internal/services/mail_service.go`; `openGormConnection`, `pingDBFn` in `internal/configs/database.go`). Use an internal test package and restore the original with `t.Cleanup`.
 
-### Error Testing
+### Asynchronous logging
 
-```go
-func TestErrorHandling(t *testing.T) {
-    t.Run("Returns custom error", func(t *testing.T) {
-        _, err := service.GetUser(9999)
-        
-        require.Error(t, err)
-        var appErr *apperror.AppError
-        assert.True(t, errors.As(err, &appErr))
-        assert.Equal(t, http.StatusNotFound, appErr.HttpStatusCode)
-    })
-
-    t.Run("Error contains message", func(t *testing.T) {
-        _, err := service.GetUser(9999)
-        
-        assert.ErrorContains(t, err, "not found")
-    })
-}
-```
-
----
-
-## Performance Testing
-
-### Benchmarking
-
-```go
-func BenchmarkHashPassword(b *testing.B) {
-    password := "SecurePassword123!"
-    for i := 0; i < b.N; i++ {
-        bcrypt.GenerateFromPassword([]byte(password), 10)
-    }
-}
-
-// Run benchmark
-// go test -bench=. -benchtime=10s
-```
-
-### Load Testing
-
-```go
-func TestConcurrentRequests(t *testing.T) {
-    const numGoroutines = 100
-    
-    var wg sync.WaitGroup
-    errors := make(chan error, numGoroutines)
-    
-    for i := 0; i < numGoroutines; i++ {
-        wg.Add(1)
-        go func(id int) {
-            defer wg.Done()
-            user, err := service.GetUser(uint(id))
-            if err != nil {
-                errors <- err
-            }
-        }(i)
-    }
-    
-    wg.Wait()
-    close(errors)
-    
-    for err := range errors {
-        t.Errorf("Error: %v", err)
-    }
-}
-```
-
----
-
-## Best Practices Summary
-
-✅ **DO:**
-- Group related tests under parent test functions
-- Use `require` for critical assertions
-- Use `assert` for value checks
-- Mock external dependencies
-- Test both success and error cases
-- Use table-driven tests for multiple scenarios
-- Keep tests independent and isolated
-- Use meaningful test names
-- Test edge cases and boundary conditions
-- Maintain high test coverage
-
-❌ **DON'T:**
-- Test multiple things in one test
-- Ignore test failures
-- Write tests that depend on each other
-- Skip error handling tests
-- Use time-based assertions (flaky tests)
-- Mock internal dependencies
-- Have complex setup in tests
-- Mix test levels (unit + integration)
-
----
-
-Last Updated: November 21, 2025
+`LogMiddleware` writes its entry from a goroutine. Wait for it with `assert.Eventually` before asserting on log output, otherwise the test is flaky.

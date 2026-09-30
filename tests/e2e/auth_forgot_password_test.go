@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,20 +30,17 @@ func TestAuthForgotPassword(t *testing.T) {
 	require.NoError(t, result.Error)
 
 	t.Run("Forgot Password - Token Persisted On Email Failure", func(t *testing.T) {
-		// Force deterministic behavior: with MAIL_FROM unset the sender fails
+		// Force deterministic behavior: with mail_from empty the sender fails
 		// fast on address parsing (no network), so we always hit the 500 path
 		// and can verify the token was persisted before the send.
-		for _, key := range []string{"MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM"} {
-			prev, had := os.LookupEnv(key)
-			if err := os.Unsetenv(key); err != nil {
-				t.Fatalf("failed to unset %s: %v", key, err)
-			}
-			t.Cleanup(func() {
-				if had {
-					_ = os.Setenv(key, prev)
-				}
-			})
-		}
+		require.NoError(t, db.Create(&[]models.Setting{
+			{Key: "mail_host", Value: "smtp.example.com"},
+			{Key: "mail_port", Value: "587"},
+			{Key: "mail_username", Value: ""},
+			{Key: "mail_password", Value: ""},
+			{Key: "mail_from", Value: ""},
+			{Key: "frontend_url", Value: "http://localhost:5173"},
+		}).Error)
 
 		payload := map[string]string{
 			"email": "test_forgot@example.com",

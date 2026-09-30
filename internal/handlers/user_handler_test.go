@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -55,7 +54,7 @@ func TestUpdateProfile(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the handler
@@ -186,7 +185,7 @@ func TestUpdateProfile(t *testing.T) {
 				// Create a test context
 				w := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(w)
-				c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBufferString(tt.reqBody))
+				c.Request, _ = http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBufferString(tt.reqBody))
 				c.Set("UserID", uint(1))
 
 				// Call the handler
@@ -222,7 +221,7 @@ func TestUpdateProfile(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", nil)
+		c.Request, _ = http.NewRequest("PATCH", "/api/v1/profile", nil)
 		c.Set("UserID", 0) // Invalid User ID
 
 		// Call the handler
@@ -270,7 +269,7 @@ func TestUpdateProfile(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBuffer(body))
 		c.Set("UserID", userID)
 
 		// Call the handler
@@ -318,7 +317,7 @@ func TestUpdateProfile(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/profile", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("PATCH", "/api/v1/profile", bytes.NewBuffer(body))
 		c.Set("UserID", userID)
 
 		// Call the handler
@@ -489,7 +488,7 @@ func TestChangePassword(t *testing.T) {
 		// Create http request and context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the ChangePassword handler
@@ -616,7 +615,7 @@ func TestChangePassword(t *testing.T) {
 				// Create http request and context
 				w := httptest.NewRecorder()
 				c, _ := gin.CreateTestContext(w)
-				c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBufferString(tt.reqBody))
+				c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBufferString(tt.reqBody))
 				c.Set("UserID", uint(1))
 
 				// Call the ChangePassword handler
@@ -660,7 +659,7 @@ func TestChangePassword(t *testing.T) {
 		// Create http request and context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the ChangePassword handler
@@ -700,7 +699,7 @@ func TestChangePassword(t *testing.T) {
 		// Create a new UserHandler instance
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the ChangePassword handler
@@ -741,7 +740,7 @@ func TestChangePassword(t *testing.T) {
 		// Create test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the ChangePassword handler
@@ -780,7 +779,7 @@ func TestChangePassword(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the handler
@@ -810,7 +809,7 @@ func TestChangePassword(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", nil)
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", nil)
 		c.Set("UserID", "invalid") // Invalid User ID
 
 		// Call the handler
@@ -843,7 +842,7 @@ func TestChangePassword(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the handler
@@ -883,7 +882,7 @@ func TestChangePassword(t *testing.T) {
 		// Create a test context
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request, _ = http.NewRequest("PUT", "/api/v1/change-password", bytes.NewBuffer(body))
+		c.Request, _ = http.NewRequest("POST", "/api/v1/change-password", bytes.NewBuffer(body))
 		c.Set("UserID", uint(1))
 
 		// Call the handler
@@ -1215,21 +1214,6 @@ func TestForgotPassword(t *testing.T) {
 	utils.InitValidator()
 
 	t.Run("ForgotPassword - Success", func(t *testing.T) {
-		_ = os.Setenv("MAIL_HOST", "smtp.gmail.com")
-		_ = os.Setenv("MAIL_PORT", "587")
-		_ = os.Setenv("MAIL_USERNAME", "test@example.com")
-		_ = os.Setenv("MAIL_PASSWORD", "testpassword")
-		_ = os.Setenv("MAIL_FROM", "noreply@example.com")
-		_ = os.Setenv("FRONTEND_URL", "https://example.com")
-		defer func() {
-			_ = os.Unsetenv("MAIL_HOST")
-			_ = os.Unsetenv("MAIL_PORT")
-			_ = os.Unsetenv("MAIL_USERNAME")
-			_ = os.Unsetenv("MAIL_PASSWORD")
-			_ = os.Unsetenv("MAIL_FROM")
-			_ = os.Unsetenv("FRONTEND_URL")
-		}()
-
 		userService := new(mocks.MockUserService)
 		mailerService := new(mocks.MockMailerService)
 		handler := handlers.NewUserHandler(userService, mailerService)
