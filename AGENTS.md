@@ -2,7 +2,7 @@
 
 > For detailed architecture, testing patterns, code templates, and conventions, see:
 > - `.github/skills/golang-cms-architecture/SKILL.md` - Full development guidelines
-> - `.github/skills/golang-cms-architecture/references/` - Templates, cheatsheet, commands
+> - `.github/skills/golang-cms-architecture/references/` - Templates and workflow
 > - `README.md`, `DEVELOPMENT.md`, `TESTING.md` - Setup, coding standards, testing standards
 > - `docs/logging-standards.md` - Logging fields, events, and data masking
 
@@ -40,7 +40,7 @@ go run cmd/server/main.go
 go run cmd/seeder/seeder.go
 ```
 
-> See `.github/skills/golang-cms-architecture/references/commands.md` for full command reference.
+> See `README.md` and the `Makefile` (`make help`) for the full command reference.
 
 ## Before Committing
 

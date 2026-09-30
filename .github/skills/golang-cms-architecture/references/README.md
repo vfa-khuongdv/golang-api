@@ -1,21 +1,8 @@
 # Development References
 
-Quick reference guides for golang-cms development.
-
-## Files
-
 | File | Description |
 |------|-------------|
-| [templates.md](templates.md) | Code templates for repository, service, handler, DTO |
-| [cheatsheet.md](cheatsheet.md) | Quick reference for patterns, naming, logging |
-| [workflow.md](workflow.md) | Development workflow and common patterns |
-| [commands.md](commands.md) | Common development commands |
+| [templates.md](templates.md) | Code templates for repository, service, handler, DTO, routes, tests |
+| [workflow.md](workflow.md) | Feature and bug-fix workflow, review checklist |
 
-## External Docs
-
-- `AGENTS.md` - Agent coding guidelines (project root)
-- `README.md` - Setup, environment variables, and API overview
-- `DEVELOPMENT.md` - Development setup and patterns
-- `TESTING.md` - Testing patterns and examples
-- `docs/logging-standards.md` - Logging fields, events, and data masking
-- `docs/swagger.json` - OpenAPI specification (maintained by hand)
+Elsewhere: `README.md` (setup, env vars, endpoints, `make` targets), `DEVELOPMENT.md`, `TESTING.md`, `docs/logging-standards.md`, `docs/swagger.json`.

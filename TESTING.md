@@ -1,143 +1,68 @@
 # Testing Standards
 
-Comprehensive testing guidelines for the Golang CMS project using Testify framework.
+Testing rules for Golang CMS using [Testify](https://github.com/stretchr/testify) (`assert`, `require`, `mock`, `suite`).
 
-## Table of Contents
+## Rules
 
-1. [Testing Architecture](#testing-architecture)
-2. [Testify Framework](#testify-framework)
-3. [Unit Testing](#unit-testing)
-4. [Integration Testing](#integration-testing)
-5. [Mocking Strategy](#mocking-strategy)
-6. [Test Organization](#test-organization)
-7. [Coverage Goals](#coverage-goals)
-8. [Common Test Patterns](#common-test-patterns)
-9. [Performance Testing](#performance-testing)
-10. [Best Practices Summary](#best-practices-summary)
+- **TDD**: write the failing test first (red), then the minimum code to pass (green), then refactor. For a bug, first write a test that reproduces it.
+- Arrange-Act-Assert; group cases with `t.Run("Name - Case", ...)`; table-driven tests for many inputs.
+- `require` for checks that must stop the test (errors, nil), `assert` for value checks.
+- Test success and failure paths and boundaries. Keep tests independent; avoid time-based assertions.
+- Mock external dependencies (repositories, services, SMTP), not the code under test.
 
----
-
-## Testing Architecture
-
-### Test Pyramid
+## Layout
 
 ```
-       🧪 E2E Tests (5%)
-      /              \
-     /  Integration   \  (15%)
-    /    Tests         \
-   /___________________ \
-  /                      \     
- /    Unit Tests (80%)    \
-/__________________________\
+internal/**/*_test.go, pkg/**/*_test.go   unit tests next to the code
+  package x_test                          black-box tests (default)
+  *_internal_test.go (package x)          tests that need unexported identifiers
+tests/e2e                                 full-router tests (in-memory SQLite)
+tests/mocks                               shared hand-written Testify mocks
 ```
 
-- **Unit Tests** (80%): Fast, isolated, single function/method, colocated with the code
-- **Integration Tests** (15%): Several real components together (for example repositories against in-memory SQLite)
-- **E2E Tests** (5%): The full router and all layers in `tests/e2e`, using in-memory SQLite instead of MySQL
+| Kind | How |
+|------|-----|
+| Service | Mock repositories/services from `tests/mocks` |
+| Handler | `gin.CreateTestContext`, mocked services, call the handler method directly |
+| Repository | In-memory SQLite (`gorm.Open(sqlite.Open(":memory:"))`) |
+| Middleware | Table-driven with a Gin router and mocked services |
+| End-to-end | Real router via `setupTestRouter()` in `tests/e2e/setup_test.go` |
 
----
+Mocks in `tests/mocks`: `MockUserRepository`, `MockRefreshTokenRepository`, `MockSettingRepository`, `MockAuthService`, `MockUserService`, `MockRefreshTokenService`, `MockJWTService`, `MockMailerService`, `MockDB`/`MockTx`. Add one for every new repository or service interface.
 
-## Testify Framework
+## Commands
 
-### Core Packages
-
-We use three main Testify packages:
-
-#### 1. **assert** - Soft Assertions
-
-```go
-import "github.com/stretchr/testify/assert"
-
-assert.Equal(t, 5, result)           // Continue on failure
-assert.True(t, condition)            // Continue on failure
-assert.NotNil(t, value)              // Continue on failure
+```bash
+make test             # unit tests (excludes cmd, docs, tests)
+make test-e2e         # tests/e2e
+make test-coverage    # coverage.out, coverage-summary.txt, coverage.html (core packages)
+make watch-test       # re-run on change (needs reflex)
+go test ./internal/services -run TestUserService -v
+go test ./... -race
 ```
 
-**When to use:** Value checks that don't stop test execution
+## Coverage
 
-#### 2. **require** - Hard Assertions
+Targets: handlers 95%, services 85%, repositories 90%, middlewares 85%, utils 80%. CI runs the unit tests of every package except `cmd`, `docs` and `tests` and fails below **70%** total. `internal/models`, `internal/routes` and the seeders have no unit tests (routes are covered by e2e).
 
-```go
-import "github.com/stretchr/testify/require"
+## Patterns
 
-require.NoError(t, err)              // Stop on failure
-require.NotNil(t, value)             // Stop on failure
-require.True(t, condition)           // Stop on failure
-```
+### Service
 
-**When to use:** Critical checks that must pass to continue
-
-#### 3. **mock** - Object Mocking
-
-```go
-import "github.com/stretchr/testify/mock"
-
-mockRepo := new(mocks.MockUserRepository)
-mockRepo.On("GetByID", mock.Anything, uint(1)).Return(&models.User{}, nil)
-defer mockRepo.AssertExpectations(t)
-```
-
-**When to use:** Simulating dependencies and external calls
-
-### Common Assertions
-
-```go
-// Equality
-assert.Equal(t, expected, actual)           // Deep equality
-assert.NotEqual(t, unexpected, actual)      // Not equal
-assert.EqualValues(t, expected, actual)     // Convert types
-
-// Nil checks
-assert.Nil(t, value)                        // Should be nil
-assert.NotNil(t, value)                     // Should not be nil
-
-// Boolean
-assert.True(t, value)                       // Should be true
-assert.False(t, value)                      // Should be false
-
-// Collections
-assert.Len(t, collection, 5)                // Check length
-assert.Empty(t, collection)                 // Check empty
-assert.NotEmpty(t, collection)              // Check not empty
-assert.Contains(t, collection, element)     // Element in collection
-
-// String
-assert.Contains(t, "hello world", "world")  // Substring exists
-assert.NotContains(t, "hello", "world")     // Substring missing
-
-// Errors
-assert.Error(t, err)                        // Should have error
-assert.NoError(t, err)                      // Should have no error
-assert.ErrorContains(t, err, "message")     // Error contains message
-
-// Type
-assert.IsType(t, (*models.User)(nil), result)      // Check type
-assert.Implements(t, (*Reader)(nil), obj)   // Implements interface
-```
-
----
-
-## Unit Testing
-
-### Test Structure (AAA Pattern)
+Every service and repository method takes a `context.Context` first, so mocks match it with `mock.Anything`.
 
 ```go
 package services_test
 
 func TestUserService(t *testing.T) {
     t.Run("GetProfile - Success", func(t *testing.T) {
-        // Arrange - set up mocks, service, and expectations
         repo := new(mocks.MockUserRepository)
-        mailer := new(mocks.MockMailerService)
-        service := services.NewUserService(repo, mailer)
-        user := &models.User{ID: 1, Email: "test@example.com", Name: "Test User"}
+        service := services.NewUserService(repo, new(mocks.MockMailerService))
+        user := &models.User{ID: 1, Email: "test@example.com"}
         repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 
-        // Act - execute the function being tested
         result, err := service.GetProfile(context.Background(), 1)
 
-        // Assert - verify the results
         require.NoError(t, err)
         assert.Equal(t, user, result)
         repo.AssertExpectations(t)
@@ -145,11 +70,19 @@ func TestUserService(t *testing.T) {
 }
 ```
 
-Service tests can also use `suite.Suite` (see `internal/services/user_service_test.go`): create the mocks and service in `SetupTest` and call `AssertExpectations` in `TearDownTest`.
+Assert on the error code rather than the message:
 
-### Handler Testing
+```go
+appErr, ok := apperror.ToAppError(err)
+require.True(t, ok)
+assert.Equal(t, apperror.ErrInvalidPassword, appErr.Code)
+```
 
-Handlers are concrete structs (`handlers.NewUserHandler(userService, mailerService)`). Tests build a Gin test context, set the authenticated user ID the way `AuthMiddleware` does (`c.Set("UserID", uint(1))`), and call the handler method directly. Call `utils.InitValidator()` first so the custom binding tags (`password_complexity`, `not_blank`, `valid_birthday`) are registered.
+Service tests can also use `suite.Suite` (see `internal/services/user_service_test.go`): build mocks in `SetupTest`, assert expectations in `TearDownTest`. `NewAuthService(userRepo, refreshTokenService, jwtService)` takes the user repository, refresh token service and JWT service.
+
+### Handler
+
+Handlers are concrete structs. Call `utils.InitValidator()` so the custom binding rules (`password_complexity`, `not_blank`, `valid_birthday`) exist, and set the user like `AuthMiddleware` does.
 
 ```go
 package handlers_test
@@ -158,32 +91,7 @@ func TestGetProfile(t *testing.T) {
     gin.SetMode(gin.TestMode)
     utils.InitValidator()
 
-    t.Run("GetProfile - Success", func(t *testing.T) {
-        // Arrange
-        userService := new(mocks.MockUserService)
-        mailerService := new(mocks.MockMailerService)
-        handler := handlers.NewUserHandler(userService, mailerService)
-
-        user := &models.User{ID: 1, Email: "test@example.com", Name: "Test User"}
-        userService.On("GetProfile", mock.Anything, uint(1)).Return(user, nil)
-
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
-        c.Set("UserID", uint(1))
-
-        // Act
-        handler.GetProfile(c)
-
-        // Assert
-        require.Equal(t, http.StatusOK, w.Code)
-        var response map[string]any
-        require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-        assert.Equal(t, "test@example.com", response["email"])
-        userService.AssertExpectations(t)
-    })
-
-    t.Run("GetProfile - Not Found", func(t *testing.T) {
+    t.Run("Not Found", func(t *testing.T) {
         userService := new(mocks.MockUserService)
         handler := handlers.NewUserHandler(userService, new(mocks.MockMailerService))
         userService.On("GetProfile", mock.Anything, uint(1)).
@@ -202,440 +110,43 @@ func TestGetProfile(t *testing.T) {
 }
 ```
 
-Responses are written by `utils.RespondWithOK` / `utils.RespondWithError` as plain JSON bodies: `RespondWithOK` serializes the body you pass (there is no `data` envelope), and errors are `{"code": ..., "message": ...}` (plus `fields` for validation errors).
+Responses are plain JSON: `RespondWithOK` writes the body you pass (no `data` envelope); errors are `{"code","message"}` plus `fields` for validation errors. Use the real HTTP method and path of the route.
 
-### Repository Testing
-
-Repository tests run against an in-memory SQLite database created with GORM; only the models the test needs are migrated.
+### Repository
 
 ```go
-package repositories_test
-
-// setupUserTestDB creates an in-memory SQLite database for testing
 func setupUserTestDB(t *testing.T) *gorm.DB {
     db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
     require.NoError(t, err)
-
-    require.NoError(t, db.AutoMigrate(&models.User{}))
+    require.NoError(t, db.AutoMigrate(&models.User{})) // only the models the test needs
     return db
 }
-
-func TestUserRepository(t *testing.T) {
-    t.Run("Create and GetByID", func(t *testing.T) {
-        // Arrange
-        db := setupUserTestDB(t)
-        repo := repositories.NewUserRepository(db)
-        ctx := context.Background()
-        user := &models.User{Name: "Test", Email: "test@example.com", Password: "hashed", Gender: 1}
-
-        // Act
-        created, err := repo.Create(ctx, user)
-        require.NoError(t, err)
-        found, err := repo.GetByID(ctx, created.ID)
-
-        // Assert
-        require.NoError(t, err)
-        assert.Equal(t, "test@example.com", found.Email)
-    })
-
-    t.Run("GetByID - Not Found", func(t *testing.T) {
-        db := setupUserTestDB(t)
-        repo := repositories.NewUserRepository(db)
-
-        result, err := repo.GetByID(context.Background(), 9999)
-
-        assert.Error(t, err)
-        assert.Nil(t, result)
-    })
-}
 ```
 
-### Service Testing
+### End-to-end
 
-Services are tested with mocked repositories and collaborating services. `NewAuthService` takes the user repository, the refresh token service, and the JWT service:
+`setupTestRouter()` sets `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY`, opens a shared in-memory SQLite (one connection), migrates `User`, `RefreshToken` and `Setting`, calls `utils.InitValidator()`, and returns the `*gin.Engine` and `*gorm.DB`. Create data directly with `db`, then send requests through `router.ServeHTTP`:
 
 ```go
-package services_test
+router, db := setupTestRouter()
+hashed, _ := utils.HashPassword("password123")
+require.NoError(t, db.Create(&models.User{Name: "Test", Email: "t@example.com", Password: hashed, Gender: 1}).Error)
 
-func TestAuthService(t *testing.T) {
-    t.Run("Login - Invalid Credentials", func(t *testing.T) {
-        // Arrange
-        userRepo := new(mocks.MockUserRepository)
-        refreshTokenService := new(mocks.MockRefreshTokenService)
-        jwtService := new(mocks.MockJWTService)
-        service := services.NewAuthService(userRepo, refreshTokenService, jwtService)
+body, _ := json.Marshal(map[string]string{"email": "t@example.com", "password": "password123"})
+w := httptest.NewRecorder()
+req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
+req.Header.Set("Content-Type", "application/json")
+router.ServeHTTP(w, req)
 
-        hashed, _ := utils.HashPassword("correct-password")
-        user := &models.User{ID: 1, Email: "test@example.com", Password: hashed}
-        userRepo.On("FindByField", mock.Anything, "email", "test@example.com").Return(user, nil)
-        userRepo.On("Update", mock.Anything, mock.Anything).Return(nil)
-
-        // Act
-        result, err := service.Login(context.Background(), "test@example.com", "wrong-password", "127.0.0.1")
-
-        // Assert
-        require.Error(t, err)
-        assert.Nil(t, result)
-        appErr, ok := apperror.ToAppError(err)
-        require.True(t, ok)
-        assert.Equal(t, apperror.ErrInvalidPassword, appErr.Code)
-        userRepo.AssertExpectations(t)
-    })
-}
+assert.Equal(t, http.StatusOK, w.Code)
 ```
 
----
+Current suites cover login, logout, refresh token, forgot/reset password, change password, get/update profile, empty bodies, rate limiting, health and version.
 
-## Integration Testing
+### Replacing external calls
 
-Integration-style tests live in `tests/e2e`. They start the real router (`routes.SetupRouter`) with every real repository and service, backed by an in-memory SQLite database, and send requests through `router.ServeHTTP`. Only the SMTP server is not exercised. Run them with `make test-e2e` or `go test ./tests/e2e/... -v`.
+Some packages expose function variables so tests can swap external calls (`newEmailSender`, `parseForgotTemplate` in `internal/services/mail_service.go`; `openGormConnection`, `pingDBFn` in `internal/configs/database.go`). Use an internal test package and restore the original with `t.Cleanup`.
 
-### End-to-End Setup
+### Asynchronous logging
 
-`tests/e2e/setup_test.go` provides `setupTestRouter()`, which:
-
-- sets `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY` for the test process
-- opens a shared in-memory SQLite database (capped at one connection) and migrates `User`, `RefreshToken`, and `Setting`
-- calls `utils.InitValidator()` and returns the configured `*gin.Engine` together with the `*gorm.DB`
-
-```go
-package e2e
-
-func TestAuthLogin(t *testing.T) {
-    router, db := setupTestRouter()
-
-    // Create a user directly in the database
-    hashed, _ := utils.HashPassword("password123")
-    user := models.User{Name: "Test User", Email: "test_login@example.com", Password: hashed, Gender: 1}
-    require.NoError(t, db.Create(&user).Error)
-
-    t.Run("Login - Success", func(t *testing.T) {
-        body, _ := json.Marshal(map[string]string{
-            "email":    "test_login@example.com",
-            "password": "password123",
-        })
-
-        w := httptest.NewRecorder()
-        req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
-        req.Header.Set("Content-Type", "application/json")
-
-        router.ServeHTTP(w, req)
-
-        assert.Equal(t, http.StatusOK, w.Code)
-        var response dto.LoginResponse
-        require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-        assert.NotEmpty(t, response.AccessToken.Token)
-        assert.NotEmpty(t, response.RefreshToken.Token)
-    })
-}
-```
-
-The current e2e suites cover login, logout, refresh token, forgot/reset password, change password, get/update profile, empty request bodies, rate limiting, the health check, and the version endpoint.
-
----
-
-## Mocking Strategy
-
-### Shared Mocks
-
-Reusable mocks live in `tests/mocks` and are written by hand on top of `testify/mock`:
-
-| Mock | Mocks |
-|------|-------|
-| `MockUserRepository` | `repositories.UserRepository` |
-| `MockRefreshTokenRepository` | `repositories.RefreshTokenRepository` |
-| `MockSettingRepository` | `repositories.SettingRepository` |
-| `MockAuthService` | `services.AuthService` |
-| `MockUserService` | `services.UserService` |
-| `MockRefreshTokenService` | `services.RefreshTokenService` |
-| `MockJWTService` | `services.JWTService` |
-| `MockMailerService` | `services.MailerService` |
-| `MockDB` / `MockTx` | GORM transaction helpers |
-
-When you add a repository or service interface, add a matching mock next to these.
-
-```go
-// A mock is a struct embedding mock.Mock; each method records the call
-type MockMailerService struct {
-    mock.Mock
-}
-
-func (m *MockMailerService) SendMailForgotPassword(ctx context.Context, user *models.User) error {
-    args := m.Called(ctx, user)
-    return args.Error(0)
-}
-```
-
-### Mocking with Arguments
-
-```go
-// Every service and repository method receives a context first
-repo.On("GetByID", mock.Anything, uint(1)).Return(&models.User{ID: 1}, nil)
-
-// Match argument by type
-repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil)
-
-// Match argument by function
-repo.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
-    return u.Email != "" && len(u.Name) > 0
-})).Return(nil)
-
-// Specify call count
-repo.On("Update", mock.Anything, mock.Anything).Return(nil).Once()    // Called once
-repo.On("Update", mock.Anything, mock.Anything).Return(nil).Times(3)  // Called 3 times
-repo.On("Update", mock.Anything, mock.Anything).Return(nil)           // Any number of times
-```
-
-### Mocking Internal Hooks
-
-Some packages expose package-level function variables so tests can replace external calls, for example `newEmailSender` and `parseForgotTemplate` in `internal/services/mail_service.go`, or `openGormConnection` and `pingDBFn` in `internal/configs/database.go`. Such tests use an internal test package (`package services`, `package configs`; see `*_internal_test.go`) and restore the original value with `t.Cleanup`.
-
----
-
-## Test Organization
-
-### File Naming
-
-```
-service.go                   // Production code
-service_test.go              // Unit tests (external package, e.g. services_test)
-service_internal_test.go     // Tests that need unexported identifiers (same package)
-```
-
-### Test Package Organization
-
-```
-internal/
-├── services/
-│   ├── user_service.go
-│   ├── user_service_test.go          # package services_test
-│   ├── jwt_service.go
-│   ├── jwt_service_test.go
-│   └── jwt_service_internal_test.go  # package services
-├── handlers/
-│   ├── user_handler.go
-│   └── user_handler_test.go
-└── repositories/
-    ├── user_repository.go
-    └── user_repository_test.go
-tests/
-├── e2e/                              # Full-router tests
-└── mocks/                            # Shared mocks
-```
-
-### Grouped Test Functions
-
-```go
-// Old style - multiple separate test functions
-func TestGetProfile(t *testing.T) { }
-func TestUpdateProfile(t *testing.T) { }
-
-// Preferred style - grouped test functions
-func TestUserService(t *testing.T) {
-    t.Run("GetProfile", func(t *testing.T) { })
-    t.Run("UpdateProfile", func(t *testing.T) { })
-}
-```
-
-### Shared Test Fixtures
-
-```go
-// Helper function for test setup (in-memory SQLite, no cleanup needed)
-func setupUserTestDB(t *testing.T) *gorm.DB {
-    db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-    require.NoError(t, err)
-    require.NoError(t, db.AutoMigrate(&models.User{}))
-    return db
-}
-
-// Usage in tests
-func TestUserRepository(t *testing.T) {
-    db := setupUserTestDB(t)
-    repo := repositories.NewUserRepository(db)
-    // ... test code
-}
-```
-
----
-
-## Coverage Goals
-
-### Target Coverage by Layer
-
-| Layer | Target | Rationale |
-|-------|--------|-----------|
-| Handlers | 95%+ | Critical for API contracts |
-| Services | 85%+ | Core business logic |
-| Repositories | 90%+ | Data access is crucial |
-| Middlewares | 85%+ | Security-related |
-| Utils | 80%+ | General utilities |
-| Models | 0% | Usually just data structures |
-
-CI (`.github/workflows/build.yml`) runs the unit tests of every package except `cmd`, `docs`, and `tests`, and fails if total coverage is below **70%**. `internal/models`, `internal/routes`, and `internal/database/seeders` have no unit tests of their own (routes are covered by the e2e suite).
-
-### Generate Coverage Report
-
-```bash
-# Makefile: core packages, writes coverage.out, coverage-summary.txt, coverage.html
-make test-coverage
-
-# Coverage for all packages
-go test ./... -cover
-
-# Detailed coverage report
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-
-# Coverage for a specific package
-go test ./internal/services -cover
-
-# Total coverage percentage (what CI checks)
-go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//'
-```
-
-### Measuring Coverage
-
-```bash
-# Show uncovered functions
-go tool cover -func=coverage.out | grep 0$
-
-# HTML report with coverage visualization
-go tool cover -html=coverage.out -o coverage.html
-```
-
----
-
-## Common Test Patterns
-
-### Table-Driven Middleware Tests
-
-Many middleware tests define a table of cases with a mock setup function (see `internal/middlewares/auth_middleware_test.go`):
-
-```go
-tests := []struct {
-    name               string
-    authHeader         string
-    mockSetup          func(*mocks.MockJWTService)
-    expectedStatusCode int
-    expectNext         bool
-}{
-    {
-        name:               "missing Authorization header",
-        authHeader:         "",
-        mockSetup:          func(m *mocks.MockJWTService) {},
-        expectedStatusCode: http.StatusUnauthorized,
-        expectNext:         false,
-    },
-    // ...
-}
-
-for _, tt := range tests {
-    t.Run(tt.name, func(t *testing.T) {
-        jwtService := new(mocks.MockJWTService)
-        tt.mockSetup(jwtService)
-        // build a router with middlewares.AuthMiddleware(jwtService), send the request,
-        // and assert on the status code and whether the next handler ran
-    })
-}
-```
-
-### Parametrized Tests
-
-```go
-func TestValidateBirthday(t *testing.T) {
-    tests := []struct {
-        name     string
-        birthday string
-        valid    bool
-    }{
-        {"Valid date", "2000-01-01", true},
-        {"Invalid month", "2000-13-01", false},
-        {"Not a date", "tomorrow", false},
-        {"Empty string", "", false},
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            // validate tt.birthday with the valid_birthday rule and compare with tt.valid
-        })
-    }
-}
-```
-
-### Error Testing
-
-Services return `*apperror.AppError`; assert on its code and HTTP status rather than on message text alone.
-
-```go
-func TestErrorHandling(t *testing.T) {
-    t.Run("Returns custom error", func(t *testing.T) {
-        _, err := service.GetProfile(context.Background(), 9999)
-
-        require.Error(t, err)
-        var appErr *apperror.AppError
-        require.True(t, errors.As(err, &appErr))
-        assert.Equal(t, http.StatusNotFound, appErr.HttpStatusCode)
-        assert.Equal(t, apperror.ErrNotFound, appErr.Code)
-    })
-
-    t.Run("Error contains message", func(t *testing.T) {
-        _, err := service.GetProfile(context.Background(), 9999)
-
-        assert.ErrorContains(t, err, "User not found")
-    })
-}
-```
-
-### Asynchronous Logging
-
-`LogMiddleware` writes its log entry from a goroutine. Tests that assert on log output must wait for it (for example with `assert.Eventually`) instead of reading the buffer immediately, otherwise they are flaky.
-
----
-
-## Performance Testing
-
-### Benchmarking
-
-```go
-func BenchmarkHashPassword(b *testing.B) {
-    for i := 0; i < b.N; i++ {
-        _, _ = utils.HashPassword("SecurePassword123!")
-    }
-}
-
-// Run benchmark
-// go test -bench=. -benchtime=10s ./internal/shared/utils
-```
-
-The project does not currently contain benchmarks or load tests; add them next to the code they measure.
-
----
-
-## Best Practices Summary
-
-✅ **DO:**
-- Write the failing test first (TDD: red → green → refactor), then the code
-- Group related tests under parent test functions
-- Use `require` for critical assertions
-- Use `assert` for value checks
-- Mock external dependencies
-- Test both success and error cases
-- Use table-driven tests for multiple scenarios
-- Keep tests independent and isolated
-- Use meaningful test names
-- Test edge cases and boundary conditions
-- Maintain high test coverage
-
-❌ **DON'T:**
-- Test multiple things in one test
-- Ignore test failures
-- Write tests that depend on each other
-- Skip error handling tests
-- Use time-based assertions (flaky tests)
-- Mock internal dependencies
-- Have complex setup in tests
-- Mix test levels (unit + integration)
-
----
-
-Last Updated: September 30, 2026
+`LogMiddleware` writes its entry from a goroutine. Wait for it with `assert.Eventually` before asserting on log output, otherwise the test is flaky.

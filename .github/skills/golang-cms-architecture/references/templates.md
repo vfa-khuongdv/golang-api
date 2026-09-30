@@ -176,132 +176,54 @@ func TestExampleService_CreateExample(t *testing.T) {
 ```go
 package handlers_test
 
-import (
-    "bytes"
-    "encoding/json"
-    "net/http"
-    "net/http/httptest"
-    "testing"
-
-    "github.com/gin-gonic/gin"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/mock"
-    "github.com/stretchr/testify/require"
-    "github.com/vfa-khuongdv/golang-cms/internal/handlers"
-    "github.com/vfa-khuongdv/golang-cms/internal/models"
-    "github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
-    "github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
-    "github.com/vfa-khuongdv/golang-cms/pkg/apperror"
-    "github.com/vfa-khuongdv/golang-cms/tests/mocks"
-)
-
 func TestCreateExample(t *testing.T) {
     gin.SetMode(gin.TestMode)
-    utils.InitValidator()
+    utils.InitValidator() // registers custom binding rules
 
-    t.Run("CreateExample - Success", func(t *testing.T) {
-        // ARRANGE - Setup mock and handler
-        mockSvc := new(mocks.MockExampleService)
-        handler := handlers.NewExampleHandler(mockSvc)
-
-        example := &models.Example{ID: 1, Name: "Test"}
-        mockSvc.On("CreateExample", mock.Anything, mock.AnythingOfType("*dto.CreateExampleInput")).Return(example, nil)
-
-        // ARRANGE - Create request
-        body, _ := json.Marshal(map[string]string{"name": "Test"})
+    // post builds a test context with a JSON body
+    post := func(body map[string]string) (*gin.Context, *httptest.ResponseRecorder) {
+        b, _ := json.Marshal(body)
         w := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(w)
-        c.Request, _ = http.NewRequest("POST", "/api/v1/examples", bytes.NewBuffer(body))
+        c.Request, _ = http.NewRequest("POST", "/api/v1/examples", bytes.NewBuffer(b))
         c.Request.Header.Set("Content-Type", "application/json")
+        c.Set("UserID", uint(1)) // only needed on authenticated routes
+        return c, w
+    }
 
-        // ACT - Call handler
-        handler.CreateExample(c)
+    t.Run("Success", func(t *testing.T) {
+        svc := new(mocks.MockExampleService)
+        svc.On("CreateExample", mock.Anything, mock.AnythingOfType("*dto.CreateExampleInput")).
+            Return(&models.Example{ID: 1, Name: "Test"}, nil)
+        c, w := post(map[string]string{"name": "Test"})
 
-        // ASSERT - Verify response
+        handlers.NewExampleHandler(svc).CreateExample(c)
+
         assert.Equal(t, http.StatusCreated, w.Code)
-        mockSvc.AssertExpectations(t)
+        svc.AssertExpectations(t)
     })
 
-    t.Run("CreateExample - Validation Error", func(t *testing.T) {
-        mockSvc := new(mocks.MockExampleService)
-        handler := handlers.NewExampleHandler(mockSvc)
+    t.Run("Validation Error", func(t *testing.T) {
+        svc := new(mocks.MockExampleService) // service must not be called
+        c, w := post(map[string]string{})
 
-        body, _ := json.Marshal(map[string]string{})
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        c.Request, _ = http.NewRequest("POST", "/api/v1/examples", bytes.NewBuffer(body))
-        c.Request.Header.Set("Content-Type", "application/json")
-
-        handler.CreateExample(c)
+        handlers.NewExampleHandler(svc).CreateExample(c)
 
         assert.Equal(t, http.StatusBadRequest, w.Code)
-        mockSvc.AssertExpectations(t)
+        svc.AssertExpectations(t)
     })
 
-    t.Run("CreateExample - Service Error", func(t *testing.T) {
-        mockSvc := new(mocks.MockExampleService)
-        handler := handlers.NewExampleHandler(mockSvc)
+    t.Run("Service Error", func(t *testing.T) {
+        svc := new(mocks.MockExampleService)
+        svc.On("CreateExample", mock.Anything, mock.Anything).
+            Return((*models.Example)(nil), apperror.NewInternalServerError("db error"))
+        c, w := post(map[string]string{"name": "Test"})
 
-        mockSvc.On("CreateExample", mock.Anything, mock.AnythingOfType("*dto.CreateExampleInput")).Return(nil, apperror.NewInternalServerError("db error"))
-
-        body, _ := json.Marshal(map[string]string{"name": "Test"})
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        c.Request, _ = http.NewRequest("POST", "/api/v1/examples", bytes.NewBuffer(body))
-        c.Request.Header.Set("Content-Type", "application/json")
-
-        handler.CreateExample(c)
+        handlers.NewExampleHandler(svc).CreateExample(c)
 
         assert.Equal(t, http.StatusInternalServerError, w.Code)
-        mockSvc.AssertExpectations(t)
-    })
-}
-
-func TestGetExampleByID(t *testing.T) {
-    gin.SetMode(gin.TestMode)
-    utils.InitValidator()
-
-    t.Run("GetExampleByID - Success", func(t *testing.T) {
-        mockSvc := new(mocks.MockExampleService)
-        handler := handlers.NewExampleHandler(mockSvc)
-
-        example := &models.Example{ID: 1, Name: "Test"}
-        mockSvc.On("GetExampleByID", mock.Anything, uint(1)).Return(example, nil)
-
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        c.Params = gin.Params{{Key: "id", Value: "1"}}
-        c.Request, _ = http.NewRequest("GET", "/api/v1/examples/1", nil)
-
-        handler.GetExampleByID(c)
-
-        assert.Equal(t, http.StatusOK, w.Code)
-        mockSvc.AssertExpectations(t)
-    })
-
-    t.Run("GetExampleByID - Invalid ID", func(t *testing.T) {
-        mockSvc := new(mocks.MockExampleService)
-        handler := handlers.NewExampleHandler(mockSvc)
-
-        w := httptest.NewRecorder()
-        c, _ := gin.CreateTestContext(w)
-        c.Params = gin.Params{{Key: "id", Value: "abc"}}
-        c.Request, _ = http.NewRequest("GET", "/api/v1/examples/abc", nil)
-
-        handler.GetExampleByID(c)
-
-        assert.Equal(t, http.StatusBadRequest, w.Code)
-        mockSvc.AssertExpectations(t)
     })
 }
 ```
 
-### Handler Test Key Points
-
-1. **Package**: Use `handlers_test` (external test package)
-2. **Context setup**: Always use `gin.SetMode(gin.TestMode)` and `utils.InitValidator()` at the start (the latter registers the custom `binding` rules)
-3. **Authenticated handlers**: Set the user like `AuthMiddleware` does: `c.Set("UserID", uint(1))`
-4. **Request setup**: Create `httptest.NewRecorder()` FIRST, then `gin.CreateTestContext(w)` with that recorder
-5. **Order**: ARRANGE (mock + request) → ACT (handler call) → ASSERT (verify)
-6. **Mock location**: Setup mocks BEFORE creating the request/context
-7. **Test structure**: One `t.Run` per test case, NOT nested test functions in wrong order
+For routes with path params set `c.Params = gin.Params{{Key: "id", Value: "1"}}`. Create the `recorder` first, then the context from it, and set up mocks before the request.
