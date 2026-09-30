@@ -105,7 +105,7 @@ cd golang-api
 cp .env.example .env
 ```
 
-Edit `.env` with your configuration values (database credentials, JWT secret, SMTP settings, etc.).
+Edit `.env` with your configuration values (database credentials, JWT secret, etc.). Mail settings live in the `settings` table, see [Application Settings](#application-settings-settings-table).
 
 ### 3. Build and run the application using Docker
 
@@ -121,6 +121,7 @@ This will:
 - Start a MySQL container on port 3306.
 - Start the application container on port 3000.
 - Start a PHPMyAdmin container on port 8080 for database management.
+- Start a Mailpit container that catches outgoing mail (SMTP on 1026, web UI on 8026).
 
 ### 4. Database Migrations
 
@@ -194,6 +195,25 @@ PHPMyAdmin is available for database management through a web interface:
 - Username: `root`
 - Password: (use the `DB_PASSWORD` value from your `.env` file)
 
+### 8. Local Mail - Mailpit
+
+Mailpit catches every email the app sends locally, so nothing reaches a real inbox:
+
+```bash
+docker-compose up -d mailpit
+```
+
+Point the mail settings at Mailpit (leave `mail_username` empty: no SMTP AUTH, STARTTLS only if offered):
+
+```sql
+UPDATE settings SET value = '127.0.0.1' WHERE `key` = 'mail_host';
+UPDATE settings SET value = '1026' WHERE `key` = 'mail_port';
+UPDATE settings SET value = '' WHERE `key` IN ('mail_username', 'mail_password');
+UPDATE settings SET value = 'noreply@example.com' WHERE `key` = 'mail_from';
+```
+
+Open `http://localhost:8026` to read the captured emails (e.g. password reset links).
+
 ## Environment Variables
 
 The following environment variables are required for the application. See `.env.example` for a complete template:
@@ -230,7 +250,7 @@ Mail and frontend settings are stored as key/value rows in the `settings` table 
 |-----------------|----------------------------------------------------|-------------------------|
 | `mail_host`     | SMTP server host                                   | `smtp.gmail.com`        |
 | `mail_port`     | SMTP server port                                   | `587`                   |
-| `mail_username` | SMTP username                                      | (empty)                 |
+| `mail_username` | SMTP username (empty = no SMTP AUTH, e.g. Mailpit) | (empty)                 |
 | `mail_password` | SMTP password                                      | (empty)                 |
 | `mail_from`     | Email address used as sender                       | (empty)                 |
 | `frontend_url`  | Frontend base URL used in password reset links     | `http://localhost:5173` |

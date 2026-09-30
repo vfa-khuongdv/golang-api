@@ -28,13 +28,21 @@ type GomailSender struct {
 }
 
 func NewGomailSender(config GomailSenderConfig) *GomailSender {
-	client, err := mail.NewClient(
-		config.Host,
-		mail.WithPort(config.Port),
-		mail.WithSMTPAuth(mail.SMTPAuthLogin),
-		mail.WithUsername(config.Username),
-		mail.WithPassword(config.Password),
-	)
+	opts := []mail.Option{mail.WithPort(config.Port)}
+	if config.Username != "" {
+		opts = append(opts,
+			mail.WithSMTPAuth(mail.SMTPAuthLogin),
+			mail.WithUsername(config.Username),
+			mail.WithPassword(config.Password),
+		)
+	} else {
+		// No credentials (e.g. local Mailpit): skip SMTP AUTH and only use
+		// STARTTLS when the server offers it. With credentials, the default
+		// mandatory TLS policy stays in place so passwords never go out in clear.
+		opts = append(opts, mail.WithTLSPolicy(mail.TLSOpportunistic))
+	}
+
+	client, err := mail.NewClient(config.Host, opts...)
 	if err != nil {
 		return nil
 	}

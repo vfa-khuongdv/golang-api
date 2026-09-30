@@ -31,6 +31,14 @@ services:
       MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
     networks:
       - go-network
+  mailpit:
+    container_name: golang-mailpit
+    image: axllent/mailpit:latest
+    ports:
+      - "1026:1025" # SMTP
+      - "8026:8025" # Web UI
+    networks:
+      - go-network
 networks:
   go-network:
     driver: bridge

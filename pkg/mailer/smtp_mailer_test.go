@@ -174,3 +174,40 @@ func TestNewGomailSender(t *testing.T) {
 	assert.Equal(t, config.Password, sender.Config.Password)
 	assert.NotNil(t, sender.Dialer)
 }
+
+func TestNewGomailSender_TLSPolicy(t *testing.T) {
+	t.Run("with credentials keeps mandatory TLS", func(t *testing.T) {
+		sender := mailer.NewGomailSender(mailer.GomailSenderConfig{
+			Host:     "smtp.example.com",
+			Port:     587,
+			Username: "user",
+			Password: "pass",
+		})
+
+		assert.NotNil(t, sender)
+		client, ok := sender.Dialer.(*mail.Client)
+		assert.True(t, ok)
+		assert.Equal(t, mail.TLSMandatory.String(), client.TLSPolicy())
+	})
+
+	t.Run("without credentials uses opportunistic TLS", func(t *testing.T) {
+		sender := mailer.NewGomailSender(mailer.GomailSenderConfig{
+			Host: "127.0.0.1",
+			Port: 1025,
+		})
+
+		assert.NotNil(t, sender)
+		client, ok := sender.Dialer.(*mail.Client)
+		assert.True(t, ok)
+		assert.Equal(t, mail.TLSOpportunistic.String(), client.TLSPolicy())
+	})
+
+	t.Run("without credentials still rejects invalid port", func(t *testing.T) {
+		sender := mailer.NewGomailSender(mailer.GomailSenderConfig{
+			Host: "127.0.0.1",
+			Port: 0,
+		})
+
+		assert.Nil(t, sender)
+	})
+}
