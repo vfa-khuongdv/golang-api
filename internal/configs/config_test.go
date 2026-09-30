@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,5 +173,56 @@ func TestGetEnv(t *testing.T) {
 		assert.Equal(t, defaultVal, val)
 
 		_ = os.Unsetenv(key)
+	})
+}
+
+func setRequiredEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("PORT", "3000")
+	t.Setenv("DB_USERNAME", "u")
+	t.Setenv("DB_PASSWORD", "p")
+	t.Setenv("DB_DATABASE", "d")
+	t.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-32chars")
+	t.Setenv("SETTINGS_ENCRYPTION_KEY", strings.Repeat("a", 40))
+}
+
+func TestLoadDatabasePool(t *testing.T) {
+	t.Run("defaults are sized for several tasks sharing one small RDS", func(t *testing.T) {
+		setRequiredEnv(t)
+		for _, k := range []string{"DB_MAX_OPEN_CONNS", "DB_MAX_IDLE_CONNS", "DB_CONN_MAX_LIFETIME", "DB_CONN_MAX_IDLE_TIME"} {
+			t.Setenv(k, "")
+			_ = os.Unsetenv(k)
+		}
+
+		cfg, err := configs.Load()
+		require.NoError(t, err)
+		assert.Equal(t, 20, cfg.Database.MaxOpenConns)
+		assert.Equal(t, 5, cfg.Database.MaxIdleConns)
+		assert.Equal(t, 30*time.Minute, cfg.Database.ConnMaxLifetime)
+		assert.Equal(t, 5*time.Minute, cfg.Database.ConnMaxIdleTime)
+	})
+
+	t.Run("pool settings can be overridden from env", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("DB_MAX_OPEN_CONNS", "12")
+		t.Setenv("DB_MAX_IDLE_CONNS", "3")
+		t.Setenv("DB_CONN_MAX_LIFETIME", "10m")
+		t.Setenv("DB_CONN_MAX_IDLE_TIME", "90s")
+
+		cfg, err := configs.Load()
+		require.NoError(t, err)
+		assert.Equal(t, 12, cfg.Database.MaxOpenConns)
+		assert.Equal(t, 3, cfg.Database.MaxIdleConns)
+		assert.Equal(t, 10*time.Minute, cfg.Database.ConnMaxLifetime)
+		assert.Equal(t, 90*time.Second, cfg.Database.ConnMaxIdleTime)
+	})
+
+	t.Run("invalid duration falls back to the default", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("DB_CONN_MAX_LIFETIME", "soon")
+
+		cfg, err := configs.Load()
+		require.NoError(t, err)
+		assert.Equal(t, 30*time.Minute, cfg.Database.ConnMaxLifetime)
 	})
 }

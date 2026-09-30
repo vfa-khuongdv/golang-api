@@ -39,17 +39,17 @@ var (
 	pingDBFn  = pingDB
 )
 
-// Default connection pool settings
-// Note:
-// - Current configuration is suitable for moderate workloads (e.g., up to 200 concurrent connections)
-// - So when ccu increases, consider adjusting MaxOpenConns and MaxIdleConns accordingly
-// Example:
-// - For 1000 concurrent connections, set MaxOpenConns to 500 and MaxIdleConns to 100
-// - Monitor database performance and adjust accordingly
-// - Ensure the database server can handle the configured number of connections
+// Default connection pool settings, sized for a small deployment.
+// Total connections to the database = tasks x MaxOpenConns, so size the pool
+// from the database limit, not from the app's concurrency:
+//
+//	MaxOpenConns <= (max_connections * 0.8) / max number of tasks
+//
+// e.g. RDS db.t3.small (max_connections ~150) with 5 tasks: (150 * 0.8) / 5 = 24.
+// Override with DB_MAX_OPEN_CONNS / DB_MAX_IDLE_CONNS per environment.
 const (
-	DEFAULT_MAX_OPEN_CONNS     = 50
-	DEFAULT_MAX_IDLE_CONNS     = 10
+	DEFAULT_MAX_OPEN_CONNS     = 20
+	DEFAULT_MAX_IDLE_CONNS     = 5
 	DEFAULT_CONN_MAX_IDLE_TIME = 5 * time.Minute
 	DEFAULT_CONN_MAX_LIFETIME  = 30 * time.Minute
 )

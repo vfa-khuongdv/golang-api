@@ -84,7 +84,6 @@ The project follows a clean architecture and is organized into the following dir
 ```
 
 Unit tests live next to the code they test (`*_test.go`).
-```
 
 ## Prerequisites
 
@@ -242,8 +241,10 @@ The application is configured through the environment variables below. `DB_USERN
 - `DB_USERNAME` - MySQL database username (required)
 - `DB_PASSWORD` - MySQL database password (required)
 - `DB_DATABASE` - MySQL database name (required)
-- `DB_MAX_OPEN_CONNS` - Maximum open connections in the pool (default: 50)
-- `DB_MAX_IDLE_CONNS` - Maximum idle connections in the pool (default: 10)
+- `DB_MAX_OPEN_CONNS` - Maximum open connections in the pool, per task (default: 20)
+- `DB_MAX_IDLE_CONNS` - Maximum idle connections in the pool, per task (default: 5)
+- `DB_CONN_MAX_LIFETIME` - Maximum lifetime of a connection, e.g. `30m` (default: 30m)
+- `DB_CONN_MAX_IDLE_TIME` - Maximum idle time of a connection, e.g. `5m` (default: 5m)
 
 **Server Configuration:**
 - `PORT` - Port number for the application server (default: 3000)

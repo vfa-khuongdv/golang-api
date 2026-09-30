@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -55,13 +56,15 @@ func Load() (*Config, error) {
 			Stage:   GetEnv("STAGE", "dev"),
 		},
 		Database: DatabaseConfig{
-			Host:         GetEnv("DB_HOST", "127.0.0.1"),
-			Port:         GetEnv("DB_PORT", "3306"),
-			User:         GetEnv("DB_USERNAME", ""),
-			Password:     GetEnv("DB_PASSWORD", ""),
-			DBName:       GetEnv("DB_DATABASE", ""),
-			MaxOpenConns: GetEnvAsInt("DB_MAX_OPEN_CONNS", 50),
-			MaxIdleConns: GetEnvAsInt("DB_MAX_IDLE_CONNS", 10),
+			Host:            GetEnv("DB_HOST", "127.0.0.1"),
+			Port:            GetEnv("DB_PORT", "3306"),
+			User:            GetEnv("DB_USERNAME", ""),
+			Password:        GetEnv("DB_PASSWORD", ""),
+			DBName:          GetEnv("DB_DATABASE", ""),
+			MaxOpenConns:    GetEnvAsInt("DB_MAX_OPEN_CONNS", DEFAULT_MAX_OPEN_CONNS),
+			MaxIdleConns:    GetEnvAsInt("DB_MAX_IDLE_CONNS", DEFAULT_MAX_IDLE_CONNS),
+			ConnMaxLifetime: GetEnvAsDuration("DB_CONN_MAX_LIFETIME", DEFAULT_CONN_MAX_LIFETIME),
+			ConnMaxIdleTime: GetEnvAsDuration("DB_CONN_MAX_IDLE_TIME", DEFAULT_CONN_MAX_IDLE_TIME),
 		},
 		JWT: JWTConfig{
 			Secret: strings.TrimSpace(GetEnv("JWT_KEY", "")),
@@ -125,6 +128,13 @@ func GetEnv(key, defaultValue string) string {
 func GetEnvAsInt(key string, defaultValue int) int {
 	valueStr := GetEnv(key, "")
 	if value, err := strconv.Atoi(valueStr); err == nil {
+		return value
+	}
+	return defaultValue
+}
+
+func GetEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	if value, err := time.ParseDuration(GetEnv(key, "")); err == nil {
 		return value
 	}
 	return defaultValue
