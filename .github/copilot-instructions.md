@@ -169,13 +169,14 @@ When making changes, verify:
 
 ## Configuration & Environment
 
-Environment variables (from `.env` file, see `internal/configs/env.go`):
+Environment variables (from `.env` file, see `internal/configs/config.go`):
 - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` - Database connection
 - `JWT_KEY` - Secret key for JWT token signing (min 32 characters)
-- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` - Email configuration
 - `PORT` - Server port (default: 3000)
 
 For local development, see `.env.example` in root directory.
+
+Mail (`mail_*`) and frontend (`frontend_url`) settings live in the `settings` table (key/value), not in environment variables.
 
 ## When Adding New Features
 

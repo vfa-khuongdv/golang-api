@@ -62,7 +62,7 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 	// Send raw token to user via email (never store raw token in DB)
 	userWithRawToken := *user
 	userWithRawToken.ResetToken = &rawToken
-	if err := service.mailerService.SendMailForgotPassword(&userWithRawToken); err != nil {
+	if err := service.mailerService.SendMailForgotPassword(ctx, &userWithRawToken); err != nil {
 		return err
 	}
 

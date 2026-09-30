@@ -198,34 +198,46 @@ PHPMyAdmin is available for database management through a web interface:
 
 The following environment variables are required for the application. See `.env.example` for a complete template:
 
+**App Configuration:**
+- `APP_SERVICE` - Service name used in logs (default: golang-cms)
+- `APP_VERSION` - Version reported by `/api/v1/version` and logs (default: dev)
+- `RUN_MIGRATE` - Run database migrations on startup when `true` (default: false)
+
 **Database Configuration:**
 - `DB_HOST` - MySQL database host (default: 127.0.0.1)
 - `DB_PORT` - MySQL port number (default: 3306)
-- `DB_USERNAME` - MySQL database username (default: db_user)
-- `DB_PASSWORD` - MySQL database password (default: db_password)
-- `DB_DATABASE` - MySQL database name (default: golang_dev)
+- `DB_USERNAME` - MySQL database username (required)
+- `DB_PASSWORD` - MySQL database password (required)
+- `DB_DATABASE` - MySQL database name (required)
 
 **Server Configuration:**
 - `PORT` - Port number for the application server (default: 3000)
 - `GIN_MODE` - Gin mode ("debug" or "release", default: release)
 - `STAGE` - Environment stage ("local", "dev", "prod", default: dev)
+- `CORS_ALLOWED_ORIGINS` - Comma-separated allowed CORS origins (default: http://localhost:5173)
+- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies (default: empty, trust none)
 
 **JWT Configuration:**
-- `JWT_SECRET` - Secret key for JWT token signing (required)
-- `JWT_EXPIRY` - JWT token expiration in seconds (default: 900 / 15 minutes)
-- `REFRESH_TOKEN_EXPIRY` - Refresh token expiration in seconds (default: 2592000 / 30 days)
-
-**SMTP/Email Configuration:**
-- `SMTP_HOST` - SMTP server host
-- `SMTP_PORT` - SMTP server port
-- `SMTP_USER` - SMTP username
-- `SMTP_PASSWORD` - SMTP password
-- `MAIL_FROM` - Email address used as sender
-
-**Frontend Configuration:**
-- `FRONTEND_URL` - URL of the frontend application for password reset links
+- `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required)
 
 These can be set in the `.env` file or passed as environment variables. A sample `.env.example` file is provided in the repository.
+
+### Application Settings (`settings` table)
+
+Mail and frontend settings are stored as key/value rows in the `settings` table instead of environment variables. Migrations create the rows with default values; update them directly in the database:
+
+| Key             | Description                                        | Default                 |
+|-----------------|----------------------------------------------------|-------------------------|
+| `mail_host`     | SMTP server host                                   | `smtp.gmail.com`        |
+| `mail_port`     | SMTP server port                                   | `587`                   |
+| `mail_username` | SMTP username                                      | (empty)                 |
+| `mail_password` | SMTP password                                      | (empty)                 |
+| `mail_from`     | Email address used as sender                       | (empty)                 |
+| `frontend_url`  | Frontend base URL used in password reset links     | `http://localhost:5173` |
+
+```sql
+UPDATE settings SET value = 'noreply@example.com' WHERE `key` = 'mail_from';
+```
 
 ## API Documentation
 

@@ -126,7 +126,7 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		})).Return(nil).Once()
 
 		// Act
-		s.mailer.On("SendMailForgotPassword", mock.AnythingOfType("*models.User")).Return(nil).Once()
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
@@ -181,7 +181,7 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 
 		s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
-		s.mailer.On("SendMailForgotPassword", mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once()
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once()
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 

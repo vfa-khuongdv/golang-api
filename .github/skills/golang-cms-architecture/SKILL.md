@@ -248,13 +248,8 @@ DB_DATABASE=golang_dev
 # JWT
 JWT_KEY=your-32-character-secret-key-here
 
-# Email
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=user@example.com
-MAIL_PASSWORD=password
-MAIL_FROM=noreply@example.com
-
 # Server
 PORT=3000
 ```
+
+Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment variables; they live in the `settings` table (key/value) and are seeded by migrations.

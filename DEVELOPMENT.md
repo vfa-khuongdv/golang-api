@@ -758,17 +758,9 @@ PORT=3000
 GIN_MODE=debug
 RUN_MIGRATE=true
 STAGE=local
-
-# Email
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=your_email@gmail.com
-MAIL_PASSWORD=app_password
-MAIL_FROM=noreply@example.com
-
-# Frontend
-FRONTEND_URL=http://localhost:5173
 ```
+
+Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment variables; they live in the `settings` table (key/value) and are seeded by migrations.
 
 ---
 

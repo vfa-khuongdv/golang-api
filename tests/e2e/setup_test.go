@@ -66,6 +66,7 @@ func setupTestRouter() (*gin.Engine, *gorm.DB) {
 	err = db.AutoMigrate(
 		&models.User{},
 		&models.RefreshToken{},
+		&models.Setting{},
 	)
 	if err != nil {
 		panic("failed to migrate test database")

@@ -14,7 +14,6 @@ type (
 		Server   ServerConfig
 		Database DatabaseConfig
 		JWT      JWTConfig
-		Mail     MailConfig
 		CORS     CORSConfig
 		App      AppConfig
 	}
@@ -27,14 +26,6 @@ type (
 
 	JWTConfig struct {
 		Secret string
-	}
-
-	MailConfig struct {
-		Host     string
-		Port     int
-		Username string
-		Password string
-		From     string
 	}
 
 	CORSConfig struct {
@@ -70,20 +61,12 @@ func Load() (*Config, error) {
 		JWT: JWTConfig{
 			Secret: strings.TrimSpace(GetEnv("JWT_KEY", "")),
 		},
-		Mail: MailConfig{
-			Host:     GetEnv("MAIL_HOST", "smtp.gmail.com"),
-			Port:     GetEnvAsInt("MAIL_PORT", 587),
-			Username: GetEnv("MAIL_USERNAME", ""),
-			Password: GetEnv("MAIL_PASSWORD", ""),
-			From:     GetEnv("MAIL_FROM", ""),
-		},
 		CORS: CORSConfig{
 			AllowedOrigins: strings.Split(GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		},
 		App: AppConfig{
 			ServiceName: GetEnv("APP_SERVICE", "golang-cms"),
 			Version:     GetEnv("APP_VERSION", "dev"),
-			FrontendURL: GetEnv("FRONTEND_URL", ""),
 			RunMigrate:  GetEnv("RUN_MIGRATE", "false") == "true",
 		},
 	}

@@ -53,10 +53,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	refreshRepo := repositories.NewRefreshTokenRepository(db)
+	settingRepo := repositories.NewSettingRepository(db)
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
-	mailerService := services.NewMailerService()
+	mailerService := services.NewMailerService(settingRepo)
 	userService := services.NewUserService(userRepo, mailerService)
 	jwtService, err := services.NewJWTService()
 	if err != nil {
