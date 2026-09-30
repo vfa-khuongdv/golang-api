@@ -35,7 +35,7 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 	start := time.Now()
 	logger.WithEvent(ctx, logger.EventLoginAttempt).Infof("Login attempt for email: %s", utils.MaskWithPrefix(email, 4))
 
-	user, err := service.repo.FindByField(ctx, "email", email)
+	user, err := service.repo.FindByEmail(ctx, email)
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - user not found: %s", utils.MaskWithPrefix(email, 4))
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")

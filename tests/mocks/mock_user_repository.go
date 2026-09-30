@@ -49,8 +49,13 @@ func (m *MockUserRepository) Delete(ctx context.Context, userId uint) error {
 	return args.Error(0)
 }
 
-func (m *MockUserRepository) FindByField(ctx context.Context, field string, value string) (*models.User, error) {
-	args := m.Called(ctx, field, value)
+func (m *MockUserRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+	args := m.Called(ctx, email)
+	return args.Get(0).(*models.User), args.Error(1)
+}
+
+func (m *MockUserRepository) FindByResetToken(ctx context.Context, token string) (*models.User, error) {
+	args := m.Called(ctx, token)
 	return args.Get(0).(*models.User), args.Error(1)
 }
 

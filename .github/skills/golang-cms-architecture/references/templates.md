@@ -7,7 +7,7 @@ package repositories
 
 type ExampleRepository interface {
     Create(ctx context.Context, example *models.Example) (*models.Example, error)
-    FindByField(ctx context.Context, field string, value string) (*models.Example, error)
+    FindByName(ctx context.Context, name string) (*models.Example, error)
     GetByID(ctx context.Context, id uint) (*models.Example, error)
     GetAll(ctx context.Context, page int, limit int) (*dto.Pagination[*models.Example], error)
     Update(ctx context.Context, example *models.Example) error
@@ -59,7 +59,7 @@ func NewExampleService(exampleRepo repositories.ExampleRepository) ExampleServic
 func (svc *exampleServiceImpl) CreateExample(ctx context.Context, input *dto.CreateExampleInput) (*models.Example, error) {
     // Input format is already validated by the `binding` tags in the handler;
     // services enforce business rules.
-    existing, err := svc.exampleRepo.FindByField(ctx, "name", input.Name)
+    existing, err := svc.exampleRepo.FindByName(ctx, input.Name)
     if err != nil {
         if appErr, ok := apperror.ToAppError(err); !ok || appErr.Code != apperror.ErrNotFound {
             return nil, apperror.NewDBQueryError("Failed to check existing example")
@@ -148,7 +148,7 @@ authenticated.Use(middlewares.AuthMiddleware(jwtService))
 func TestExampleService_CreateExample(t *testing.T) {
     t.Run("Success", func(t *testing.T) {
         mockRepo := new(mocks.MockExampleRepository)
-        mockRepo.On("FindByField", mock.Anything, "name", "Test").Return((*models.Example)(nil), apperror.NewNotFoundError("not found"))
+        mockRepo.On("FindByName", mock.Anything, "Test").Return((*models.Example)(nil), apperror.NewNotFoundError("not found"))
         mockRepo.On("Create", mock.Anything, mock.Anything).Return(&models.Example{ID: 1}, nil)
         
         svc := services.NewExampleService(mockRepo)
@@ -161,7 +161,7 @@ func TestExampleService_CreateExample(t *testing.T) {
     
     t.Run("Conflict - Name Exists", func(t *testing.T) {
         mockRepo := new(mocks.MockExampleRepository)
-        mockRepo.On("FindByField", mock.Anything, "name", "Test").Return(&models.Example{ID: 1}, nil)
+        mockRepo.On("FindByName", mock.Anything, "Test").Return(&models.Example{ID: 1}, nil)
         svc := services.NewExampleService(mockRepo)
 
         _, err := svc.CreateExample(context.Background(), &dto.CreateExampleInput{Name: "Test"})

@@ -34,7 +34,7 @@ func NewUserService(repo repositories.UserRepository, mailerService MailerServic
 }
 
 func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.ForgotPasswordInput) error {
-	user, err := service.repo.FindByField(ctx, "email", input.Email)
+	user, err := service.repo.FindByEmail(ctx, input.Email)
 	if err != nil {
 		appErr, isAppErr := apperror.ToAppError(err)
 		if isAppErr && appErr.Code == apperror.ErrNotFound {
@@ -72,7 +72,7 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.ResetPasswordInput) (*models.User, error) {
 	// Hash the input token to compare with stored hash
 	hashedToken := utils.HashToken(input.Token)
-	user, err := service.repo.FindByField(ctx, "reset_token", hashedToken)
+	user, err := service.repo.FindByResetToken(ctx, hashedToken)
 	if err != nil {
 		return nil, apperror.NewNotFoundError("Invalid token")
 	}

@@ -56,7 +56,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			setupMocks: func() {
 				hashedPassword, _ := utils.HashPassword(password)
 				user := &models.User{ID: 1, Email: email, Password: hashedPassword}
-				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+				s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "mocked-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -70,7 +70,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 		{
 			name: "UserNotFound",
 			setupMocks: func() {
-				s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
+				s.repo.On("FindByEmail", mock.Anything, email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
 			},
 			expectErr: true,
 			errCode:   apperror.ErrInvalidPassword,
@@ -79,7 +79,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			name: "InvalidPassword",
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
-				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+				s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 				s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 			},
 			expectErr: true,
@@ -90,7 +90,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			setupMocks: func() {
 				hashedPassword, _ := utils.HashPassword(password)
 				user := &models.User{ID: 1, Email: email, Password: hashedPassword}
-				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+				s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
 			},
 			expectErr: true,
@@ -101,7 +101,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			setupMocks: func() {
 				hashedPassword, _ := utils.HashPassword(password)
 				user := &models.User{ID: 1, Email: email, Password: hashedPassword}
-				s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+				s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 					Token:     "mocked-access-token",
 					ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -378,7 +378,7 @@ func (s *AuthServiceTestSuite) TestLogin_AccountLocked() {
 
 	lockedUntil := time.Now().Add(30 * time.Minute).Unix()
 	user := &models.User{ID: 1, Email: email, Password: "irrelevant", LockedUntil: &lockedUntil}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
@@ -396,7 +396,7 @@ func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
 
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
@@ -423,7 +423,7 @@ func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
 	hashedPassword, _ := utils.HashPassword(password)
 	expiredLock := time.Now().Add(-30 * time.Minute).Unix()
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3, LockedUntil: &expiredLock}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
@@ -448,7 +448,7 @@ func (s *AuthServiceTestSuite) TestLogin_InvalidPasswordUpdateError() {
 	ipAddress := "127.0.0.1"
 
 	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update error"))
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
@@ -463,7 +463,7 @@ func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
 	ipAddress := "127.0.0.1"
 
 	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: 4}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
@@ -492,7 +492,7 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilExactlyNow() {
 	hashedPassword, _ := utils.HashPassword(password)
 	lockedUntil := time.Now().Unix()
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 0, LockedUntil: &lockedUntil}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
@@ -516,7 +516,7 @@ func (s *AuthServiceTestSuite) TestLogin_EmptyEmail() {
 
 	// Edge: an empty email maps to no user, so login must fail with the same
 	// generic invalid-credentials error as a wrong email (no user enumeration).
-	s.repo.On("FindByField", mock.Anything, "email", email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
+	s.repo.On("FindByEmail", mock.Anything, email).Return((*models.User)(nil), gorm.ErrRecordNotFound)
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
@@ -536,7 +536,7 @@ func (s *AuthServiceTestSuite) TestLogin_ValidLoginAtMaxFailedAttemptsResets() {
 	// a correct password. FailedAttempts must reset to 0 and LockedUntil cleared.
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: services.MaxFailedAttempts}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
@@ -563,7 +563,7 @@ func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
 	// Boundary: the user is already at MaxFailedAttempts and fails again. The
 	// account must stay locked (FailedAttempts stays >= max, LockedUntil set).
 	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: services.MaxFailedAttempts}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
@@ -588,7 +588,7 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
 	hashedPassword, _ := utils.HashPassword(password)
 	expiredLock := time.Now().Add(-10 * time.Minute).Unix()
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 0, LockedUntil: &expiredLock}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
@@ -614,7 +614,7 @@ func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
 
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 2}
-	s.repo.On("FindByField", mock.Anything, "email", email).Return(user, nil)
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 	s.repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update error"))
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",

@@ -163,7 +163,7 @@ func TestUserRepository(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("FindByField - Find By Email Success", func(t *testing.T) {
+	t.Run("FindByEmail - Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
@@ -177,7 +177,7 @@ func TestUserRepository(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		foundUser, err := repo.FindByField(context.Background(), "email", "email@example.com")
+		foundUser, err := repo.FindByEmail(context.Background(), "email@example.com")
 
 		// Assert
 		require.NoError(t, err)
@@ -185,29 +185,7 @@ func TestUserRepository(t *testing.T) {
 		assert.Equal(t, "Find User", foundUser.Name)
 	})
 
-	t.Run("FindByField - Find By Name Success", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		mockUser := &models.User{
-			Name:     "Another User",
-			Email:    "another@example.com",
-			Password: "password",
-			Gender:   1,
-		}
-		_, err := repo.Create(context.Background(), mockUser)
-		require.NoError(t, err)
-
-		// Act
-		foundUser, err := repo.FindByField(context.Background(), "name", "Another User")
-
-		// Assert
-		require.NoError(t, err)
-		require.NotNil(t, foundUser)
-		assert.Equal(t, "Another User", foundUser.Name)
-	})
-
-	t.Run("FindByField - Find By Token Success", func(t *testing.T) {
+	t.Run("FindByResetToken - Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
@@ -222,7 +200,7 @@ func TestUserRepository(t *testing.T) {
 		require.NoError(t, err)
 
 		// Act
-		foundUser, err := repo.FindByField(context.Background(), "reset_token", "token123")
+		foundUser, err := repo.FindByResetToken(context.Background(), "token123")
 
 		// Assert
 		require.NoError(t, err)
@@ -230,26 +208,26 @@ func TestUserRepository(t *testing.T) {
 		assert.Equal(t, "Token User", foundUser.Name)
 	})
 
-	t.Run("FindByField - Not Found Error", func(t *testing.T) {
+	t.Run("FindByResetToken - Not Found Error", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
 
 		// Act
-		user, err := repo.FindByField(context.Background(), "email", "notfound@example.com")
+		user, err := repo.FindByResetToken(context.Background(), "missing")
 
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
 	})
 
-	t.Run("FindByField - Invalid Field Error", func(t *testing.T) {
+	t.Run("FindByEmail - Not Found Error", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
 
 		// Act
-		user, err := repo.FindByField(context.Background(), "sql;", "Invalid")
+		user, err := repo.FindByEmail(context.Background(), "notfound@example.com")
 
 		// Assert
 		assert.Error(t, err)
@@ -559,7 +537,7 @@ func TestUserRepository(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("FindByField - Database Error", func(t *testing.T) {
+	t.Run("FindByEmail - Database Error", func(t *testing.T) {
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
 
@@ -568,7 +546,7 @@ func TestUserRepository(t *testing.T) {
 		})
 		defer func() { _ = db.Callback().Query().Remove("force_findbyfield_db_error") }()
 
-		user, err := repo.FindByField(context.Background(), "email", "test@test.com")
+		user, err := repo.FindByEmail(context.Background(), "test@test.com")
 		assert.Error(t, err)
 		assert.Nil(t, user)
 	})

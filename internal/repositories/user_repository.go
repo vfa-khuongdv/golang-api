@@ -20,7 +20,8 @@ type UserRepository interface {
 	CreateWithTx(ctx context.Context, tx *gorm.DB, user *models.User) (*models.User, error)
 	Update(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, userId uint) error
-	FindByField(ctx context.Context, field string, value string) (*models.User, error)
+	FindByEmail(ctx context.Context, email string) (*models.User, error)
+	FindByResetToken(ctx context.Context, token string) (*models.User, error)
 	GetUsers(ctx context.Context, page int, limit int) (*dto.Pagination[*models.User], error)
 	BeginTx(ctx context.Context) (*gorm.DB, error)
 }
@@ -113,23 +114,22 @@ func (repo *userRepositoryImpl) Delete(ctx context.Context, userId uint) error {
 	return nil
 }
 
-func (repo *userRepositoryImpl) FindByField(ctx context.Context, field string, value string) (*models.User, error) {
-	allowedFields := map[string]bool{
-		"name":        true,
-		"email":       true,
-		"reset_token": true,
-	}
+func (repo *userRepositoryImpl) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+	return repo.first(ctx, "email", repo.db.WithContext(ctx).Where("email = ?", email))
+}
 
-	if !allowedFields[field] {
-		return nil, apperror.New(http.StatusBadRequest, apperror.ErrBadRequest, "Invalid field")
-	}
+func (repo *userRepositoryImpl) FindByResetToken(ctx context.Context, token string) (*models.User, error) {
+	return repo.first(ctx, "reset_token", repo.db.WithContext(ctx).Where("reset_token = ?", token))
+}
 
+// first fetches the first user matched by query; field is only used for logging.
+func (repo *userRepositoryImpl) first(ctx context.Context, field string, query *gorm.DB) (*models.User, error) {
 	var user models.User
-	if err := repo.db.WithContext(ctx).Where(field+" = ?", value).First(&user).Error; err != nil {
+	if err := query.First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.New(http.StatusNotFound, apperror.ErrNotFound, "User not found")
 		}
-		logger.WithContext(ctx).Errorf("DB error: failed to fetch user by field %s: %v", field, err)
+		logger.WithContext(ctx).Errorf("DB error: failed to fetch user by %s: %v", field, err)
 		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch user", err)
 	}
 	return &user, nil
