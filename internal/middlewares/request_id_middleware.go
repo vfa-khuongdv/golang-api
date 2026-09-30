@@ -1,9 +1,8 @@
 package middlewares
 
 import (
-	"uuid"
-
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 )
 
