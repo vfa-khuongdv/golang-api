@@ -66,8 +66,14 @@ type bodyWriter struct {
 	body *bytes.Buffer
 }
 
+// Write forwards to the client and keeps a copy for logging only for error
+// responses (the only ones whose body is logged), capped at MAX_BODY_SIZE.
 func (w *bodyWriter) Write(b []byte) (int, error) {
-	w.body.Write(b)
+	if w.Status() >= 400 {
+		if remaining := MAX_BODY_SIZE - w.body.Len(); remaining > 0 {
+			w.body.Write(b[:min(len(b), remaining)])
+		}
+	}
 	return w.ResponseWriter.Write(b)
 }
 
@@ -152,6 +158,12 @@ func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
 
 func LogMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Load balancer probes hit this every few seconds on every task.
+		if c.Request.URL.Path == "/healthz" {
+			c.Next()
+			return
+		}
+
 		timeStart := time.Now()
 
 		logEntry := LogResponse{
@@ -187,8 +199,8 @@ func LogMiddleware() gin.HandlerFunc {
 			}
 		}
 
-		// Limit response body capture to MAX_BODY_SIZE
-		responseBody := bytes.NewBuffer(make([]byte, 0, MAX_BODY_SIZE))
+		// Response body capture is capped at MAX_BODY_SIZE and only allocated for errors
+		responseBody := &bytes.Buffer{}
 		c.Writer = &bodyWriter{
 			ResponseWriter: c.Writer,
 			body:           responseBody,

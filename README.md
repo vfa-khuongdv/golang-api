@@ -251,7 +251,7 @@ The application is configured through the environment variables below. `DB_USERN
 - `GIN_MODE` - Gin mode ("debug", "release", or "test", default: release)
 - `STAGE` - Environment stage, e.g. "local", "dev", "prod" (default: dev). Also reported as `env` in logs. Swagger UI and `swagger.json` are not served when it is `prod`.
 - `CORS_ALLOWED_ORIGINS` - Comma-separated allowed CORS origins, read on every request (default: http://localhost:5173)
-- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies (default: empty, trust none). Leave empty when the app is exposed directly so `X-Forwarded-For` cannot spoof the client IP used by the rate limiter.
+- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies / load balancers (default: `0.0.0.0/0`, trust every peer). The client IP used by the rate limiter and stored on refresh tokens is read from `X-Forwarded-For` when the request comes from a trusted peer. Behind a load balancer (AWS ALB, nginx, Cloudflare) it must trust the proxy, otherwise all clients appear with the proxy's IP and the public auth endpoints allow only 10 requests/minute for all users together. The default works without knowing the proxy's IP, but a client can spoof `X-Forwarded-For` and dodge the per-IP rate limit; set the proxy CIDR (e.g. the VPC CIDR `10.0.0.0/16`) to prevent that. Set it to an empty value when the app is exposed directly with no proxy.
 
 **JWT Configuration:**
 - `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required; the router refuses to start with a shorter key)

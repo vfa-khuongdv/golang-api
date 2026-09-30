@@ -173,3 +173,44 @@ func TestLogMiddleware_LogsRequest(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.NotEmpty(t, waitForLog(t, &buf, time.Second))
 }
+
+func TestBodyWriter(t *testing.T) {
+	newWriter := func(status int) (*bodyWriter, *httptest.ResponseRecorder) {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Status(status)
+		return &bodyWriter{ResponseWriter: c.Writer, body: &bytes.Buffer{}}, rec
+	}
+
+	t.Run("success response is forwarded but not buffered", func(t *testing.T) {
+		w, rec := newWriter(http.StatusOK)
+
+		_, err := w.Write([]byte("hello"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, "hello", rec.Body.String())
+		assert.Zero(t, w.body.Len())
+	})
+
+	t.Run("error response is buffered", func(t *testing.T) {
+		w, rec := newWriter(http.StatusBadRequest)
+
+		_, err := w.Write([]byte("bad"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, "bad", rec.Body.String())
+		assert.Equal(t, "bad", w.body.String())
+	})
+
+	t.Run("buffer is capped at MAX_BODY_SIZE while the client gets everything", func(t *testing.T) {
+		w, rec := newWriter(http.StatusInternalServerError)
+		payload := bytes.Repeat([]byte("x"), MAX_BODY_SIZE+1000)
+
+		n, err := w.Write(payload)
+
+		assert.NoError(t, err)
+		assert.Equal(t, len(payload), n)
+		assert.Equal(t, len(payload), rec.Body.Len())
+		assert.Equal(t, MAX_BODY_SIZE, w.body.Len())
+	})
+}

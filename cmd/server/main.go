@@ -22,6 +22,19 @@ var (
 	server *http.Server
 )
 
+// newHTTPServer builds the server with timeouts. ReadHeaderTimeout stops
+// slow-header (slowloris) clients from holding connections; IdleTimeout must be
+// longer than the load balancer's idle timeout (ALB default 60s), otherwise the
+// load balancer reuses a connection Go has already closed and returns 502.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       75 * time.Second,
+	}
+}
+
 func initializeDatabase() *gorm.DB {
 	return configs.InitDB(cfg.Database)
 }
@@ -79,10 +92,7 @@ func main() {
 
 	// Start server
 	port := fmt.Sprintf(":%s", cfg.Server.Port)
-	server = &http.Server{
-		Addr:    port,
-		Handler: router,
-	}
+	server = newHTTPServer(port, router)
 
 	go func() {
 		logger.Infof("Server starting on %s", port)

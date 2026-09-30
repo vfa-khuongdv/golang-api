@@ -10,6 +10,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type RefreshTokenRepository interface {
@@ -60,7 +61,9 @@ func (repo *refreshTokenRepositoryImpl) Update(ctx context.Context, token *model
 
 func (repo *refreshTokenRepositoryImpl) FindByTokenWithTx(ctx context.Context, tx *gorm.DB, token string) (*models.RefreshToken, error) {
 	var refreshToken models.RefreshToken
-	if err := tx.WithContext(ctx).Where("refresh_token = ? and expired_at > ?", token, time.Now().Unix()).First(&refreshToken).Error; err != nil {
+	// Lock the row for the rest of the rotation transaction, otherwise two
+	// concurrent refreshes with the same token could both succeed.
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where("refresh_token = ? and expired_at > ?", token, time.Now().Unix()).First(&refreshToken).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.New(http.StatusNotFound, apperror.ErrNotFound, "Refresh token not found or expired")
 		}
@@ -79,7 +82,8 @@ func (repo *refreshTokenRepositoryImpl) UpdateWithTx(ctx context.Context, tx *go
 }
 
 func (repo *refreshTokenRepositoryImpl) DeleteByUserID(ctx context.Context, userID uint) error {
-	if err := repo.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&models.RefreshToken{}).Error; err != nil {
+	// Unscoped: hard delete, a soft delete would leave the row in the table forever.
+	if err := repo.db.WithContext(ctx).Unscoped().Where("user_id = ?", userID).Delete(&models.RefreshToken{}).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to delete refresh tokens for user ID %d: %v", userID, err)
 		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to delete refresh tokens", err)
 	}

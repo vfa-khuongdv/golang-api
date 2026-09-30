@@ -22,12 +22,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize the new Gin router
 	router := gin.New()
 
-	// By default Gin trusts ALL proxies and therefore honors a client-supplied
-	// X-Forwarded-For header, which would let anyone spoof ClientIP() — the key
-	// used by the rate limiter and stored on refresh tokens. Disable proxy
-	// trust unless the operator explicitly opts in via TRUSTED_PROXIES
-	// (comma-separated proxy/LB CIDRs, e.g. "10.0.0.0/8").
-	trustedProxies := configs.GetEnv("TRUSTED_PROXIES", "")
+	// ClientIP() is the key used by the rate limiter and stored on refresh
+	// tokens. Behind a load balancer (AWS ALB) the peer is the balancer, so
+	// without trusting it every client would share one IP and one rate limit.
+	// The default trusts every peer (0.0.0.0/0): the real client IP is read from
+	// X-Forwarded-For, but a client can also spoof it, which weakens the per-IP
+	// rate limit. Set TRUSTED_PROXIES to the proxy CIDRs (e.g. "10.0.0.0/8") to
+	// close that, or to an empty value to trust nothing when exposed directly.
+	trustedProxies := configs.GetEnv("TRUSTED_PROXIES", "0.0.0.0/0")
 	if trustedProxies == "" {
 		if err := router.SetTrustedProxies(nil); err != nil {
 			logger.Fatalf("Failed to disable trusted proxies: %v", err)
