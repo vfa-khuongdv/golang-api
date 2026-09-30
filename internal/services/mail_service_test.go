@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ type mailerServiceTestSuite struct {
 
 func (s *mailerServiceTestSuite) SetupTest() {
 	s.settingRepo = new(mocks.MockSettingRepository)
-	s.mailerService = services.NewMailerService(s.settingRepo)
+	s.mailerService = services.NewMailerService(s.settingRepo, strings.Repeat("a", 40))
 }
 
 func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
@@ -30,7 +31,7 @@ func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 			"mail_host":     "smtp.gmail.com",
 			"mail_port":     "587",
 			"mail_username": "test@example.com",
-			"mail_password": "testpassword",
+			"mail_password": "",
 			"mail_from":     "noreply@example.com",
 			"frontend_url":  "https://example.com",
 		}, nil).Once()

@@ -172,11 +172,12 @@ When making changes, verify:
 Environment variables (from `.env` file, see `internal/configs/config.go`):
 - `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` - Database connection
 - `JWT_KEY` - Secret key for JWT token signing (min 32 characters)
+- `SETTINGS_ENCRYPTION_KEY` - Key encrypting secret settings such as `mail_password` (min 32 characters)
 - `PORT` - Server port (default: 3000)
 
 For local development, see `.env.example` in root directory.
 
-Mail (`mail_*`) and frontend (`frontend_url`) settings live in the `settings` table (key/value), not in environment variables.
+Mail (`mail_*`) and frontend (`frontend_url`) settings live in the `settings` table (key/value), not in environment variables. `mail_password` is stored encrypted (`make encrypt-setting`).
 
 ## When Adding New Features
 

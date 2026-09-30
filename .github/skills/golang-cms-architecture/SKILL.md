@@ -248,8 +248,11 @@ DB_DATABASE=golang_dev
 # JWT
 JWT_KEY=your-32-character-secret-key-here
 
+# Settings encryption
+SETTINGS_ENCRYPTION_KEY=your-32-character-encryption-key-here
+
 # Server
 PORT=3000
 ```
 
-Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment variables; they live in the `settings` table (key/value) and are seeded by migrations.
+Mail (`mail_*`) and frontend (`frontend_url`) settings are not environment variables; they live in the `settings` table (key/value) and are seeded by migrations. `mail_password` is stored encrypted with `SETTINGS_ENCRYPTION_KEY` (generate the value with `make encrypt-setting`).

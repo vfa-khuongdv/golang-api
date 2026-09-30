@@ -21,7 +21,8 @@ type MailerService interface {
 }
 
 type mailerServiceImpl struct {
-	settingRepo repositories.SettingRepository
+	settingRepo   repositories.SettingRepository
+	encryptionKey string
 }
 
 var (
@@ -33,8 +34,10 @@ var (
 	}
 )
 
-func NewMailerService(settingRepo repositories.SettingRepository) MailerService {
-	return &mailerServiceImpl{settingRepo: settingRepo}
+// NewMailerService creates a MailerService. encryptionKey decrypts the
+// mail_password setting, which is stored encrypted (see utils.EncryptSecret).
+func NewMailerService(settingRepo repositories.SettingRepository, encryptionKey string) MailerService {
+	return &mailerServiceImpl{settingRepo: settingRepo, encryptionKey: encryptionKey}
 }
 
 func (s *mailerServiceImpl) SendMailForgotPassword(ctx context.Context, user *models.User) error {
@@ -62,11 +65,21 @@ func (s *mailerServiceImpl) SendMailForgotPassword(ctx context.Context, user *mo
 		return apperror.NewInternalServerError("Frontend URL setting is not configured")
 	}
 
+	// An empty password is allowed (e.g. local Mailpit without SMTP AUTH).
+	password := settings[constants.SettingMailPassword]
+	if password != "" {
+		password, err = utils.DecryptSecret(s.encryptionKey, password)
+		if err != nil {
+			logger.WithContext(ctx).Errorf("Failed to decrypt %s setting: %v", constants.SettingMailPassword, err)
+			return apperror.NewInternalServerError("Mail settings are not configured")
+		}
+	}
+
 	sender := newEmailSender(mailer.GomailSenderConfig{
 		Host:     settings[constants.SettingMailHost],
 		Port:     port,
 		Username: settings[constants.SettingMailUsername],
-		Password: settings[constants.SettingMailPassword],
+		Password: password,
 		From:     settings[constants.SettingMailFrom],
 	})
 	if sender == nil {

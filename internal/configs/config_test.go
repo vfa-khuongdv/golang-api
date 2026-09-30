@@ -2,6 +2,7 @@ package configs_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 func TestLoad(t *testing.T) {
 	// Save and restore the environment variables Load() depends on so the
 	// subtests don't leak mutations into the rest of the test process.
-	envKeys := []string{"PORT", "DB_USERNAME", "DB_PASSWORD", "DB_DATABASE", "JWT_KEY"}
+	envKeys := []string{"PORT", "DB_USERNAME", "DB_PASSWORD", "DB_DATABASE", "JWT_KEY", "SETTINGS_ENCRYPTION_KEY"}
 	original := make(map[string]string, len(envKeys))
 	for _, k := range envKeys {
 		if v, ok := os.LookupEnv(k); ok {
@@ -42,7 +43,8 @@ func TestLoad(t *testing.T) {
 DB_USERNAME=testuser
 DB_PASSWORD=testpass
 DB_DATABASE=testdb
-JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
+JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!
+SETTINGS_ENCRYPTION_KEY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`
 		err = os.WriteFile(".env", []byte(envContent), 0644)
 		require.NoError(t, err)
 
@@ -51,6 +53,7 @@ JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
 		_ = os.Unsetenv("DB_PASSWORD")
 		_ = os.Unsetenv("DB_DATABASE")
 		_ = os.Unsetenv("JWT_KEY")
+		_ = os.Unsetenv("SETTINGS_ENCRYPTION_KEY")
 
 		cfg, err := configs.Load()
 		require.NoError(t, err)
@@ -60,6 +63,7 @@ JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
 		assert.Equal(t, "testpass", cfg.Database.Password)
 		assert.Equal(t, "testdb", cfg.Database.DBName)
 		assert.Equal(t, "this-is-a-long-enough-secret-key-32-chars!!", cfg.JWT.Secret)
+		assert.Equal(t, strings.Repeat("a", 40), cfg.Settings.EncryptionKey)
 	})
 
 	t.Run("Load - Missing required vars returns error", func(t *testing.T) {
@@ -80,6 +84,7 @@ JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
 		_ = os.Unsetenv("DB_PASSWORD")
 		_ = os.Unsetenv("DB_DATABASE")
 		_ = os.Unsetenv("JWT_KEY")
+		_ = os.Unsetenv("SETTINGS_ENCRYPTION_KEY")
 
 		cfg, err := configs.Load()
 		assert.Error(t, err)
@@ -88,6 +93,21 @@ JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
 		assert.Contains(t, err.Error(), "DB_PASSWORD")
 		assert.Contains(t, err.Error(), "DB_DATABASE")
 		assert.Contains(t, err.Error(), "JWT_KEY")
+		assert.Contains(t, err.Error(), "SETTINGS_ENCRYPTION_KEY")
+	})
+
+	t.Run("Load - Missing SETTINGS_ENCRYPTION_KEY", func(t *testing.T) {
+		_ = os.Setenv("PORT", "3000")
+		_ = os.Setenv("DB_USERNAME", "u")
+		_ = os.Setenv("DB_PASSWORD", "p")
+		_ = os.Setenv("DB_DATABASE", "d")
+		_ = os.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-testing-32chars")
+		_ = os.Setenv("SETTINGS_ENCRYPTION_KEY", "   ")
+
+		cfg, err := configs.Load()
+		assert.Error(t, err)
+		assert.Nil(t, cfg)
+		assert.Contains(t, err.Error(), "SETTINGS_ENCRYPTION_KEY")
 	})
 
 	t.Run("Load - Empty PORT env var", func(t *testing.T) {
@@ -109,6 +129,7 @@ JWT_KEY=this-is-a-long-enough-secret-key-32-chars!!`
 		_ = os.Setenv("DB_PASSWORD", "syspass")
 		_ = os.Setenv("DB_DATABASE", "sysdb")
 		_ = os.Setenv("JWT_KEY", "system-wide-secret-key-that-is-long-enough")
+		_ = os.Setenv("SETTINGS_ENCRYPTION_KEY", strings.Repeat("b", 40))
 
 		cfg, err := configs.Load()
 		require.NoError(t, err)

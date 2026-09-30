@@ -14,6 +14,7 @@ type (
 		Server   ServerConfig
 		Database DatabaseConfig
 		JWT      JWTConfig
+		Settings SettingsConfig
 		CORS     CORSConfig
 		App      AppConfig
 	}
@@ -26,6 +27,10 @@ type (
 
 	JWTConfig struct {
 		Secret string
+	}
+
+	SettingsConfig struct {
+		EncryptionKey string
 	}
 
 	CORSConfig struct {
@@ -61,6 +66,9 @@ func Load() (*Config, error) {
 		JWT: JWTConfig{
 			Secret: strings.TrimSpace(GetEnv("JWT_KEY", "")),
 		},
+		Settings: SettingsConfig{
+			EncryptionKey: strings.TrimSpace(GetEnv("SETTINGS_ENCRYPTION_KEY", "")),
+		},
 		CORS: CORSConfig{
 			AllowedOrigins: strings.Split(GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		},
@@ -95,6 +103,9 @@ func (c *Config) validate() error {
 	}
 	if c.JWT.Secret == "" {
 		missing = append(missing, "JWT_KEY")
+	}
+	if c.Settings.EncryptionKey == "" {
+		missing = append(missing, "SETTINGS_ENCRYPTION_KEY")
 	}
 
 	if len(missing) > 0 {

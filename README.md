@@ -240,6 +240,9 @@ The following environment variables are required for the application. See `.env.
 **JWT Configuration:**
 - `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required)
 
+**Settings Encryption:**
+- `SETTINGS_ENCRYPTION_KEY` - Key used to encrypt secret rows of the `settings` table such as `mail_password`, at least 32 characters (required). Changing it makes existing encrypted values unreadable, so re-encrypt them afterwards.
+
 These can be set in the `.env` file or passed as environment variables. A sample `.env.example` file is provided in the repository.
 
 ### Application Settings (`settings` table)
@@ -251,12 +254,24 @@ Mail and frontend settings are stored as key/value rows in the `settings` table 
 | `mail_host`     | SMTP server host                                   | `smtp.gmail.com`        |
 | `mail_port`     | SMTP server port                                   | `587`                   |
 | `mail_username` | SMTP username (empty = no SMTP AUTH, e.g. Mailpit) | (empty)                 |
-| `mail_password` | SMTP password                                      | (empty)                 |
+| `mail_password` | SMTP password, **stored encrypted** (see below)    | (empty)                 |
 | `mail_from`     | Email address used as sender                       | (empty)                 |
 | `frontend_url`  | Frontend base URL used in password reset links     | `http://localhost:5173` |
 
 ```sql
 UPDATE settings SET value = 'noreply@example.com' WHERE `key` = 'mail_from';
+```
+
+`mail_password` must be stored encrypted (AES-256-GCM with `SETTINGS_ENCRYPTION_KEY`); a plaintext value is rejected when sending mail. Leave it empty when the SMTP server needs no password. Generate the encrypted value (the input is read from stdin, so it stays out of shell history):
+
+```bash
+make encrypt-setting            # or: go run ./cmd/encrypt-setting
+# Value to encrypt: ********
+# enc:v1:3q2+7w...
+```
+
+```sql
+UPDATE settings SET value = 'enc:v1:3q2+7w...' WHERE `key` = 'mail_password';
 ```
 
 ## API Documentation
