@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"slices"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
@@ -113,10 +114,40 @@ func (s *roleServiceImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs
 		}
 	}
 
+	if err := s.ensureAdminRetained(ctx, userID, ids); err != nil {
+		return nil, err
+	}
+
 	if err := s.roleRepo.SetUserRoles(ctx, userID, ids); err != nil {
 		return nil, err
 	}
 	return s.roleRepo.FindByUserID(ctx, userID)
+}
+
+// ensureAdminRetained rejects a change that would leave no active user with the
+// admin role, since nobody could then manage roles through the API.
+func (s *roleServiceImpl) ensureAdminRetained(ctx context.Context, userID uint, newRoleIDs []uint) error {
+	current, err := s.roleRepo.FindByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, role := range current {
+		if role.Name != models.RoleAdmin {
+			continue
+		}
+		if slices.Contains(newRoleIDs, role.ID) {
+			return nil
+		}
+		others, err := s.roleRepo.CountUsersWithRole(ctx, role.ID, userID)
+		if err != nil {
+			return err
+		}
+		if others == 0 {
+			return apperror.NewForbiddenError("Cannot remove the admin role from the last admin")
+		}
+		return nil
+	}
+	return nil
 }
 
 // ensureNameFree returns a conflict error when another role (not exceptID)

@@ -157,4 +157,22 @@ func TestRBAC(t *testing.T) {
 		w = rbacRequest(router, "PUT", "/api/v1/users/1/roles", adminToken, `{"role_ids":[99999]}`)
 		assert.NotEqual(t, http.StatusOK, w.Code)
 	})
+
+	t.Run("The Last Admin Cannot Be Demoted", func(t *testing.T) {
+		// Other tests share this database, so make the admin role's holders known.
+		var adminRole models.Role
+		require.NoError(t, db.Where("name = ?", models.RoleAdmin).FirstOrCreate(&adminRole, models.Role{Name: models.RoleAdmin}).Error)
+		require.NoError(t, db.Where("role_id = ?", adminRole.ID).Delete(&models.UserRole{}).Error)
+		onlyAdmin, _ := createUserWithPermissions(t, db, "rbac-only-admin@example.com")
+		require.NoError(t, db.Create(&models.UserRole{UserID: onlyAdmin.ID, RoleID: adminRole.ID}).Error)
+		actor, actorToken := createUserWithPermissions(t, db, "rbac-actor@example.com", constants.PermissionUsersAssign)
+
+		w := rbacRequest(router, "PUT", fmt.Sprintf("/api/v1/users/%d/roles", onlyAdmin.ID), actorToken, `{"role_ids":[]}`)
+		assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+
+		// With a second admin, the first can be demoted.
+		require.NoError(t, db.Create(&models.UserRole{UserID: actor.ID, RoleID: adminRole.ID}).Error)
+		w = rbacRequest(router, "PUT", fmt.Sprintf("/api/v1/users/%d/roles", onlyAdmin.ID), actorToken, `{"role_ids":[]}`)
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	})
 }

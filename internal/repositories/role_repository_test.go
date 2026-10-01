@@ -249,3 +249,36 @@ func TestRoleRepository_SetUserRoles(t *testing.T) {
 		assert.Equal(t, "r1", roles[0].Name)
 	})
 }
+
+func TestRoleRepository_CountUsersWithRole(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Counts Other Active Users Only", func(t *testing.T) {
+		db := setupRoleTestDB(t)
+		role := models.Role{Name: "admin"}
+		require.NoError(t, db.Create(&role).Error)
+		active1 := models.User{Email: "a1@example.com", Name: "a1", Password: "x"}
+		active2 := models.User{Email: "a2@example.com", Name: "a2", Password: "x"}
+		deleted := models.User{Email: "d@example.com", Name: "d", Password: "x"}
+		require.NoError(t, db.Create(&[]*models.User{&active1, &active2, &deleted}).Error)
+		require.NoError(t, db.Delete(&deleted).Error)
+		for _, u := range []models.User{active1, active2, deleted} {
+			require.NoError(t, db.Create(&models.UserRole{UserID: u.ID, RoleID: role.ID}).Error)
+		}
+		repo := repositories.NewRoleRepository(db)
+
+		n, err := repo.CountUsersWithRole(ctx, role.ID, active1.ID)
+
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, n, "excludes the given user and soft-deleted users")
+	})
+
+	t.Run("DB Error", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{}) // no tables
+		require.NoError(t, err)
+
+		_, err = repositories.NewRoleRepository(db).CountUsersWithRole(ctx, 1, 2)
+
+		assert.Error(t, err)
+	})
+}
