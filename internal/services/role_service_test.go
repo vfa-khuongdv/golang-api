@@ -59,6 +59,19 @@ func TestRoleService_CreateRole(t *testing.T) {
 		roleRepo.AssertExpectations(t)
 	})
 
+	t.Run("Without Permissions Returns An Empty List Not Nil", func(t *testing.T) {
+		svc, roleRepo, _ := newRoleService()
+		roleRepo.On("FindByName", ctx, "bare").Return(nil, errRoleNotFound)
+		roleRepo.On("FindPermissionsByIDs", ctx, []uint{}).Return(nil, nil)
+		roleRepo.On("Create", ctx, mock.Anything).Return(nil)
+
+		role, err := svc.CreateRole(ctx, &dto.RoleInput{Name: "bare"})
+
+		require.NoError(t, err)
+		assert.NotNil(t, role.Permissions)
+		assert.Empty(t, role.Permissions)
+	})
+
 	t.Run("Duplicate Name Is Conflict", func(t *testing.T) {
 		svc, roleRepo, _ := newRoleService()
 		roleRepo.On("FindByName", ctx, "editor").Return(&models.Role{ID: 9, Name: "editor"}, nil)

@@ -144,6 +144,9 @@ func (s *roleServiceImpl) resolvePermissions(ctx context.Context, permissionIDs 
 	if len(perms) != len(ids) {
 		return nil, apperror.NewBadRequestError("One or more permissions do not exist")
 	}
+	if perms == nil {
+		perms = []models.Permission{} // serialize as [] instead of null
+	}
 	return perms, nil
 }
 
