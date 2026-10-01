@@ -328,6 +328,12 @@ These four endpoints share a per-IP rate limit of 10 requests per minute (`429` 
 - `PATCH /api/v1/profile` - Update authenticated user's profile
 - `POST /api/v1/change-password` - Change authenticated user's password
 
+#### Settings (Authenticated)
+- `GET /api/v1/settings` - Get mail and frontend settings (the mail password is never returned)
+- `PUT /api/v1/settings` - Update the provided settings (the mail password is stored encrypted)
+
+Every account can read and change the settings, so do not add public registration or lower-privileged accounts without adding a role check first.
+
 ## Testing
 
 To install required testing tools and run tests with coverage report generation:

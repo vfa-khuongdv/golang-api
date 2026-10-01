@@ -34,6 +34,10 @@ func (f *fakeSettingRepository) GetValues(_ context.Context, _ ...string) (map[s
 	return f.values, f.err
 }
 
+func (f *fakeSettingRepository) SetValues(_ context.Context, _ map[string]string) error {
+	return f.err
+}
+
 // Low-entropy dummy key so secret scanners do not flag it.
 var testEncryptionKey = strings.Repeat("a", 40)
 

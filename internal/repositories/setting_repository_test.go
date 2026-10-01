@@ -82,4 +82,68 @@ func TestSettingRepository(t *testing.T) {
 		assert.Nil(t, values)
 		assert.Contains(t, err.Error(), "Failed to fetch settings")
 	})
+
+	t.Run("SetValues - Inserts New And Updates Existing Keys", func(t *testing.T) {
+		// Arrange
+		db := setupSettingTestDB(t)
+		require.NoError(t, db.Create(&models.Setting{Key: "mail.host", Value: "old.example.com"}).Error)
+		repo := repositories.NewSettingRepository(db)
+
+		// Act
+		err := repo.SetValues(context.Background(), map[string]string{
+			"mail.host": "smtp.example.com",
+			"mail.port": "587",
+		})
+
+		// Assert
+		require.NoError(t, err)
+		values, err := repo.GetValues(context.Background(), "mail.host", "mail.port")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"mail.host": "smtp.example.com", "mail.port": "587"}, values)
+
+		var count int64
+		db.Model(&models.Setting{}).Where("`key` = ?", "mail.host").Count(&count)
+		assert.Equal(t, int64(1), count)
+	})
+
+	t.Run("SetValues - Empty Value Is Stored", func(t *testing.T) {
+		// Arrange
+		db := setupSettingTestDB(t)
+		require.NoError(t, db.Create(&models.Setting{Key: "mail.username", Value: "mailer"}).Error)
+		repo := repositories.NewSettingRepository(db)
+
+		// Act
+		err := repo.SetValues(context.Background(), map[string]string{"mail.username": ""})
+
+		// Assert
+		require.NoError(t, err)
+		values, err := repo.GetValues(context.Background(), "mail.username")
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"mail.username": ""}, values)
+	})
+
+	t.Run("SetValues - No Values Is A No-Op", func(t *testing.T) {
+		// Arrange
+		repo := repositories.NewSettingRepository(setupSettingTestDB(t))
+
+		// Act
+		err := repo.SetValues(context.Background(), map[string]string{})
+
+		// Assert
+		assert.NoError(t, err)
+	})
+
+	t.Run("SetValues - DB Error", func(t *testing.T) {
+		// Arrange
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		repo := repositories.NewSettingRepository(db) // settings table not migrated
+
+		// Act
+		err = repo.SetValues(context.Background(), map[string]string{"mail.host": "x"})
+
+		// Assert
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Failed to update settings")
+	})
 }

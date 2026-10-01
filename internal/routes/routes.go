@@ -66,6 +66,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 	mailerService := services.NewMailerService(settingRepo, settingsEncryptionKey)
 	userService := services.NewUserService(userRepo, mailerService)
+	settingService := services.NewSettingService(settingRepo, settingsEncryptionKey)
 	jwtService, err := services.NewJWTService()
 	if err != nil {
 		logger.Fatalf("Failed to initialize JWT service: %v", err)
@@ -75,6 +76,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService, mailerService)
+	settingHandler := handlers.NewSettingHandler(settingService)
 
 	// Add middleware
 	router.Use(
@@ -109,6 +111,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.POST("/change-password", userHandler.ChangePassword)
 			authenticated.GET("/profile", userHandler.GetProfile)
 			authenticated.PATCH("/profile", userHandler.UpdateProfile)
+			authenticated.GET("/settings", settingHandler.GetSettings)
+			authenticated.PUT("/settings", settingHandler.UpdateSettings)
 		}
 	}
 
