@@ -34,11 +34,22 @@ func SeedUsers(db *gorm.DB) error {
 		},
 	}
 
-	for _, userData := range users {
+	// The first seeded user becomes the admin so the admin-only endpoints are reachable
+	var adminRole models.Role
+	hasAdminRole := db.Where("name = ?", models.RoleAdmin).First(&adminRole).Error == nil
+
+	for i, userData := range users {
 		// Create new user
 		if err := db.Create(&userData.User).Error; err != nil {
 			logger.Errorf("Error creating user %s: %v", userData.User.Name, err)
 			continue
+		}
+
+		if i == 0 && hasAdminRole {
+			userRole := models.UserRole{UserID: userData.User.ID, RoleID: adminRole.ID}
+			if err := db.Create(&userRole).Error; err != nil {
+				logger.Errorf("Error assigning admin role to %s: %v", userData.User.Email, err)
+			}
 		}
 	}
 
