@@ -73,3 +73,9 @@ func (m *MockRoleRepository) CountRolesByIDs(ctx context.Context, ids []uint) (i
 func (m *MockRoleRepository) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error {
 	return m.Called(ctx, userID, roleIDs).Error(0)
 }
+
+func (m *MockRoleRepository) CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error) {
+	args := m.Called(ctx, roleID, excludeUserID)
+	n, _ := args.Get(0).(int64)
+	return n, args.Error(1)
+}

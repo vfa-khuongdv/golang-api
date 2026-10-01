@@ -29,6 +29,9 @@ type RoleRepository interface {
 	FindPermissionsByIDs(ctx context.Context, ids []uint) ([]models.Permission, error)
 	// CountRolesByIDs counts how many of the IDs exist.
 	CountRolesByIDs(ctx context.Context, ids []uint) (int64, error)
+	// CountUsersWithRole counts the active (not soft-deleted) users that hold
+	// the role, not counting excludeUserID.
+	CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error)
 	// SetUserRoles replaces all roles of the user atomically.
 	SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error
 }
@@ -160,6 +163,18 @@ func (repo *roleRepositoryImpl) CountRolesByIDs(ctx context.Context, ids []uint)
 	}
 	if err := repo.db.WithContext(ctx).Model(&models.Role{}).Where("id IN ?", ids).Count(&count).Error; err != nil {
 		return 0, dbError(ctx, "Failed to count roles", err)
+	}
+	return count, nil
+}
+
+func (repo *roleRepositoryImpl) CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error) {
+	var count int64
+	err := repo.db.WithContext(ctx).Model(&models.UserRole{}).
+		Joins("JOIN users ON users.id = user_roles.user_id AND users.deleted_at IS NULL").
+		Where("user_roles.role_id = ? AND user_roles.user_id <> ?", roleID, excludeUserID).
+		Count(&count).Error
+	if err != nil {
+		return 0, dbError(ctx, "Failed to count users with role", err)
 	}
 	return count, nil
 }
