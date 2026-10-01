@@ -28,6 +28,10 @@
     {
       "name": "Users",
       "description": "Authenticated user profile and password"
+    },
+    {
+      "name": "Settings",
+      "description": "Mail and frontend settings"
     }
   ],
   "paths": {
@@ -828,6 +832,112 @@
           }
         }
       }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Get settings",
+        "description": "The mail password is never returned; mail_password_set tells whether one is stored.",
+        "operationId": "getSettings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Update settings",
+        "description": "Only the provided fields are changed. mail_password is stored encrypted; send an empty string to clear it.",
+        "operationId": "updateSettings",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Update settings successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1084,6 +1194,72 @@
                 }
               }
             }
+          }
+        }
+      },
+      "SettingsResponse": {
+        "type": "object",
+        "properties": {
+          "mail_host": {
+            "type": "string",
+            "example": "smtp.example.com"
+          },
+          "mail_port": {
+            "type": "integer",
+            "example": 587
+          },
+          "mail_username": {
+            "type": "string",
+            "example": "mailer"
+          },
+          "mail_password_set": {
+            "type": "boolean",
+            "example": true
+          },
+          "mail_from": {
+            "type": "string",
+            "format": "email",
+            "example": "noreply@example.com"
+          },
+          "frontend_url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://app.example.com"
+          }
+        }
+      },
+      "UpdateSettingsRequest": {
+        "type": "object",
+        "description": "All fields are optional",
+        "properties": {
+          "mail_host": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "smtp.example.com"
+          },
+          "mail_port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "example": 587
+          },
+          "mail_username": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "mail_password": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Write-only; empty string clears it"
+          },
+          "mail_from": {
+            "type": "string",
+            "format": "email"
+          },
+          "frontend_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "http(s) URL; used in password reset links"
           }
         }
       }

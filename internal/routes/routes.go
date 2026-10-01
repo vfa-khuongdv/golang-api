@@ -10,6 +10,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/constants"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
@@ -57,6 +58,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	userRepo := repositories.NewUserRepository(db)
 	refreshRepo := repositories.NewRefreshTokenRepository(db)
 	settingRepo := repositories.NewSettingRepository(db)
+	roleRepo := repositories.NewRoleRepository(db)
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
@@ -66,6 +68,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 	mailerService := services.NewMailerService(settingRepo, settingsEncryptionKey)
 	userService := services.NewUserService(userRepo, mailerService)
+	settingService := services.NewSettingService(settingRepo, settingsEncryptionKey)
+	roleService := services.NewRoleService(roleRepo, userRepo)
 	jwtService, err := services.NewJWTService()
 	if err != nil {
 		logger.Fatalf("Failed to initialize JWT service: %v", err)
@@ -75,6 +79,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService, mailerService)
+	settingHandler := handlers.NewSettingHandler(settingService)
+	roleHandler := handlers.NewRoleHandler(roleService)
 
 	// Add middleware
 	router.Use(
@@ -109,6 +115,21 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			authenticated.POST("/change-password", userHandler.ChangePassword)
 			authenticated.GET("/profile", userHandler.GetProfile)
 			authenticated.PATCH("/profile", userHandler.UpdateProfile)
+
+			// Routes below require a permission granted by one of the user's roles
+			require := func(permission string) gin.HandlerFunc {
+				return middlewares.RequirePermission(roleService, permission)
+			}
+			authenticated.GET("/settings", require(constants.PermissionSettingsRead), settingHandler.GetSettings)
+			authenticated.PUT("/settings", require(constants.PermissionSettingsUpdate), settingHandler.UpdateSettings)
+
+			authenticated.GET("/roles", require(constants.PermissionRolesRead), roleHandler.ListRoles)
+			authenticated.POST("/roles", require(constants.PermissionRolesCreate), roleHandler.CreateRole)
+			authenticated.GET("/roles/:id", require(constants.PermissionRolesRead), roleHandler.GetRole)
+			authenticated.PUT("/roles/:id", require(constants.PermissionRolesUpdate), roleHandler.UpdateRole)
+			authenticated.DELETE("/roles/:id", require(constants.PermissionRolesDelete), roleHandler.DeleteRole)
+			authenticated.GET("/permissions", require(constants.PermissionPermissionsRead), roleHandler.ListPermissions)
+			authenticated.PUT("/users/:id/roles", require(constants.PermissionUsersAssign), roleHandler.SetUserRoles)
 		}
 	}
 

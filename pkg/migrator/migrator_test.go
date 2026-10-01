@@ -343,5 +343,5 @@ func TestNewMySQLDSN(t *testing.T) {
 	dsn := NewMySQLDSN(cfg)
 
 	// Assert
-	assert.Equal(t, "root:pass@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=UTC", dsn)
+	assert.Equal(t, "root:pass@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true", dsn)
 }

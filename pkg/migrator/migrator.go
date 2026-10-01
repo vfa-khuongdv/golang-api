@@ -74,9 +74,11 @@ func (m *Migrator) Close() {
 	}
 }
 
+// NewMySQLDSN builds the DSN used to run migrations. multiStatements lets one
+// migration file hold several statements.
 func NewMySQLDSN(config MySQLConfig) string {
 	return fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC",
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true",
 		config.User,
 		config.Password,
 		config.Host,
