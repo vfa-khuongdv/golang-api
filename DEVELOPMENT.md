@@ -7,7 +7,7 @@ Project-specific standards for Golang CMS. Setup, environment variables, endpoin
 Clean architecture: `handlers → services → repositories → database`. Dependencies are wired by hand in `SetupRouter` (`internal/routes/routes.go`): repositories → services → handlers.
 
 ```
-cmd/{server,seeder,encrypt-setting}   entry points
+cmd/{server,seeder}   entry points
 internal/
   configs/        env config + DB connection
   database/       migrations/ (SQL, golang-migrate), seeders/
@@ -133,7 +133,7 @@ Do not write production code without a failing test first. Patterns, mocks, e2e 
 
 - **Access JWT**: 1 hour, `access` scope, HMAC-signed only. **Refresh token**: 60 random characters, 30 days, stored in the database, rotated on refresh, deleted on logout. **Reset token**: 1 hour, only its hash is stored.
 - **Passwords**: bcrypt; `password_complexity` requires 8+ characters with upper, lower, digit and special character. 5 failed logins lock the account for 15 minutes (`services.MaxFailedAttempts`, `LockoutDurationMinutes`). The four public auth endpoints are limited to 10 requests/minute per IP. Never reveal whether an email exists.
-- **Secrets**: `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY` (32+ characters) come from the environment. Secret `settings` rows (`mail.password`) are AES-256-GCM encrypted (`utils.EncryptSecret`, `make encrypt-setting`). Mail and frontend settings live in the `settings` table, not env vars.
+- **Secrets**: `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY` (32+ characters) come from the environment. Secret `settings` rows (`mail.password`) are AES-256-GCM encrypted (`utils.EncryptSecret`), set through `PUT /api/v1/settings`. Mail and frontend settings live in the `settings` table, not env vars.
 - **Input**: validate with `binding` tags on DTOs; use GORM parameterized queries; never log raw sensitive values (`utils.MaskWithPrefix`; the log middleware masks bodies and headers).
 - **CORS**: `CORS_ALLOWED_ORIGINS` (exact origins, default `http://localhost:5173`); credentials are allowed, so never use `*` in production.
 - **Proxies**: `TRUSTED_PROXIES` defaults to `0.0.0.0/0` so the client IP (rate limiter key) is read from `X-Forwarded-For` behind an ALB or reverse proxy without configuring its IP. The trade-off is that a client can spoof that header and dodge the per-IP rate limit; set the proxy CIDR to prevent it, or set an empty value when the app is exposed directly with no proxy. Trusting nothing behind a proxy makes all clients share the proxy's IP and throttles every user together.

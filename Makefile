@@ -1,5 +1,5 @@
 .PHONY: help install-tools test test-e2e test-coverage watch-test \
-        build clean encrypt-setting dev lint fmt vet pre-push
+        build clean dev lint fmt vet pre-push
 
 # Variables
 GO := go
@@ -42,10 +42,6 @@ build:
 	@echo "Building $(BINARY_NAME)..."
 	@$(GO) build -o $(BINARY_NAME) ./cmd/server/main.go
 	@echo "✅ Build complete."
-
-## Encrypt Setting: Encrypt a secret setting value (reads the value from stdin)
-encrypt-setting:
-	@$(GO) run ./cmd/encrypt-setting
 
 ## Clean: Remove generated files
 clean:
