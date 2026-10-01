@@ -45,8 +45,6 @@ The project follows a clean architecture and is organized into the following dir
 ├── README.md                         # Project documentation
 ├── TESTING.md                        # Testing standards
 ├── cmd                               # Command-line entry points
-│   ├── encrypt-setting               # Encrypts secret setting values (e.g. mail.password)
-│   │   └── main.go
 │   ├── seeder                        # Seeder for initial data population
 │   │   └── seeder.go
 │   └── server                        # Main entry point for the web server
@@ -280,16 +278,12 @@ UPDATE settings SET value = '587' WHERE `key` = 'mail.port';
 UPDATE settings SET value = 'user@example.com' WHERE `key` = 'mail.username';
 ```
 
-`mail.password` must be stored encrypted (AES-256-GCM with `SETTINGS_ENCRYPTION_KEY`); a plaintext value is rejected when sending mail. Leave it empty when the SMTP server needs no password. Generate the encrypted value (the input is read from stdin, so it stays out of shell history):
+`mail.password` is stored encrypted (AES-256-GCM with `SETTINGS_ENCRYPTION_KEY`); a plaintext value in the table is rejected when sending mail, so do not set it with SQL. Set it through the authenticated settings API, which encrypts it before saving. Leave it empty when the SMTP server needs no password:
 
 ```bash
-make encrypt-setting            # or: go run ./cmd/encrypt-setting
-# Value to encrypt: ********
-# enc:v1:3q2+7w...
-```
-
-```sql
-UPDATE settings SET value = 'enc:v1:3q2+7w...' WHERE `key` = 'mail.password';
+curl -X PUT http://localhost:3000/api/v1/settings \
+  -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
+  -d '{"mail_password": "your-smtp-password"}'
 ```
 
 ## API Documentation
@@ -369,7 +363,6 @@ Unit tests sit next to the code they test (`internal/**/*_test.go`, `pkg/**/*_te
 - `make install-tools`: Install all required development tools
 - `make help`: List all targets
 - `make build`: Build the application binary to `bin/server`
-- `make encrypt-setting`: Encrypt a secret setting value (reads from stdin)
 - `make clean`: Remove generated files and binaries
 - `make test`: Run unit tests with gotestsum
 - `make test-e2e`: Run end-to-end tests
