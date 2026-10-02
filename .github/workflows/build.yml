@@ -161,3 +161,8 @@ jobs:
 
       - name: 🐳 Build image (not pushed)
         run: docker build -t golang-cms:${{ github.sha }} .
+
+      - name: 📄 Check the image contains the migrations and API docs
+        run: |
+          docker run --rm --entrypoint ls golang-cms:${{ github.sha }} \
+            internal/database/migrations/000001_create_users_table.up.sql docs/swagger.json docs/swagger.html

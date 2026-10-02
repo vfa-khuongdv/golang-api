@@ -37,4 +37,3 @@ testdata/
 # Others
 docker-compose.yml
 mysql/
-docs/
