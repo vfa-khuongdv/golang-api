@@ -32,6 +32,10 @@ type RoleRepository interface {
 	// CountUsersWithRole counts the active (not soft-deleted) users that hold
 	// the role, not counting excludeUserID.
 	CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error)
+	// FindPermissionIDsByUserID returns the distinct permissions granted by the user's roles.
+	FindPermissionIDsByUserID(ctx context.Context, userID uint) ([]uint, error)
+	// FindPermissionIDsByRoleIDs returns the distinct permissions of the roles.
+	FindPermissionIDsByRoleIDs(ctx context.Context, roleIDs []uint) ([]uint, error)
 	// SetUserRoles replaces all roles of the user atomically.
 	SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error
 }
@@ -177,6 +181,30 @@ func (repo *roleRepositoryImpl) CountUsersWithRole(ctx context.Context, roleID u
 		return 0, dbError(ctx, "Failed to count users with role", err)
 	}
 	return count, nil
+}
+
+func (repo *roleRepositoryImpl) FindPermissionIDsByUserID(ctx context.Context, userID uint) ([]uint, error) {
+	var ids []uint
+	err := repo.db.WithContext(ctx).Table("role_permissions").Distinct("role_permissions.permission_id").
+		Joins("JOIN user_roles ON user_roles.role_id = role_permissions.role_id").
+		Where("user_roles.user_id = ?", userID).Pluck("role_permissions.permission_id", &ids).Error
+	if err != nil {
+		return nil, dbError(ctx, "Failed to fetch user permissions", err)
+	}
+	return ids, nil
+}
+
+func (repo *roleRepositoryImpl) FindPermissionIDsByRoleIDs(ctx context.Context, roleIDs []uint) ([]uint, error) {
+	var ids []uint
+	if len(roleIDs) == 0 {
+		return ids, nil
+	}
+	err := repo.db.WithContext(ctx).Table("role_permissions").Distinct("permission_id").
+		Where("role_id IN ?", roleIDs).Pluck("permission_id", &ids).Error
+	if err != nil {
+		return nil, dbError(ctx, "Failed to fetch role permissions", err)
+	}
+	return ids, nil
 }
 
 func (repo *roleRepositoryImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error {

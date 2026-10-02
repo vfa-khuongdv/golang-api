@@ -282,3 +282,71 @@ func TestRoleRepository_CountUsersWithRole(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestRoleRepository_FindPermissionIDsByUserID(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Returns The Distinct Permissions Of All Roles Of The User", func(t *testing.T) {
+		db := setupRoleTestDB(t)
+		read, update, other := models.Permission{Name: "a:read"}, models.Permission{Name: "a:update"}, models.Permission{Name: "b:read"}
+		require.NoError(t, db.Create(&[]*models.Permission{&read, &update, &other}).Error)
+		r1 := models.Role{Name: "r1", Permissions: []models.Permission{read}}
+		r2 := models.Role{Name: "r2", Permissions: []models.Permission{read, update}}
+		r3 := models.Role{Name: "r3", Permissions: []models.Permission{other}}
+		require.NoError(t, db.Create(&[]*models.Role{&r1, &r2, &r3}).Error)
+		require.NoError(t, db.Create(&[]models.UserRole{{UserID: 7, RoleID: r1.ID}, {UserID: 7, RoleID: r2.ID}, {UserID: 8, RoleID: r3.ID}}).Error)
+		repo := repositories.NewRoleRepository(db)
+
+		ids, err := repo.FindPermissionIDsByUserID(ctx, 7)
+
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []uint{read.ID, update.ID}, ids)
+	})
+
+	t.Run("DB Error", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{}) // no tables
+		require.NoError(t, err)
+
+		_, err = repositories.NewRoleRepository(db).FindPermissionIDsByUserID(ctx, 1)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestRoleRepository_FindPermissionIDsByRoleIDs(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("Returns The Distinct Permissions Of The Roles", func(t *testing.T) {
+		db := setupRoleTestDB(t)
+		read, update, other := models.Permission{Name: "a:read"}, models.Permission{Name: "a:update"}, models.Permission{Name: "b:read"}
+		require.NoError(t, db.Create(&[]*models.Permission{&read, &update, &other}).Error)
+		r1 := models.Role{Name: "r1", Permissions: []models.Permission{read}}
+		r2 := models.Role{Name: "r2", Permissions: []models.Permission{read, update}}
+		r3 := models.Role{Name: "r3", Permissions: []models.Permission{other}}
+		require.NoError(t, db.Create(&[]*models.Role{&r1, &r2, &r3}).Error)
+		repo := repositories.NewRoleRepository(db)
+
+		ids, err := repo.FindPermissionIDsByRoleIDs(ctx, []uint{r1.ID, r2.ID})
+
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []uint{read.ID, update.ID}, ids)
+	})
+
+	t.Run("No Roles Returns No Permissions", func(t *testing.T) {
+		repo := repositories.NewRoleRepository(setupRoleTestDB(t))
+
+		ids, err := repo.FindPermissionIDsByRoleIDs(ctx, nil)
+
+		require.NoError(t, err)
+		assert.Empty(t, ids)
+	})
+
+	t.Run("DB Error", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{}) // no tables
+		require.NoError(t, err)
+
+		_, err = repositories.NewRoleRepository(db).FindPermissionIDsByRoleIDs(ctx, []uint{1})
+
+		assert.Error(t, err)
+	})
+}
