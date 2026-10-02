@@ -23,18 +23,21 @@ type UserServiceTestSuite struct {
 	suite.Suite
 	repo    *mocks.MockUserRepository
 	mailer  *mocks.MockMailerService
+	refresh *mocks.MockRefreshTokenService
 	service services.UserService
 }
 
 func (s *UserServiceTestSuite) SetupTest() {
 	s.repo = new(mocks.MockUserRepository)
 	s.mailer = new(mocks.MockMailerService)
-	s.service = services.NewUserService(s.repo, s.mailer)
+	s.refresh = new(mocks.MockRefreshTokenService)
+	s.service = services.NewUserService(s.repo, s.mailer, s.refresh)
 }
 
 func (s *UserServiceTestSuite) TearDownTest() {
 	s.repo.AssertExpectations(s.T())
 	s.mailer.AssertExpectations(s.T())
+	s.refresh.AssertExpectations(s.T())
 }
 
 func (s *UserServiceTestSuite) TestGetProfile() {
@@ -235,6 +238,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
 
@@ -265,6 +269,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 
 		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
 
@@ -275,6 +280,22 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		s.Nil(result.ResetExpiredAt)
 		s.Zero(result.FailedAttempts)
 		s.Nil(result.LockedUntil)
+	})
+
+	s.T().Run("RevokeSessionsFailure", func(t *testing.T) {
+		input := &dto.ResetPasswordInput{Token: "token-7", NewPassword: "new-password"}
+		hashedToken := utils.HashToken(input.Token)
+		notExpired := time.Now().Add(10 * time.Minute).Unix()
+		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
+
+		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(apperror.NewDBDeleteError("Failed to delete refresh tokens")).Once()
+
+		result, err := s.service.ResetPassword(context.Background(), input)
+
+		s.Nil(result)
+		s.Error(err)
 	})
 
 	s.T().Run("HashPasswordFailure", func(t *testing.T) {
@@ -398,12 +419,31 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(6)).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(nil).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 6, input)
 
 		s.NoError(err)
 		s.NotNil(result)
 		s.True(utils.CheckPasswordHash(input.NewPassword, result.Password))
+	})
+
+	s.T().Run("RevokeSessionsFailure", func(t *testing.T) {
+		input := &dto.ChangePasswordInput{
+			OldPassword:     "old-password",
+			NewPassword:     "new-password",
+			ConfirmPassword: "new-password",
+		}
+		hashedPassword, _ := utils.HashPassword(input.OldPassword)
+		user := &models.User{ID: 7, Password: hashedPassword}
+		s.repo.On("GetByID", mock.Anything, uint(7)).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.refresh.On("DeleteByUserID", mock.Anything, uint(7)).Return(apperror.NewDBDeleteError("Failed to delete refresh tokens")).Once()
+
+		result, err := s.service.ChangePassword(context.Background(), 7, input)
+
+		s.Nil(result)
+		s.Error(err)
 	})
 }
 

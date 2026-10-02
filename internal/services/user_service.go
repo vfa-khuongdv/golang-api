@@ -22,14 +22,18 @@ type UserService interface {
 }
 
 type userServiceImpl struct {
-	repo          repositories.UserRepository
-	mailerService MailerService
+	repo                repositories.UserRepository
+	mailerService       MailerService
+	refreshTokenService RefreshTokenService
 }
 
-func NewUserService(repo repositories.UserRepository, mailerService MailerService) UserService {
+// NewUserService creates a UserService. refreshTokenService revokes the user's
+// sessions after a password reset or change.
+func NewUserService(repo repositories.UserRepository, mailerService MailerService, refreshTokenService RefreshTokenService) UserService {
 	return &userServiceImpl{
-		repo:          repo,
-		mailerService: mailerService,
+		repo:                repo,
+		mailerService:       mailerService,
+		refreshTokenService: refreshTokenService,
 	}
 }
 
@@ -99,6 +103,11 @@ func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.Re
 		logger.WithEvent(ctx, logger.EventPasswordReset).Errorf("Failed to update user password: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update password")
 	}
+
+	// Sign out every session, so whoever knew the old password loses access.
+	if err := service.refreshTokenService.DeleteByUserID(ctx, user.ID); err != nil {
+		return nil, err
+	}
 	return user, nil
 }
 
@@ -130,6 +139,11 @@ func (service *userServiceImpl) ChangePassword(ctx context.Context, userId uint,
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventPasswordChangeFailed).Errorf("Failed to update user password: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update password")
+	}
+
+	// Sign out every session, so whoever knew the old password loses access.
+	if err := service.refreshTokenService.DeleteByUserID(ctx, user.ID); err != nil {
+		return nil, err
 	}
 	return user, nil
 }

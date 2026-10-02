@@ -67,7 +67,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		logger.Fatalf("SETTINGS_ENCRYPTION_KEY must be at least %d characters", utils.MinSecretKeyLength)
 	}
 	mailerService := services.NewMailerService(settingRepo, settingsEncryptionKey)
-	userService := services.NewUserService(userRepo, mailerService)
+	userService := services.NewUserService(userRepo, mailerService, refreshTokenService)
 	settingService := services.NewSettingService(settingRepo, settingsEncryptionKey)
 	roleService := services.NewRoleService(roleRepo, userRepo)
 	jwtService, err := services.NewJWTService()
