@@ -2,9 +2,11 @@ package routes_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -155,5 +157,21 @@ func TestSetupRouter_SwaggerRoutesGoThroughTheMiddleware(t *testing.T) {
 		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
 
 		assert.NotEmpty(t, w.Header().Get("X-Request-ID"), path)
+	}
+}
+
+// Every API route must be documented, so the docs cannot fall behind again.
+func TestSwaggerDocumentsEveryAPIRoute(t *testing.T) {
+	raw, err := os.ReadFile("../../docs/swagger.json")
+	require.NoError(t, err)
+	var doc struct {
+		Paths map[string]map[string]any `json:"paths"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &doc))
+
+	for _, route := range newRouter(t, inProd).Routes() {
+		path := regexp.MustCompile(`:(\w+)`).ReplaceAllString(route.Path, "{$1}")
+		_, ok := doc.Paths[path][strings.ToLower(route.Method)]
+		assert.True(t, ok, "%s %s is not in docs/swagger.json", route.Method, path)
 	}
 }
