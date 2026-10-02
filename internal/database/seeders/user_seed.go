@@ -1,35 +1,57 @@
 package seeders
 
 import (
+	"errors"
+
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
 )
 
-func hashPassword(password string) string {
-	hashed, _ := utils.HashPassword(password)
-	return hashed
+// DevPassword is the well-known password of the sample users outside prod.
+const DevPassword = "password123"
+
+// SeedPassword returns the password for the sample users: configured (the
+// SEED_USER_PASSWORD variable) if set, else DevPassword. In prod the first
+// sample user becomes an admin, so a well-known password is refused there.
+func SeedPassword(stage, configured string) (string, error) {
+	if configured != "" {
+		return configured, nil
+	}
+	if stage == "prod" {
+		return "", errors.New("SEED_USER_PASSWORD must be set to seed users when STAGE is prod")
+	}
+	return DevPassword, nil
 }
 
 type UserSeeder struct {
 	User *models.User
 }
 
-func SeedUsers(db *gorm.DB) error {
+// SeedUsers creates two sample users with the given password; the first one
+// gets the admin role when it exists.
+func SeedUsers(db *gorm.DB, password string) error {
+	hashed, err := utils.HashPassword(password)
+	if err != nil {
+		return err
+	}
+
 	users := []UserSeeder{
 		{
 			User: &models.User{
 				Name:     "John Doe",
 				Email:    "john@example.com",
-				Password: hashPassword("password123"),
+				Password: hashed,
+				Gender:   models.GenderMale,
 			},
 		},
 		{
 			User: &models.User{
 				Name:     "Jane Smith",
 				Email:    "jane@example.com",
-				Password: hashPassword("password123"),
+				Password: hashed,
+				Gender:   models.GenderFemale,
 			},
 		},
 	}

@@ -160,13 +160,13 @@ This will create two files:
 
 ### 5. Seeding the Database
 
-The seeder does not create tables, so start the server once with `RUN_MIGRATE=true` first. Then seed two sample users (`john@example.com` and `jane@example.com`, both with password `password123`):
+The seeder does not create tables, so start the server once with `RUN_MIGRATE=true` first. Then seed two sample users (`john@example.com`, an admin, and `jane@example.com`, both with password `password123`, or `SEED_USER_PASSWORD` when set):
 
 ```bash
 go run cmd/seeder/seeder.go
 ```
 
-These accounts are for local development only. Running the seeder again logs an error for each user because the emails already exist.
+These accounts are for local development only: with `STAGE=prod` the seeder refuses to run unless `SEED_USER_PASSWORD` is set. Running the seeder again logs an error for each user because the emails already exist.
 
 ### 6. Running the Server
 

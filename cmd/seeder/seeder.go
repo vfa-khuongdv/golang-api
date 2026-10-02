@@ -18,9 +18,14 @@ func main() {
 		Stage:       cfg.Server.Stage,
 	})
 
+	password, err := seeders.SeedPassword(cfg.Server.Stage, configs.GetEnv("SEED_USER_PASSWORD", ""))
+	if err != nil {
+		logger.Fatalf("Seeding refused: %v", err)
+	}
+
 	// Initialize database connection
 	db := configs.InitDB(cfg.Database)
 
 	// Run seeder
-	seeders.Run(db)
+	seeders.Run(db, password)
 }
