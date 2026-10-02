@@ -23,8 +23,6 @@ type DatabaseConfig struct {
 	ConnMaxIdleTime time.Duration
 }
 
-var DB *gorm.DB
-
 var (
 	openGormConnection = func(dsn string) (*gorm.DB, error) {
 		return gorm.Open(mysql.Open(dsn), gormConfig())
@@ -98,7 +96,6 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 		config.ConnMaxIdleTime,
 	)
 
-	DB = db
 	return db
 }
 

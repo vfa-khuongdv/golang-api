@@ -35,7 +35,7 @@ func createUserWithPermissions(t *testing.T, db *gorm.DB, email string, permissi
 	require.NoError(t, db.Create(&role).Error)
 	require.NoError(t, db.Create(&models.UserRole{UserID: user.ID, RoleID: role.ID}).Error)
 
-	jwtService, err := services.NewJWTService()
+	jwtService, err := services.NewJWTService(testJWTKey)
 	require.NoError(t, err)
 	token, err := jwtService.GenerateAccessToken(user.ID)
 	require.NoError(t, err)

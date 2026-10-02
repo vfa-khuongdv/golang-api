@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"os"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +10,6 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/constants"
-	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
 )
@@ -20,9 +17,10 @@ import (
 // maxRequestBodyBytes caps request bodies; the API only takes small JSON.
 const maxRequestBodyBytes = 1 << 20 // 1 MB
 
-func SetupRouter(db *gorm.DB) *gin.Engine {
-	ginMode := configs.GetEnv("GIN_MODE", "release")
-	gin.SetMode(ginMode)
+// SetupRouter builds the router and its dependencies from cfg, which
+// configs.Load has validated.
+func SetupRouter(db *gorm.DB, cfg *configs.Config) *gin.Engine {
+	gin.SetMode(cfg.Server.GinMode)
 
 	// Initialize the new Gin router
 	router := gin.New()
@@ -34,26 +32,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// X-Forwarded-For, but a client can also spoof it, which weakens the per-IP
 	// rate limit. Set TRUSTED_PROXIES to the proxy CIDRs (e.g. "10.0.0.0/8") to
 	// close that, or to an empty value to trust nothing when exposed directly.
-	trustedProxies := configs.GetEnv("TRUSTED_PROXIES", "0.0.0.0/0")
-	if trustedProxies == "" {
-		if err := router.SetTrustedProxies(nil); err != nil {
-			logger.Fatalf("Failed to disable trusted proxies: %v", err)
-		}
-	} else {
-		proxies := strings.Split(trustedProxies, ",")
-		for i := range proxies {
-			proxies[i] = strings.TrimSpace(proxies[i])
-		}
-		if err := router.SetTrustedProxies(proxies); err != nil {
-			logger.Fatalf("Failed to configure trusted proxies %q: %v", trustedProxies, err)
-		}
+	if err := router.SetTrustedProxies(cfg.Server.TrustedProxies); err != nil {
+		logger.Fatalf("Failed to configure trusted proxies %q: %v", cfg.Server.TrustedProxies, err)
 	}
 
-	stage := configs.GetEnv("STAGE", "dev")
+	stage := cfg.Server.Stage
 
 	// The default is kept so existing deployments behind a load balancer keep
 	// working, but in prod it lets clients spoof their IP, so say so.
-	if _, set := os.LookupEnv("TRUSTED_PROXIES"); !set && stage == "prod" {
+	if cfg.Server.TrustedProxiesDefault && stage == "prod" {
 		logger.Warnf("TRUSTED_PROXIES is not set, so X-Forwarded-For is trusted from every peer: clients can spoof their IP and bypass the per-IP rate limit. Set it to the load balancer CIDR, e.g. 10.0.0.0/16")
 	}
 
@@ -65,15 +52,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	// Initialize services
 	refreshTokenService := services.NewRefreshTokenService(refreshRepo)
-	settingsEncryptionKey := strings.TrimSpace(configs.GetEnv("SETTINGS_ENCRYPTION_KEY", ""))
-	if len(settingsEncryptionKey) < utils.MinSecretKeyLength {
-		logger.Fatalf("SETTINGS_ENCRYPTION_KEY must be at least %d characters", utils.MinSecretKeyLength)
-	}
+	settingsEncryptionKey := cfg.Settings.EncryptionKey
 	mailerService := services.NewMailerService(settingRepo, settingsEncryptionKey)
 	userService := services.NewUserService(userRepo, mailerService, refreshTokenService)
 	settingService := services.NewSettingService(settingRepo, settingsEncryptionKey)
 	roleService := services.NewRoleService(roleRepo, userRepo)
-	jwtService, err := services.NewJWTService()
+	jwtService, err := services.NewJWTService(cfg.JWT.Secret)
 	if err != nil {
 		logger.Fatalf("Failed to initialize JWT service: %v", err)
 	}
@@ -91,7 +75,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	router.Use(
 		gin.Recovery(),
 		middlewares.RequestIDMiddleware(),
-		middlewares.CORSMiddleware(),
+		middlewares.CORSMiddleware(cfg.CORS.AllowedOrigins),
 		middlewares.BodySizeLimit(maxRequestBodyBytes),
 		middlewares.LogMiddleware(),
 	)

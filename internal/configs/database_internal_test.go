@@ -177,7 +177,6 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		result := InitDB(config)
 		assert.NotNil(t, result)
 		assert.Equal(t, gdb, result)
-		assert.Equal(t, gdb, DB)
 		assert.True(t, infoCalled)
 	})
 

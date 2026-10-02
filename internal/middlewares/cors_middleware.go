@@ -1,20 +1,18 @@
 package middlewares
 
 import (
-	"strings"
+	"slices"
 
 	"github.com/gin-gonic/gin"
-	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 )
 
-// CORSMiddleware handles Cross-Origin Resource Sharing (CORS)
-// Security: Configure CORS_ALLOWED_ORIGINS environment variable with specific
-// origins (e.g., "http://localhost:5173,https://example.com"). Never use "*"
-// in production with credentials enabled.
-func CORSMiddleware() gin.HandlerFunc {
+// CORSMiddleware handles Cross-Origin Resource Sharing (CORS) for the given
+// allowed origins (CORS_ALLOWED_ORIGINS, e.g. "http://localhost:5173,https://example.com").
+// Security: list specific origins. Never use "*" in production with
+// credentials enabled.
+func CORSMiddleware(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		allowedOrigins := configs.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
 
 		// Check if origin is allowed and set appropriate headers
 		if isOriginAllowed(origin, allowedOrigins) {
@@ -38,20 +36,9 @@ func CORSMiddleware() gin.HandlerFunc {
 }
 
 // isOriginAllowed checks if the request origin is in the allowed origins list
-func isOriginAllowed(origin, allowedOrigins string) bool {
+func isOriginAllowed(origin string, allowedOrigins []string) bool {
 	if origin == "" {
 		return false
 	}
-
-	if allowedOrigins == "*" {
-		return true
-	}
-
-	origins := strings.SplitSeq(allowedOrigins, ",")
-	for allowed := range origins {
-		if strings.TrimSpace(allowed) == origin {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowedOrigins, "*") || slices.Contains(allowedOrigins, origin)
 }
