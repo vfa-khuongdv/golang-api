@@ -118,3 +118,15 @@ func TestSetupRouter_WarnsAboutTheDefaultTrustedProxiesInProd(t *testing.T) {
 		assert.NotContains(t, logs.String(), "TRUSTED_PROXIES")
 	})
 }
+
+func TestSetupRouter_RejectsOversizedBodies(t *testing.T) {
+	router := newRouter(t)
+	body := `{"email":"` + strings.Repeat("a", 2<<20) + `@example.com","password":"x"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/login", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}

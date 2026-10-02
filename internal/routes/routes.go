@@ -17,6 +17,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// maxRequestBodyBytes caps request bodies; the API only takes small JSON.
+const maxRequestBodyBytes = 1 << 20 // 1 MB
+
 func SetupRouter(db *gorm.DB) *gin.Engine {
 	ginMode := configs.GetEnv("GIN_MODE", "release")
 	gin.SetMode(ginMode)
@@ -90,11 +93,13 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	roleHandler := handlers.NewRoleHandler(roleService)
 
 	// Add middleware
-	// Recovery goes first so a panic in any later middleware still gets a response.
+	// Recovery goes first so a panic in any later middleware still gets a
+	// response; the body limit goes before LogMiddleware, which reads the body.
 	router.Use(
 		gin.Recovery(),
 		middlewares.RequestIDMiddleware(),
 		middlewares.CORSMiddleware(),
+		middlewares.BodySizeLimit(maxRequestBodyBytes),
 		middlewares.LogMiddleware(),
 	)
 

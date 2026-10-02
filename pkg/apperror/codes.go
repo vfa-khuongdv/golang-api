@@ -9,6 +9,7 @@ const (
 	ErrForbidden       = 1004 // Forbidden access
 	ErrConflict        = 1005 // Conflict error
 	ErrTooManyRequests = 1006 // Too many requests
+	ErrPayloadTooLarge = 1007 // Request body is too large
 
 	// Database errors
 	ErrDBConnection = 2000 // Failed to connect to DB
