@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -166,12 +167,20 @@ func LogMiddleware() gin.HandlerFunc {
 
 		timeStart := time.Now()
 
+		// The URL is logged with the same masked query, so a token passed in the
+		// query string (e.g. ?token=...) never reaches the logs.
+		query := censorQueryParams(c.Request.URL.Query())
+		logURL := c.Request.URL.Path
+		if len(query) > 0 {
+			logURL += "?" + url.Values(query).Encode()
+		}
+
 		logEntry := LogResponse{
 			RequestID: GetRequestID(c),
 			Method:    c.Request.Method,
-			URL:       c.Request.URL.String(),
+			URL:       logURL,
 			Header:    filterSensitiveHeaders(c.Request.Header),
-			Request:   censorQueryParams(c.Request.URL.Query()),
+			Request:   query,
 		}
 
 		// Only log request body if method is POST or PUT, and limit to maxBodySize
@@ -238,26 +247,25 @@ func LogMiddleware() gin.HandlerFunc {
 			logEntry.Response = NotLoggedResponse
 		}
 
-		// Use goroutine to write log entry to avoid blocking
-		go func(entry LogResponse, sc int) {
-			fields := log.Fields{
-				"request_id":  entry.RequestID,
-				"method":      entry.Method,
-				"url":         entry.URL,
-				"status_code": entry.StatusCode,
-				"latency":     entry.Latency,
-				"header":      entry.Header,
-				"request":     entry.Request,
-				"response":    entry.Response,
-			}
-			switch {
-			case sc >= 500:
-				logger.WithFields(fields).Error("HTTP request completed")
-			case sc >= 400:
-				logger.WithFields(fields).Warn("HTTP request completed")
-			default:
-				logger.WithFields(fields).Info("HTTP request completed")
-			}
-		}(logEntry, statusCode)
+		// Written before the request returns: an entry written from a goroutine
+		// can be lost on shutdown or interleave with later requests.
+		fields := log.Fields{
+			"request_id":  logEntry.RequestID,
+			"method":      logEntry.Method,
+			"url":         logEntry.URL,
+			"status_code": logEntry.StatusCode,
+			"latency":     logEntry.Latency,
+			"header":      logEntry.Header,
+			"request":     logEntry.Request,
+			"response":    logEntry.Response,
+		}
+		switch {
+		case statusCode >= 500:
+			logger.WithFields(fields).Error("HTTP request completed")
+		case statusCode >= 400:
+			logger.WithFields(fields).Warn("HTTP request completed")
+		default:
+			logger.WithFields(fields).Info("HTTP request completed")
+		}
 	}
 }

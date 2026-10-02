@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/middlewares"
 )
 
@@ -589,4 +590,40 @@ func TestLogMiddleware_HandlerReadsFullBodyLargerThanLogLimit(t *testing.T) {
 	router.ServeHTTP(httptest.NewRecorder(), req)
 
 	assert.Equal(t, len(body), received)
+}
+
+func TestLogMiddleware_MasksSensitiveQueryParamsInTheLoggedURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	buf, restore := setupLogCapture()
+	defer restore()
+
+	router := gin.New()
+	router.Use(middlewares.LogMiddleware())
+	router.GET("/reset", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	req := httptest.NewRequest(http.MethodGet, "/reset?token=supersecretvalue&page=2", nil)
+	router.ServeHTTP(httptest.NewRecorder(), req)
+
+	var logEntry map[string]any
+	require.NoError(t, json.Unmarshal(waitForLog(t, buf, time.Second), &logEntry))
+	url, _ := logEntry["url"].(string)
+	assert.NotContains(t, url, "supersecretvalue")
+	assert.Contains(t, url, "/reset?")
+	assert.Contains(t, url, "page=2")
+}
+
+func TestLogMiddleware_WritesTheLogBeforeTheRequestReturns(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	buf, restore := setupLogCapture()
+	defer restore()
+
+	router := gin.New()
+	router.Use(middlewares.LogMiddleware())
+	router.GET("/sync", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/sync", nil))
+
+	// No waiting: an entry written later can be lost on shutdown or land in
+	// another request's logs.
+	assert.Contains(t, string(buf.Bytes()), `"url":"/sync"`)
 }
