@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
@@ -19,7 +20,9 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id uint) (*models.User, error)
 	Create(ctx context.Context, user *models.User) (*models.User, error)
 	CreateWithTx(ctx context.Context, tx *gorm.DB, user *models.User) (*models.User, error)
-	Update(ctx context.Context, user *models.User) error
+	// UpdateColumns writes only the given columns of user (zero values
+	// included), so a stale copy cannot overwrite columns changed elsewhere.
+	UpdateColumns(ctx context.Context, user *models.User, columns ...string) error
 	// RecordFailedLogin atomically increments failed_attempts and sets
 	// locked_until to lockUntil once the counter reaches maxAttempts.
 	RecordFailedLogin(ctx context.Context, userID uint, maxAttempts int, lockUntil int64) error
@@ -103,8 +106,8 @@ func (repo *userRepositoryImpl) CreateWithTx(ctx context.Context, tx *gorm.DB, u
 	return user, nil
 }
 
-func (repo *userRepositoryImpl) Update(ctx context.Context, user *models.User) error {
-	if err := repo.db.WithContext(ctx).Save(user).Error; err != nil {
+func (repo *userRepositoryImpl) UpdateColumns(ctx context.Context, user *models.User, columns ...string) error {
+	if err := repo.db.WithContext(ctx).Model(user).Select(append(slices.Clip(columns), "updated_at")).Updates(user).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to update user id %d: %v", user.ID, err)
 		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update user", err)
 	}

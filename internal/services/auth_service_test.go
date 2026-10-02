@@ -146,7 +146,6 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				assert.NotZero(t, resp.AccessToken.ExpiresAt)
 				assert.Equal(t, "mocked-refresh-token", resp.RefreshToken.Token)
 				assert.NotZero(t, resp.RefreshToken.ExpiresAt)
-				s.repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
 				s.repo.AssertNotCalled(t, "ResetFailedLogins", mock.Anything, mock.Anything)
 			}
 			s.repo.AssertExpectations(t)
@@ -421,7 +420,6 @@ func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
@@ -448,7 +446,6 @@ func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_InvalidPasswordUpdateError() {
@@ -480,7 +477,6 @@ func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_LockedUntilExactlyNow() {
@@ -557,7 +553,6 @@ func (s *AuthServiceTestSuite) TestLogin_ValidLoginAtMaxFailedAttemptsResets() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
@@ -576,7 +571,6 @@ func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
@@ -606,7 +600,6 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {

@@ -3,6 +3,7 @@ package repositories_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -232,36 +233,6 @@ func TestUserRepository(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
-	})
-
-	t.Run("Update - Success", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		mockUser := &models.User{
-			Name:     "Update User",
-			Email:    "update@example.com",
-			Password: "password",
-			Gender:   1,
-		}
-		createdUser, err := repo.Create(context.Background(), mockUser)
-		require.NoError(t, err)
-
-		// Update fields
-		createdUser.Name = "Updated User"
-		createdUser.Password = "newpassword"
-
-		// Act
-		err = repo.Update(context.Background(), createdUser)
-
-		// Assert
-		require.NoError(t, err)
-
-		// Verify update
-		updatedUser, err := repo.GetByID(context.Background(), createdUser.ID)
-		require.NoError(t, err)
-		assert.Equal(t, "Updated User", updatedUser.Name)
-		assert.Equal(t, "newpassword", updatedUser.Password)
 	})
 
 	t.Run("CreateWithTx - Duplicate Email Error", func(t *testing.T) {
@@ -520,23 +491,6 @@ func TestUserRepository(t *testing.T) {
 		assert.Nil(t, user)
 	})
 
-	t.Run("Update - Database Error", func(t *testing.T) {
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		created, err := repo.Create(context.Background(), &models.User{
-			Name: "Update Error", Email: "updateerr@example.com", Password: "pass", Gender: 1,
-		})
-		require.NoError(t, err)
-
-		_ = db.Callback().Update().Before("gorm:update").Register("force_update_db_error", func(tx *gorm.DB) {
-			_ = tx.AddError(assert.AnError)
-		})
-		defer func() { _ = db.Callback().Update().Remove("force_update_db_error") }()
-
-		err = repo.Update(context.Background(), created)
-		assert.Error(t, err)
-	})
-
 	t.Run("FindByEmail - Database Error", func(t *testing.T) {
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
@@ -638,6 +592,47 @@ func TestUserRepository_ResetFailedLogins(t *testing.T) {
 		require.NoError(t, sqlDB.Close())
 
 		err = repo.ResetFailedLogins(context.Background(), 1)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestUserRepository_UpdateColumns(t *testing.T) {
+	t.Run("Writes Only The Given Columns, Including Zero Values", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		lockedUntil := int64(999)
+		user := &models.User{Name: "Original", Email: "cols@example.com", Password: "old-hash", Gender: 1, FailedAttempts: 3, LockedUntil: &lockedUntil}
+		require.NoError(t, db.Create(user).Error)
+		past := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+		require.NoError(t, db.Model(user).UpdateColumn("updated_at", past).Error)
+
+		// A stale copy: Name was changed elsewhere and must not be written back.
+		stale := *user
+		stale.Name = "Stale"
+		stale.Password = "new-hash"
+		stale.FailedAttempts = 0
+		stale.LockedUntil = nil
+		err := repo.UpdateColumns(context.Background(), &stale, "password", "failed_attempts", "locked_until")
+
+		require.NoError(t, err)
+		var got models.User
+		require.NoError(t, db.First(&got, user.ID).Error)
+		assert.Equal(t, "new-hash", got.Password)
+		assert.Equal(t, 0, got.FailedAttempts)
+		assert.Nil(t, got.LockedUntil)
+		assert.Equal(t, "Original", got.Name)
+		assert.True(t, got.UpdatedAt.After(past), "updated_at is refreshed")
+	})
+
+	t.Run("Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+
+		err = repo.UpdateColumns(context.Background(), &models.User{ID: 1}, "password")
 
 		assert.Error(t, err)
 	})

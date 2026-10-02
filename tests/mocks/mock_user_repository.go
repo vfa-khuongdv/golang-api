@@ -39,8 +39,8 @@ func (m *MockUserRepository) Create(ctx context.Context, user *models.User) (*mo
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
-func (m *MockUserRepository) Update(ctx context.Context, user *models.User) error {
-	args := m.Called(ctx, user)
+func (m *MockUserRepository) UpdateColumns(ctx context.Context, user *models.User, columns ...string) error {
+	args := m.Called(ctx, user, columns)
 	return args.Error(0)
 }
 
