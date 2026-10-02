@@ -190,11 +190,11 @@ func TestUserRepository(t *testing.T) {
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
 		mockUser := &models.User{
-			Name:     "Token User",
-			Email:    "token@example.com",
-			Password: "password",
-			ResetToken:    utils.StringToPtr("token123"),
-			Gender:   1,
+			Name:       "Token User",
+			Email:      "token@example.com",
+			Password:   "password",
+			ResetToken: utils.StringToPtr("token123"),
+			Gender:     1,
 		}
 		_, err := repo.Create(context.Background(), mockUser)
 		require.NoError(t, err)

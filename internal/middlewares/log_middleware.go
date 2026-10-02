@@ -118,10 +118,10 @@ func maskCookieValue(value string) string {
 				rawVal := part[eqIdx+1:]
 				parts[i] = key + "=" + utils.MaskWithPrefix(rawVal, 4)
 			} else {
-				parts[i] = part 
+				parts[i] = part
 			}
 		} else {
-			parts[i] = part 
+			parts[i] = part
 		}
 	}
 	return strings.Join(parts, "; ")

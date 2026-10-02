@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	mail "github.com/wneessen/go-mail"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/vfa-khuongdv/golang-cms/pkg/mailer"
+	mail "github.com/wneessen/go-mail"
 )
 
 type MockDialer struct {
