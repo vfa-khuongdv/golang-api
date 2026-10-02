@@ -83,19 +83,28 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 		}
 
 		s.repo.On("GetByID", mock.Anything, userID).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+		s.repo.On("UpdateColumns", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			return u.Name == "John Doe" &&
 				u.Address != nil && *u.Address == "123 Main St" &&
 				u.Gender == models.Gender(1) &&
 				u.Birthday.Equal(time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)) &&
 				u.Password == "newpassword123"
-		})).Return(nil).Once()
+		}), []string{"name", "address", "gender", "birthday"}).Return(nil).Once()
 
 		// Act
 		err := s.service.UpdateProfile(context.Background(), userID, &input)
 
 		// Assert
 		s.NoError(err)
+	})
+	s.T().Run("Nothing To Update Writes Nothing", func(t *testing.T) {
+		userID := uint(5)
+		s.repo.On("GetByID", mock.Anything, userID).Return(&models.User{ID: userID}, nil).Once()
+
+		err := s.service.UpdateProfile(context.Background(), userID, &dto.UpdateProfileInput{})
+
+		s.NoError(err)
+		s.repo.AssertNotCalled(t, "UpdateColumns", mock.Anything, mock.MatchedBy(func(u *models.User) bool { return u.ID == userID }), mock.Anything)
 	})
 	s.T().Run("Error", func(t *testing.T) {
 		// Arrange
@@ -106,7 +115,7 @@ func (s *UserServiceTestSuite) TestUpdateProfile() {
 		}
 
 		s.repo.On("GetByID", mock.Anything, userID).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"name"}).Return(errors.New("update failed")).Once()
 
 		// Act
 		err := s.service.UpdateProfile(context.Background(), userID, input)
@@ -123,18 +132,21 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		user := &models.User{Email: email}
 
 		s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+		s.repo.On("UpdateColumns", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			// Verify that stored token is a SHA-256 hash (64 hex chars), not plaintext
 			return u.ResetToken != nil && len(*u.ResetToken) == 64
-		})).Return(nil).Once()
+		}), []string{"reset_token", "reset_expired_at"}).Return(nil).Once()
 
 		// Act
-		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
+		sent := make(chan struct{})
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once().
+			Run(func(mock.Arguments) { close(sent) })
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		// Assert
 		s.NoError(err)
+		waitFor(t, sent)
 		s.NotNil(user.ResetToken)
 		s.Len(*user.ResetToken, 64) // SHA-256 hash is 64 hex characters
 		s.NotNil(user.ResetExpiredAt)
@@ -167,7 +179,7 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		user := &models.User{Email: email}
 
 		s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"reset_token", "reset_expired_at"}).Return(errors.New("update failed")).Once()
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
@@ -183,12 +195,39 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		user := &models.User{Email: email}
 
 		s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
-		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once()
+		s.repo.On("UpdateColumns", mock.Anything, mock.AnythingOfType("*models.User"), []string{"reset_token", "reset_expired_at"}).Return(nil).Once()
+		sent := make(chan struct{})
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once().
+			Run(func(mock.Arguments) { close(sent) })
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
-		s.Error(err)
+		// Like for an unknown email: an error here would reveal the account exists.
+		s.NoError(err)
+		waitFor(t, sent)
+	})
+
+	s.T().Run("Answers Without Waiting For The Mail", func(t *testing.T) {
+		email := "slow-mail@example.com"
+		user := &models.User{Email: email}
+		s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil).Once()
+		s.repo.On("UpdateColumns", mock.Anything, mock.AnythingOfType("*models.User"), []string{"reset_token", "reset_expired_at"}).Return(nil).Once()
+		release, sent := make(chan struct{}), make(chan struct{})
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once().
+			Run(func(mock.Arguments) { <-release; close(sent) })
+
+		done := make(chan error)
+		go func() { done <- s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email}) }()
+
+		// The SMTP delay would otherwise tell registered emails apart.
+		select {
+		case err := <-done:
+			s.NoError(err)
+		case <-time.After(time.Second):
+			t.Fatal("ForgotPassword waited for the mail to be sent")
+		}
+		close(release)
+		waitFor(t, sent)
 	})
 }
 
@@ -237,7 +276,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &now}
 
 		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password", "reset_token", "reset_expired_at", "failed_attempts", "locked_until"}).Return(nil).Once()
 		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
@@ -253,7 +292,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
 
 		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password", "reset_token", "reset_expired_at", "failed_attempts", "locked_until"}).Return(errors.New("update failed")).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
 
@@ -268,7 +307,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
 
 		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password", "reset_token", "reset_expired_at", "failed_attempts", "locked_until"}).Return(nil).Once()
 		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(nil).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
@@ -289,7 +328,7 @@ func (s *UserServiceTestSuite) TestResetPassword() {
 		user := &models.User{ID: 1, ResetToken: &hashedToken, ResetExpiredAt: &notExpired}
 
 		s.repo.On("FindByResetToken", mock.Anything, hashedToken).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password", "reset_token", "reset_expired_at", "failed_attempts", "locked_until"}).Return(nil).Once()
 		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(apperror.NewDBDeleteError("Failed to delete refresh tokens")).Once()
 
 		result, err := s.service.ResetPassword(context.Background(), input)
@@ -401,7 +440,7 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hashedPassword, _ := utils.HashPassword(input.OldPassword)
 		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(5)).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(errors.New("update failed")).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password"}).Return(errors.New("update failed")).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 5, input)
 
@@ -418,7 +457,7 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hashedPassword, _ := utils.HashPassword(input.OldPassword)
 		user := &models.User{ID: 1, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(6)).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password"}).Return(nil).Once()
 		s.refresh.On("DeleteByUserID", mock.Anything, uint(1)).Return(nil).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 6, input)
@@ -437,7 +476,7 @@ func (s *UserServiceTestSuite) TestChangePassword() {
 		hashedPassword, _ := utils.HashPassword(input.OldPassword)
 		user := &models.User{ID: 7, Password: hashedPassword}
 		s.repo.On("GetByID", mock.Anything, uint(7)).Return(user, nil).Once()
-		s.repo.On("Update", mock.Anything, user).Return(nil).Once()
+		s.repo.On("UpdateColumns", mock.Anything, user, []string{"password"}).Return(nil).Once()
 		s.refresh.On("DeleteByUserID", mock.Anything, uint(7)).Return(apperror.NewDBDeleteError("Failed to delete refresh tokens")).Once()
 
 		result, err := s.service.ChangePassword(context.Background(), 7, input)
@@ -468,4 +507,14 @@ func (s *UserServiceTestSuite) TestUpdateProfileErrors() {
 
 func TestUserServiceTestSuite(t *testing.T) {
 	suite.Run(t, new(UserServiceTestSuite))
+}
+
+// waitFor fails the test unless ch is closed within a second.
+func waitFor(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timed out")
+	}
 }

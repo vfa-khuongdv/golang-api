@@ -4,8 +4,10 @@ A Go REST API for a Content Management System (CMS) with user authentication, JW
 
 ## Key Features
 
-- **User Authentication**: JWT access tokens (1 hour) and rotating refresh tokens (30 days, stored in the database)
+- **User Authentication**: JWT access tokens (1 hour) and rotating refresh tokens (30 days, stored as SHA-256 hashes)
 - **Account Protection**: Account lockout after 5 failed logins (15 minutes) and a per-IP rate limit (10 requests/minute) on the public auth endpoints
+- **Role-Based Access Control**: Roles grant permissions; a user can only grant or remove permissions they hold
+- **Request Limits**: Request bodies are limited to 1 MB (`413` when larger)
 - **Password Management**: bcrypt hashing, password complexity validation, change password, and password reset via email (only a hash of the reset token is stored)
 - **Email Service**: SMTP integration (go-mail) for password reset emails, configured through the `settings` table
 - **Application Settings**: Key/value `settings` table, with secret values encrypted using AES-256-GCM
@@ -158,13 +160,13 @@ This will create two files:
 
 ### 5. Seeding the Database
 
-The seeder does not create tables, so start the server once with `RUN_MIGRATE=true` first. Then seed two sample users (`john@example.com` and `jane@example.com`, both with password `password123`):
+The seeder does not create tables, so start the server once with `RUN_MIGRATE=true` first. Then seed two sample users (`john@example.com`, an admin, and `jane@example.com`, both with password `password123`, or `SEED_USER_PASSWORD` when set):
 
 ```bash
 go run cmd/seeder/seeder.go
 ```
 
-These accounts are for local development only. Running the seeder again logs an error for each user because the emails already exist.
+These accounts are for local development only: with `STAGE=prod` the seeder refuses to run unless `SEED_USER_PASSWORD` is set. Running the seeder again logs an error for each user because the emails already exist.
 
 ### 6. Running the Server
 
@@ -249,7 +251,7 @@ The application is configured through the environment variables below. `DB_USERN
 - `GIN_MODE` - Gin mode ("debug", "release", or "test", default: release)
 - `STAGE` - Environment stage, e.g. "local", "dev", "prod" (default: dev). Also reported as `env` in logs. Swagger UI and `swagger.json` are not served when it is `prod`.
 - `CORS_ALLOWED_ORIGINS` - Comma-separated allowed CORS origins, read on every request (default: http://localhost:5173)
-- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies / load balancers (default: `0.0.0.0/0`, trust every peer). The client IP used by the rate limiter and stored on refresh tokens is read from `X-Forwarded-For` when the request comes from a trusted peer. Behind a load balancer (AWS ALB, nginx, Cloudflare) it must trust the proxy, otherwise all clients appear with the proxy's IP and the public auth endpoints allow only 10 requests/minute for all users together. The default works without knowing the proxy's IP, but a client can spoof `X-Forwarded-For` and dodge the per-IP rate limit; set the proxy CIDR (e.g. the VPC CIDR `10.0.0.0/16`) to prevent that. Set it to an empty value when the app is exposed directly with no proxy.
+- `TRUSTED_PROXIES` - Comma-separated CIDRs of trusted reverse proxies / load balancers (default: `0.0.0.0/0`, trust every peer). The client IP used by the rate limiter and stored on refresh tokens is read from `X-Forwarded-For` when the request comes from a trusted peer. Behind a load balancer (AWS ALB, nginx, Cloudflare) it must trust the proxy, otherwise all clients appear with the proxy's IP and the public auth endpoints allow only 10 requests/minute for all users together. The default works without knowing the proxy's IP, but a client can spoof `X-Forwarded-For` and dodge the per-IP rate limit; set the proxy CIDR (e.g. the VPC CIDR `10.0.0.0/16`) to prevent that. With `STAGE=prod` and `TRUSTED_PROXIES` unset, the server logs a warning at startup. Set it to an empty value when the app is exposed directly with no proxy.
 
 **JWT Configuration:**
 - `JWT_KEY` - Secret key for JWT token signing, at least 32 characters (required; the router refuses to start with a shorter key)
@@ -299,7 +301,7 @@ These routes are only registered when `STAGE` is not `prod`, and the server must
 
 The server runs on port `3000` by default. All authenticated endpoints require a valid JWT access token in the `Authorization` header: `Bearer <token>`
 
-Every response carries an `X-Request-ID` header (the client's value is reused if sent). Errors are returned as `{"code": <int>, "message": "..."}`; validation errors also include a `fields` array. Error codes are defined in `pkg/apperror/codes.go`.
+Every response carries an `X-Request-ID` header (the client's value is reused if it is at most 128 letters, digits or `-_.:=`, otherwise a new UUID is generated). Errors are returned as `{"code": <int>, "message": "..."}`; validation errors also include a `fields` array. Error codes are defined in `pkg/apperror/codes.go`.
 
 #### Health and Version (Public)
 - `GET /healthz` - Health status check
@@ -307,12 +309,12 @@ Every response carries an `X-Request-ID` header (the client's value is reused if
 
 #### Authentication (Public)
 
-These four endpoints share a per-IP rate limit of 10 requests per minute (`429` with `X-RateLimit-*` headers when exceeded). After 5 failed logins an account is locked for 15 minutes.
+These four endpoints share a per-IP rate limit of 10 requests per minute (`429` with `X-RateLimit-*` headers when exceeded). After 5 failed logins an account is locked for 15 minutes; once the lock ends, the count starts again from zero. Every failed login (unknown email, wrong password, locked account, even with the right password) gets the same `400` answer, so it does not reveal which emails are registered.
 
 - `POST /api/v1/login` - User login (returns access and refresh tokens)
 - `POST /api/v1/refresh-token` - Exchange a refresh token and the (possibly expired) access token for a new pair; the refresh token is rotated
-- `POST /api/v1/forgot-password` - Request password reset email (always responds with the same message, whether or not the email exists)
-- `POST /api/v1/reset-password` - Reset password using the emailed token (valid for 1 hour)
+- `POST /api/v1/forgot-password` - Request password reset email (always responds at once with the same message, whether or not the email exists; the email is sent in the background)
+- `POST /api/v1/reset-password` - Reset password using the emailed token (valid for 1 hour); signs out every session
 
 #### Session (Authenticated)
 - `POST /api/v1/logout` - Revoke all refresh tokens of the authenticated user
@@ -320,13 +322,21 @@ These four endpoints share a per-IP rate limit of 10 requests per minute (`429` 
 #### User Profile (Authenticated)
 - `GET /api/v1/profile` - Get authenticated user's profile
 - `PATCH /api/v1/profile` - Update authenticated user's profile
-- `POST /api/v1/change-password` - Change authenticated user's password
+- `POST /api/v1/change-password` - Change authenticated user's password; signs out every session
 
-#### Settings (Authenticated)
-- `GET /api/v1/settings` - Get mail and frontend settings (the mail password is never returned)
-- `PUT /api/v1/settings` - Update the provided settings (the mail password is stored encrypted)
+#### Settings (Permission Required)
+- `GET /api/v1/settings` - Get mail and frontend settings (the mail password is never returned); needs `settings:read`
+- `PUT /api/v1/settings` - Update the provided settings (the mail password is stored encrypted); needs `settings:update`
 
-Every account can read and change the settings, so do not add public registration or lower-privileged accounts without adding a role check first.
+#### Roles and Permissions (Permission Required)
+- `GET /api/v1/roles`, `GET /api/v1/roles/:id` - List roles or get one, with their permissions; needs `roles:read`
+- `POST /api/v1/roles` - Create a role; needs `roles:create`
+- `PUT /api/v1/roles/:id` - Update a role and replace its permissions; needs `roles:update`
+- `DELETE /api/v1/roles/:id` - Delete a role; needs `roles:delete`
+- `GET /api/v1/permissions` - List all permissions; needs `permissions:read`
+- `PUT /api/v1/users/:id/roles` - Replace the roles of a user; needs `users:assign-roles`
+
+Without the permission the answer is `403`. A user can only create, change, delete, assign or remove a role whose permissions they all hold, so nobody can grant more than they have. The built-in `admin` role holds every permission and cannot be changed or deleted, and the last admin cannot lose it.
 
 ## Testing
 

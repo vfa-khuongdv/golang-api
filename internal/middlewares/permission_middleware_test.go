@@ -42,6 +42,12 @@ func TestRequirePermission(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 		},
 		{
+			name:       "user ID of the wrong type is unauthorized, not a panic",
+			userID:     "1",
+			mockSetup:  func(m *mocks.MockRoleService) {},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
 			name:       "no authenticated user",
 			userID:     nil,
 			mockSetup:  func(m *mocks.MockRoleService) {},

@@ -15,10 +15,9 @@ import (
 
 func TestJWTService(t *testing.T) {
 	const testJWTSecret = "this-is-a-very-long-secret-key-for-testing-purposes-32-chars"
-	t.Setenv("JWT_KEY", testJWTSecret)
 
 	t.Run("GenerateAccessToken", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		result, err := svc.GenerateAccessToken(456)
@@ -32,7 +31,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenWithScope_AccessToken", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		result, err := svc.GenerateAccessToken(123)
@@ -45,7 +44,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateToken_InvalidToken", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		_, err = svc.ValidateToken("this.is.not.a.token")
@@ -68,37 +67,33 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("NewJWTService_ErrorWhenSecretEmpty", func(t *testing.T) {
-		t.Setenv("JWT_KEY", "   ")
-		_, err := services.NewJWTService()
+		_, err := services.NewJWTService("   ")
 		assert.Error(t, err)
 		assert.Equal(t, services.ErrJWTKeyMissing, err)
 	})
 
 	t.Run("NewJWTService_ErrorWhenSecretTooShort", func(t *testing.T) {
-		t.Setenv("JWT_KEY", "short")
-		_, err := services.NewJWTService()
+		_, err := services.NewJWTService("short")
 		assert.Error(t, err)
 		assert.Equal(t, services.ErrJWTKeyTooShort, err)
 	})
 
 	t.Run("NewJWTService_SecretLengthBoundary", func(t *testing.T) {
 		t.Run("31 chars rejected", func(t *testing.T) {
-			t.Setenv("JWT_KEY", strings.Repeat("a", 31))
-			_, err := services.NewJWTService()
+			_, err := services.NewJWTService(strings.Repeat("a", 31))
 			assert.Error(t, err)
 			assert.Equal(t, services.ErrJWTKeyTooShort, err)
 		})
 
 		t.Run("32 chars accepted", func(t *testing.T) {
-			t.Setenv("JWT_KEY", strings.Repeat("b", 32))
-			svc, err := services.NewJWTService()
+			svc, err := services.NewJWTService(strings.Repeat("b", 32))
 			assert.NoError(t, err)
 			assert.NotNil(t, svc)
 		})
 	})
 
 	t.Run("ValidateTokenWithScope_Mismatch", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		result, err := svc.GenerateAccessToken(789)
@@ -110,7 +105,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenWithScope_InvalidToken", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		claims, err := svc.ValidateTokenWithScope("invalid.token.value", services.TokenScopeAccess)
@@ -119,7 +114,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenIgnoreExpiration_ExpiredTokenSuccess", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &services.CustomClaims{
@@ -140,7 +135,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateToken_ExpiredTokenRejected", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &services.CustomClaims{
@@ -161,7 +156,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenIgnoreExpiration_WrongSignature", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, &services.CustomClaims{
@@ -181,7 +176,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenIgnoreExpiration_InvalidToken", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		claims, err := svc.ValidateTokenIgnoreExpiration("invalid.token.value")
@@ -190,7 +185,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateToken_RejectNonHMACAlg", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		// An RS256 token is the classic alg-confusion attack vector:
@@ -216,7 +211,7 @@ func TestJWTService(t *testing.T) {
 	})
 
 	t.Run("ValidateTokenIgnoreExpiration_RejectNonHMACAlg", func(t *testing.T) {
-		svc, err := services.NewJWTService()
+		svc, err := services.NewJWTService(testJWTSecret)
 		require.NoError(t, err)
 
 		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)

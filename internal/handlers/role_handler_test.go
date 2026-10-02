@@ -24,8 +24,12 @@ func newRoleContext(method, body, id string) (*gin.Context, *httptest.ResponseRe
 	if id != "" {
 		c.Params = gin.Params{{Key: "id", Value: id}}
 	}
+	c.Set("UserID", testActorID)
 	return c, w
 }
+
+// testActorID is the authenticated user making the requests.
+const testActorID = uint(99)
 
 func TestRoleHandler_ListRoles(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -105,7 +109,7 @@ func TestRoleHandler_CreateRole(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("CreateRole", mock.Anything, &dto.RoleInput{Name: "editor", Description: "d", PermissionIDs: []uint{1, 2}}).
+		svc.On("CreateRole", mock.Anything, testActorID, &dto.RoleInput{Name: "editor", Description: "d", PermissionIDs: []uint{1, 2}}).
 			Return(&models.Role{ID: 3, Name: "editor"}, nil)
 		c, w := newRoleContext("POST", `{"name":"editor","description":"d","permission_ids":[1,2]}`, "")
 
@@ -139,7 +143,7 @@ func TestRoleHandler_CreateRole(t *testing.T) {
 
 	t.Run("Service Conflict", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("CreateRole", mock.Anything, mock.Anything).Return(nil, apperror.NewConflictError("Role name already exists"))
+		svc.On("CreateRole", mock.Anything, testActorID, mock.Anything).Return(nil, apperror.NewConflictError("Role name already exists"))
 		c, w := newRoleContext("POST", `{"name":"editor"}`, "")
 
 		handlers.NewRoleHandler(svc).CreateRole(c)
@@ -148,13 +152,39 @@ func TestRoleHandler_CreateRole(t *testing.T) {
 	})
 }
 
+func TestRoleHandler_RequiresAnAuthenticatedUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := new(mocks.MockRoleService)
+	h := handlers.NewRoleHandler(svc)
+
+	for name, call := range map[string]func(*gin.Context){
+		"CreateRole":   h.CreateRole,
+		"UpdateRole":   h.UpdateRole,
+		"DeleteRole":   h.DeleteRole,
+		"SetUserRoles": h.SetUserRoles,
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, w := newRoleContext("POST", `{"name":"editor","role_ids":[1]}`, "3")
+			delete(c.Keys, "UserID")
+
+			call(c)
+
+			assert.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+	}
+	svc.AssertNotCalled(t, "CreateRole", mock.Anything, mock.Anything, mock.Anything)
+	svc.AssertNotCalled(t, "UpdateRole", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	svc.AssertNotCalled(t, "DeleteRole", mock.Anything, mock.Anything, mock.Anything)
+	svc.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestRoleHandler_UpdateRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	utils.InitValidator()
 
 	t.Run("Success", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("UpdateRole", mock.Anything, uint(3), &dto.RoleInput{Name: "writer"}).Return(&models.Role{ID: 3, Name: "writer"}, nil)
+		svc.On("UpdateRole", mock.Anything, testActorID, uint(3), &dto.RoleInput{Name: "writer"}).Return(&models.Role{ID: 3, Name: "writer"}, nil)
 		c, w := newRoleContext("PUT", `{"name":"writer"}`, "3")
 
 		handlers.NewRoleHandler(svc).UpdateRole(c)
@@ -183,7 +213,7 @@ func TestRoleHandler_UpdateRole(t *testing.T) {
 
 	t.Run("Forbidden For Admin", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("UpdateRole", mock.Anything, uint(1), mock.Anything).Return(nil, apperror.NewForbiddenError("no"))
+		svc.On("UpdateRole", mock.Anything, testActorID, uint(1), mock.Anything).Return(nil, apperror.NewForbiddenError("no"))
 		c, w := newRoleContext("PUT", `{"name":"writer"}`, "1")
 
 		handlers.NewRoleHandler(svc).UpdateRole(c)
@@ -197,7 +227,7 @@ func TestRoleHandler_DeleteRole(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("DeleteRole", mock.Anything, uint(3)).Return(nil)
+		svc.On("DeleteRole", mock.Anything, testActorID, uint(3)).Return(nil)
 		c, w := newRoleContext("DELETE", "", "3")
 
 		handlers.NewRoleHandler(svc).DeleteRole(c)
@@ -216,7 +246,7 @@ func TestRoleHandler_DeleteRole(t *testing.T) {
 
 	t.Run("Service Error", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("DeleteRole", mock.Anything, uint(3)).Return(apperror.NewNotFoundError("Role not found"))
+		svc.On("DeleteRole", mock.Anything, testActorID, uint(3)).Return(apperror.NewNotFoundError("Role not found"))
 		c, w := newRoleContext("DELETE", "", "3")
 
 		handlers.NewRoleHandler(svc).DeleteRole(c)
@@ -256,7 +286,7 @@ func TestRoleHandler_SetUserRoles(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("SetUserRoles", mock.Anything, uint(4), []uint{1, 2}).Return([]models.Role{{ID: 1, Name: "admin"}}, nil)
+		svc.On("SetUserRoles", mock.Anything, testActorID, uint(4), []uint{1, 2}).Return([]models.Role{{ID: 1, Name: "admin"}}, nil)
 		c, w := newRoleContext("PUT", `{"role_ids":[1,2]}`, "4")
 
 		handlers.NewRoleHandler(svc).SetUserRoles(c)
@@ -267,7 +297,7 @@ func TestRoleHandler_SetUserRoles(t *testing.T) {
 
 	t.Run("Empty List Clears Roles", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("SetUserRoles", mock.Anything, uint(4), []uint{}).Return(nil, nil)
+		svc.On("SetUserRoles", mock.Anything, testActorID, uint(4), []uint{}).Return(nil, nil)
 		c, w := newRoleContext("PUT", `{"role_ids":[]}`, "4")
 
 		handlers.NewRoleHandler(svc).SetUserRoles(c)
@@ -297,7 +327,7 @@ func TestRoleHandler_SetUserRoles(t *testing.T) {
 
 	t.Run("Service Error", func(t *testing.T) {
 		svc := new(mocks.MockRoleService)
-		svc.On("SetUserRoles", mock.Anything, uint(4), mock.Anything).Return(nil, apperror.NewNotFoundError("User not found"))
+		svc.On("SetUserRoles", mock.Anything, testActorID, uint(4), mock.Anything).Return(nil, apperror.NewNotFoundError("User not found"))
 		c, w := newRoleContext("PUT", `{"role_ids":[1]}`, "4")
 
 		handlers.NewRoleHandler(svc).SetUserRoles(c)

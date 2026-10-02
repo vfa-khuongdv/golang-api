@@ -29,20 +29,20 @@ func (m *MockRoleService) GetRole(ctx context.Context, id uint) (*models.Role, e
 	return role, args.Error(1)
 }
 
-func (m *MockRoleService) CreateRole(ctx context.Context, input *dto.RoleInput) (*models.Role, error) {
-	args := m.Called(ctx, input)
+func (m *MockRoleService) CreateRole(ctx context.Context, actorID uint, input *dto.RoleInput) (*models.Role, error) {
+	args := m.Called(ctx, actorID, input)
 	role, _ := args.Get(0).(*models.Role)
 	return role, args.Error(1)
 }
 
-func (m *MockRoleService) UpdateRole(ctx context.Context, id uint, input *dto.RoleInput) (*models.Role, error) {
-	args := m.Called(ctx, id, input)
+func (m *MockRoleService) UpdateRole(ctx context.Context, actorID uint, id uint, input *dto.RoleInput) (*models.Role, error) {
+	args := m.Called(ctx, actorID, id, input)
 	role, _ := args.Get(0).(*models.Role)
 	return role, args.Error(1)
 }
 
-func (m *MockRoleService) DeleteRole(ctx context.Context, id uint) error {
-	return m.Called(ctx, id).Error(0)
+func (m *MockRoleService) DeleteRole(ctx context.Context, actorID uint, id uint) error {
+	return m.Called(ctx, actorID, id).Error(0)
 }
 
 func (m *MockRoleService) ListPermissions(ctx context.Context) ([]models.Permission, error) {
@@ -51,8 +51,8 @@ func (m *MockRoleService) ListPermissions(ctx context.Context) ([]models.Permiss
 	return perms, args.Error(1)
 }
 
-func (m *MockRoleService) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) ([]models.Role, error) {
-	args := m.Called(ctx, userID, roleIDs)
+func (m *MockRoleService) SetUserRoles(ctx context.Context, actorID uint, userID uint, roleIDs []uint) ([]models.Role, error) {
+	args := m.Called(ctx, actorID, userID, roleIDs)
 	roles, _ := args.Get(0).([]models.Role)
 	return roles, args.Error(1)
 }

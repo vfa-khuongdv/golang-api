@@ -42,7 +42,6 @@ func TestErrorConstructors(t *testing.T) {
 		{"PasswordHashFailedError", NewPasswordHashFailedError, ErrPasswordHashFailed, http.StatusInternalServerError},
 		{"PasswordMismatchError", NewPasswordMismatchError, ErrPasswordMismatch, http.StatusBadRequest},
 		{"PasswordUnchangedError", NewPasswordUnchangedError, ErrPasswordUnchanged, http.StatusBadRequest},
-		{"AccountLockedError", NewAccountLockedError, ErrAccountLocked, http.StatusTooManyRequests},
 
 		// Common errors
 		{"ParseError", NewParseError, ErrParseError, http.StatusBadRequest},

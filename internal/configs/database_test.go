@@ -49,26 +49,4 @@ func TestSQLiteDatabaseSmoke(t *testing.T) {
 		assert.Equal(t, "testpass", config.Password)
 		assert.Equal(t, "testdb", config.DBName)
 	})
-
-	t.Run("Global DB variable assignment", func(t *testing.T) {
-		// Reset global DB to nil
-		configs.DB = nil
-		assert.Nil(t, configs.DB)
-
-		// Create a temporary SQLite database for testing
-		tempFile, err := os.CreateTemp("", "test_db_global_*.sqlite")
-		require.NoError(t, err)
-		defer func() {
-			_ = os.Remove(tempFile.Name())
-		}()
-
-		_ = tempFile.Close()
-		db, err := gorm.Open(sqlite.Open(tempFile.Name()), &gorm.Config{})
-		require.NoError(t, err)
-
-		// Simulate setting the global DB variable
-		configs.DB = db
-		assert.NotNil(t, configs.DB)
-		assert.Equal(t, db, configs.DB)
-	})
 }

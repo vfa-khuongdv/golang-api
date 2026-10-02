@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 )
 
@@ -56,9 +55,9 @@ var (
 	}
 )
 
-// NewJWTService returns a new instance of jwtServiceImpl
-func NewJWTService() (JWTService, error) {
-	secret := strings.TrimSpace(configs.GetEnv("JWT_KEY", ""))
+// NewJWTService returns a JWTService that signs tokens with secret (JWT_KEY).
+func NewJWTService(secret string) (JWTService, error) {
+	secret = strings.TrimSpace(secret)
 	if secret == "" {
 		return nil, ErrJWTKeyMissing
 	}

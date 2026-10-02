@@ -18,7 +18,7 @@ import (
 func TestUsersChangePassword(t *testing.T) {
 	router, db := setupTestRouter()
 
-	jwtService, err := services.NewJWTService()
+	jwtService, err := services.NewJWTService(testJWTKey)
 	if err != nil {
 		t.Fatalf("Failed to create JWT service: %v", err)
 	}

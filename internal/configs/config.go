@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 )
 
 type (
@@ -24,6 +25,11 @@ type (
 		Port    string
 		GinMode string
 		Stage   string
+		// TrustedProxies are the peers whose X-Forwarded-For is trusted; empty
+		// trusts nobody. TrustedProxiesDefault is true when TRUSTED_PROXIES is
+		// unset and every peer is trusted.
+		TrustedProxies        []string
+		TrustedProxiesDefault bool
 	}
 
 	JWTConfig struct {
@@ -49,11 +55,18 @@ type (
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
+	trustedProxies, trustedProxiesSet := os.LookupEnv("TRUSTED_PROXIES")
+	if !trustedProxiesSet {
+		trustedProxies = "0.0.0.0/0"
+	}
+
 	cfg := &Config{
 		Server: ServerConfig{
-			Port:    GetEnv("PORT", "3000"),
-			GinMode: GetEnv("GIN_MODE", "release"),
-			Stage:   GetEnv("STAGE", "dev"),
+			Port:                  GetEnv("PORT", "3000"),
+			GinMode:               GetEnv("GIN_MODE", "release"),
+			Stage:                 GetEnv("STAGE", "dev"),
+			TrustedProxies:        splitList(trustedProxies),
+			TrustedProxiesDefault: !trustedProxiesSet,
 		},
 		Database: DatabaseConfig{
 			Host:            GetEnv("DB_HOST", "127.0.0.1"),
@@ -73,7 +86,7 @@ func Load() (*Config, error) {
 			EncryptionKey: strings.TrimSpace(GetEnv("SETTINGS_ENCRYPTION_KEY", "")),
 		},
 		CORS: CORSConfig{
-			AllowedOrigins: strings.Split(GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
+			AllowedOrigins: splitList(GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")),
 		},
 		App: AppConfig{
 			ServiceName: GetEnv("APP_SERVICE", "golang-cms"),
@@ -115,7 +128,25 @@ func (c *Config) validate() error {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
+	for name, secret := range map[string]string{"JWT_KEY": c.JWT.Secret, "SETTINGS_ENCRYPTION_KEY": c.Settings.EncryptionKey} {
+		if len(secret) < utils.MinSecretKeyLength {
+			return fmt.Errorf("%s must be at least %d characters", name, utils.MinSecretKeyLength)
+		}
+	}
+
 	return nil
+}
+
+// splitList splits a comma-separated value and trims each item, dropping
+// empty ones; an empty value gives an empty list.
+func splitList(value string) []string {
+	items := []string{}
+	for item := range strings.SplitSeq(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			items = append(items, item)
+		}
+	}
+	return items
 }
 
 func GetEnv(key, defaultValue string) string {

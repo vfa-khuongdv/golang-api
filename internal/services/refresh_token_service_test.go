@@ -14,6 +14,7 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
+	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 	"gorm.io/driver/sqlite"
@@ -54,7 +55,9 @@ func (s *RefreshTokenServiceTestSuite) TestCreate() {
 
 		// The returned token must match the one persisted in the DB
 		if s.NotNil(persisted) {
-			assert.Equal(t, persisted.RefreshToken, result.Token)
+			// Only the hash is stored, so a database leak does not leak sessions.
+			assert.Equal(t, utils.HashToken(result.Token), persisted.RefreshToken)
+			assert.NotEqual(t, result.Token, persisted.RefreshToken)
 			assert.Equal(t, persisted.ExpiredAt, result.ExpiresAt)
 		}
 
@@ -87,7 +90,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		svc := services.NewRefreshTokenService(repo)
 
 		orig := &models.RefreshToken{
-			RefreshToken: "existing_token",
+			RefreshToken: utils.HashToken("existing_token"),
 			IpAddress:    "",
 			ExpiredAt:    9999999999,
 			UserID:       1,
@@ -103,7 +106,10 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		assert.Greater(t, result.Token.ExpiresAt, int64(0))
 
 		var stored models.RefreshToken
-		assert.NoError(t, db.Where("refresh_token = ?", result.Token.Token).First(&stored).Error)
+		assert.NoError(t, db.Where("refresh_token = ?", utils.HashToken(result.Token.Token)).First(&stored).Error)
+		var rawStored int64
+		db.Model(&models.RefreshToken{}).Where("refresh_token = ?", result.Token.Token).Count(&rawStored)
+		assert.Zero(t, rawStored, "the raw token must not be stored")
 		assert.Equal(t, uint(1), stored.UserID)
 		assert.Equal(t, "127.0.0.2", stored.IpAddress)
 	})
@@ -116,7 +122,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		repo := repositories.NewRefreshTokenRepository(db)
 		svc := services.NewRefreshTokenService(repo)
 
-		orig := &models.RefreshToken{RefreshToken: "victim_token", ExpiredAt: 9999999999, UserID: 1}
+		orig := &models.RefreshToken{RefreshToken: utils.HashToken("victim_token"), ExpiredAt: 9999999999, UserID: 1}
 		require.NoError(t, repo.Create(context.Background(), orig))
 
 		result, err := svc.Update(context.Background(), "victim_token", "127.0.0.1", 2)
@@ -128,7 +134,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		}
 		// The victim's token must still be usable.
 		var stored models.RefreshToken
-		assert.NoError(t, db.Where("refresh_token = ?", "victim_token").First(&stored).Error)
+		assert.NoError(t, db.Where("refresh_token = ?", utils.HashToken("victim_token")).First(&stored).Error)
 	})
 
 	s.T().Run("TokenNotFound", func(t *testing.T) {
@@ -156,7 +162,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		svc := services.NewRefreshTokenService(repo)
 
 		orig := &models.RefreshToken{
-			RefreshToken: "existing_token",
+			RefreshToken: utils.HashToken("existing_token"),
 			IpAddress:    "",
 			ExpiredAt:    9999999999,
 			UserID:       1,
@@ -184,7 +190,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		svc := services.NewRefreshTokenService(repo)
 
 		orig := &models.RefreshToken{
-			RefreshToken: "expired_token",
+			RefreshToken: utils.HashToken("expired_token"),
 			IpAddress:    "",
 			ExpiredAt:    time.Now().Add(-time.Hour).Unix(),
 			UserID:       1,
@@ -207,7 +213,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		require.NoError(t, err)
 		tx := realDB.Session(&gorm.Session{})
 		mockRepo.On("BeginTx", mock.Anything).Return(tx, nil)
-		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "some_token").Return((*models.RefreshToken)(nil), errors.New("find error"))
+		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, utils.HashToken("some_token")).Return((*models.RefreshToken)(nil), errors.New("find error"))
 		svc := services.NewRefreshTokenService(mockRepo)
 
 		result, err := svc.Update(context.Background(), "some_token", "127.0.0.1", 1)
@@ -222,7 +228,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		require.NoError(t, err)
 		tx := realDB.Session(&gorm.Session{})
 		mockRepo.On("BeginTx", mock.Anything).Return(tx, nil)
-		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "existing_token").Return(&models.RefreshToken{
+		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, utils.HashToken("existing_token")).Return(&models.RefreshToken{
 			RefreshToken: "old_token",
 			IpAddress:    "",
 			ExpiredAt:    time.Now().Add(time.Hour).Unix(),
@@ -247,7 +253,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		require.NoError(t, err)
 		tx := realDB.Session(&gorm.Session{})
 		mockRepo.On("BeginTx", mock.Anything).Return(tx, nil)
-		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "existing_token").Return(&models.RefreshToken{
+		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, utils.HashToken("existing_token")).Return(&models.RefreshToken{
 			RefreshToken: "old_token",
 			IpAddress:    "",
 			ExpiredAt:    time.Now().Add(time.Hour).Unix(),

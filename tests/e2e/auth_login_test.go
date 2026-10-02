@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -211,16 +212,53 @@ func TestAuthLoginLockout(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	}
 
-	// The next attempt should hit the account lockout path (429).
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
+	login := func(email, password string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]string{"email": email, "password": password})
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		return w
+	}
 
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+	// The account is now locked. Whatever the password, the answer is the same
+	// as for an unknown email: a distinct one would reveal the account exists,
+	// and one that differs for the right password would let guessing go on.
+	unknown := login("nobody-lockout@example.com", "wrongpassword")
+	lockedWrong := login("test_lockout@example.com", "wrongpassword")
+	lockedRight := login("test_lockout@example.com", password)
 
-	var errResp ErrorResponse
-	err := json.Unmarshal(w.Body.Bytes(), &errResp)
+	assert.Equal(t, http.StatusBadRequest, unknown.Code)
+	assert.Equal(t, unknown.Code, lockedWrong.Code)
+	assert.Equal(t, unknown.Body.String(), lockedWrong.Body.String())
+	assert.Equal(t, unknown.Code, lockedRight.Code)
+	assert.Equal(t, unknown.Body.String(), lockedRight.Body.String())
+}
+
+func TestAuthLogin_ExpiredLockRestartsTheCount(t *testing.T) {
+	router, db := setupTestRouter()
+	hashed, err := utils.HashPassword("password123")
 	require.NoError(t, err)
-	assert.Equal(t, apperror.ErrAccountLocked, errResp.Code)
+	expired := time.Now().Add(-time.Minute).Unix()
+	user := models.User{Name: "Locked", Email: "expired-lock@example.com", Password: hashed, Gender: 1,
+		FailedAttempts: services.MaxFailedAttempts, LockedUntil: &expired}
+	require.NoError(t, db.Create(&user).Error)
+
+	login := func(password string) int {
+		body, _ := json.Marshal(map[string]string{"email": user.Email, "password": password})
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "192.0.2.10:1234" // its own rate limit bucket
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	assert.Equal(t, http.StatusBadRequest, login("wrong-password"), "one wrong password after the lock ends is not a new lock")
+
+	var got models.User
+	require.NoError(t, db.First(&got, user.ID).Error)
+	assert.Equal(t, 1, got.FailedAttempts)
+	assert.Nil(t, got.LockedUntil)
+	assert.Equal(t, http.StatusOK, login("password123"))
 }

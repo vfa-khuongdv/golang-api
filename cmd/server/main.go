@@ -14,12 +14,6 @@ import (
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"github.com/vfa-khuongdv/golang-cms/pkg/migrator"
-	"gorm.io/gorm"
-)
-
-var (
-	cfg    *configs.Config
-	server *http.Server
 )
 
 // newHTTPServer builds the server with timeouts. ReadHeaderTimeout stops
@@ -35,17 +29,13 @@ func newHTTPServer(addr string, handler http.Handler) *http.Server {
 	}
 }
 
-func initializeDatabase() *gorm.DB {
-	return configs.InitDB(cfg.Database)
-}
-
-func runMigrations() {
+func runMigrations(database configs.DatabaseConfig) {
 	sqlConfig := migrator.MySQLConfig{
-		Host:     cfg.Database.Host,
-		Port:     cfg.Database.Port,
-		User:     cfg.Database.User,
-		Password: cfg.Database.Password,
-		DBName:   cfg.Database.DBName,
+		Host:     database.Host,
+		Port:     database.Port,
+		User:     database.User,
+		Password: database.Password,
+		DBName:   database.DBName,
 	}
 	dsn := migrator.NewMySQLDSN(sqlConfig)
 
@@ -63,8 +53,7 @@ func runMigrations() {
 }
 
 func main() {
-	var err error
-	cfg, err = configs.Load()
+	cfg, err := configs.Load()
 	if err != nil {
 		logger.Fatalf("Config validation failed: %v", err)
 	}
@@ -77,22 +66,22 @@ func main() {
 	})
 
 	// Initialize database
-	db := initializeDatabase()
+	db := configs.InitDB(cfg.Database)
 
 	// Run migrations
 	if cfg.App.RunMigrate {
-		runMigrations()
+		runMigrations(cfg.Database)
 	}
 
 	// Setup routes
-	router := routes.SetupRouter(db)
+	router := routes.SetupRouter(db, cfg)
 
 	// Initialize custom validator
 	utils.InitValidator()
 
 	// Start server
 	port := fmt.Sprintf(":%s", cfg.Server.Port)
-	server = newHTTPServer(port, router)
+	server := newHTTPServer(port, router)
 
 	go func() {
 		logger.Infof("Server starting on %s", port)
@@ -111,6 +100,15 @@ func main() {
 
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	// Close the pool once the in-flight requests are done with it.
+	sqlDB, err := db.DB()
+	if err == nil {
+		err = sqlDB.Close()
+	}
+	if err != nil {
+		logger.Errorf("Failed to close the database: %v", err)
 	}
 	logger.Infof("Server exited")
 }

@@ -226,3 +226,73 @@ func TestLoadDatabasePool(t *testing.T) {
 		assert.Equal(t, 30*time.Minute, cfg.Database.ConnMaxLifetime)
 	})
 }
+
+func TestLoadTrustedProxies(t *testing.T) {
+	t.Run("Unset Trusts Every Peer And Is Marked As The Default", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("TRUSTED_PROXIES", "")
+		require.NoError(t, os.Unsetenv("TRUSTED_PROXIES"))
+
+		cfg, err := configs.Load()
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"0.0.0.0/0"}, cfg.Server.TrustedProxies)
+		assert.True(t, cfg.Server.TrustedProxiesDefault)
+	})
+
+	t.Run("Empty Trusts Nothing", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("TRUSTED_PROXIES", "")
+
+		cfg, err := configs.Load()
+
+		require.NoError(t, err)
+		assert.Empty(t, cfg.Server.TrustedProxies)
+		assert.False(t, cfg.Server.TrustedProxiesDefault)
+	})
+
+	t.Run("A List Is Split And Trimmed", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8, 192.168.0.0/16")
+
+		cfg, err := configs.Load()
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"10.0.0.0/8", "192.168.0.0/16"}, cfg.Server.TrustedProxies)
+		assert.False(t, cfg.Server.TrustedProxiesDefault)
+	})
+}
+
+func TestLoadCORSAllowedOrigins(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://a.example.com, https://b.example.com")
+
+	cfg, err := configs.Load()
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://a.example.com", "https://b.example.com"}, cfg.CORS.AllowedOrigins)
+}
+
+func TestLoadRejectsShortSecrets(t *testing.T) {
+	for _, key := range []string{"JWT_KEY", "SETTINGS_ENCRYPTION_KEY"} {
+		t.Run(key, func(t *testing.T) {
+			setRequiredEnv(t)
+			t.Setenv(key, strings.Repeat("x", 31))
+
+			_, err := configs.Load()
+
+			assert.ErrorContains(t, err, key)
+		})
+	}
+}
+
+func TestLoadCORSAllowedOriginsDefault(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("CORS_ALLOWED_ORIGINS", "")
+	require.NoError(t, os.Unsetenv("CORS_ALLOWED_ORIGINS"))
+
+	cfg, err := configs.Load()
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"http://localhost:5173"}, cfg.CORS.AllowedOrigins)
+}

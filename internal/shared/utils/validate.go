@@ -264,23 +264,3 @@ func validationMessage(fieldName, tag, param string) string {
 		return fmt.Sprintf("%s is invalid", fieldName)
 	}
 }
-
-func ToFieldErrors(json any) []apperror.FieldError {
-	var fieldErrors []apperror.FieldError
-
-	if items, ok := json.([]any); ok {
-		for _, item := range items {
-			if fieldMap, ok := item.(map[string]any); ok {
-				field, _ := fieldMap["field"].(string)
-				message, _ := fieldMap["message"].(string)
-
-				fieldErrors = append(fieldErrors, apperror.FieldError{
-					Field:   field,
-					Message: message,
-				})
-			}
-		}
-	}
-
-	return fieldErrors
-}

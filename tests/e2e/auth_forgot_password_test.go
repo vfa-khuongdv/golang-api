@@ -29,10 +29,10 @@ func TestAuthForgotPassword(t *testing.T) {
 	result := db.Create(&user)
 	require.NoError(t, result.Error)
 
-	t.Run("Forgot Password - Token Persisted On Email Failure", func(t *testing.T) {
-		// Force deterministic behavior: with mail.from empty the sender fails
-		// fast on address parsing (no network), so we always hit the 500 path
-		// and can verify the token was persisted before the send.
+	t.Run("Forgot Password - Email Failure Answers Like An Unknown Email", func(t *testing.T) {
+		// With mail.from empty the sender fails fast on address parsing (no
+		// network). The answer must still be the same 200 as for an unknown
+		// email, otherwise the endpoint reveals which emails are registered.
 		require.NoError(t, db.Create(&[]models.Setting{
 			{Key: "mail.host", Value: "smtp.example.com"},
 			{Key: "mail.port", Value: "587"},
@@ -53,18 +53,17 @@ func TestAuthForgotPassword(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		// Email sending fails (500) but the token should still be generated in DB
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code)
+		unknown := httptest.NewRecorder()
+		unknownReq, _ := http.NewRequest("POST", "/api/v1/forgot-password", bytes.NewBufferString(`{"email":"nobody@example.com"}`))
+		unknownReq.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(unknown, unknownReq)
+		assert.Equal(t, unknown.Body.String(), w.Body.String())
 
 		var updatedUser models.User
 		db.First(&updatedUser, user.ID)
 		assert.NotNil(t, updatedUser.ResetToken)
 		assert.NotNil(t, updatedUser.ResetExpiredAt)
-
-		var errResp ErrorResponse
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
-		require.NoError(t, err)
-		assert.Equal(t, apperror.ErrInternalServer, errResp.Code)
 	})
 
 	t.Run("Forgot Password - Email Not Found", func(t *testing.T) {

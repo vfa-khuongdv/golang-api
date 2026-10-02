@@ -14,11 +14,14 @@ type RoleService interface {
 	HasPermission(ctx context.Context, userID uint, permission string) (bool, error)
 	ListRoles(ctx context.Context) ([]models.Role, error)
 	GetRole(ctx context.Context, id uint) (*models.Role, error)
-	CreateRole(ctx context.Context, input *dto.RoleInput) (*models.Role, error)
-	UpdateRole(ctx context.Context, id uint, input *dto.RoleInput) (*models.Role, error)
-	DeleteRole(ctx context.Context, id uint) error
+	// The methods below take the ID of the user making the change (actorID) and
+	// refuse a change that involves a permission the actor does not hold, so
+	// nobody can grant or take away more than they have.
+	CreateRole(ctx context.Context, actorID uint, input *dto.RoleInput) (*models.Role, error)
+	UpdateRole(ctx context.Context, actorID uint, id uint, input *dto.RoleInput) (*models.Role, error)
+	DeleteRole(ctx context.Context, actorID uint, id uint) error
 	ListPermissions(ctx context.Context) ([]models.Permission, error)
-	SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) ([]models.Role, error)
+	SetUserRoles(ctx context.Context, actorID uint, userID uint, roleIDs []uint) ([]models.Role, error)
 }
 
 type roleServiceImpl struct {
@@ -46,12 +49,15 @@ func (s *roleServiceImpl) ListPermissions(ctx context.Context) ([]models.Permiss
 	return s.roleRepo.FindPermissions(ctx)
 }
 
-func (s *roleServiceImpl) CreateRole(ctx context.Context, input *dto.RoleInput) (*models.Role, error) {
+func (s *roleServiceImpl) CreateRole(ctx context.Context, actorID uint, input *dto.RoleInput) (*models.Role, error) {
 	if err := s.ensureNameFree(ctx, input.Name, 0); err != nil {
 		return nil, err
 	}
 	perms, err := s.resolvePermissions(ctx, input.PermissionIDs)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.ensureActorHolds(ctx, actorID, permissionIDs(perms)); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +68,7 @@ func (s *roleServiceImpl) CreateRole(ctx context.Context, input *dto.RoleInput) 
 	return role, nil
 }
 
-func (s *roleServiceImpl) UpdateRole(ctx context.Context, id uint, input *dto.RoleInput) (*models.Role, error) {
+func (s *roleServiceImpl) UpdateRole(ctx context.Context, actorID uint, id uint, input *dto.RoleInput) (*models.Role, error) {
 	role, err := s.roleRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -77,6 +83,10 @@ func (s *roleServiceImpl) UpdateRole(ctx context.Context, id uint, input *dto.Ro
 	if err != nil {
 		return nil, err
 	}
+	// Both the permissions the role loses and the ones it gains.
+	if err := s.ensureActorHolds(ctx, actorID, append(permissionIDs(role.Permissions), permissionIDs(perms)...)); err != nil {
+		return nil, err
+	}
 
 	role.Name = input.Name
 	role.Description = input.Description
@@ -87,7 +97,7 @@ func (s *roleServiceImpl) UpdateRole(ctx context.Context, id uint, input *dto.Ro
 	return role, nil
 }
 
-func (s *roleServiceImpl) DeleteRole(ctx context.Context, id uint) error {
+func (s *roleServiceImpl) DeleteRole(ctx context.Context, actorID uint, id uint) error {
 	role, err := s.roleRepo.FindByID(ctx, id)
 	if err != nil {
 		return err
@@ -95,10 +105,13 @@ func (s *roleServiceImpl) DeleteRole(ctx context.Context, id uint) error {
 	if role.Name == models.RoleAdmin {
 		return apperror.NewForbiddenError("The admin role cannot be deleted")
 	}
+	if err := s.ensureActorHolds(ctx, actorID, permissionIDs(role.Permissions)); err != nil {
+		return err
+	}
 	return s.roleRepo.Delete(ctx, id)
 }
 
-func (s *roleServiceImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) ([]models.Role, error) {
+func (s *roleServiceImpl) SetUserRoles(ctx context.Context, actorID uint, userID uint, roleIDs []uint) ([]models.Role, error) {
 	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
 		return nil, err
 	}
@@ -114,7 +127,23 @@ func (s *roleServiceImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs
 		}
 	}
 
-	if err := s.ensureAdminRetained(ctx, userID, ids); err != nil {
+	current, err := s.roleRepo.FindByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check the roles the user gains or loses; the ones kept are unchanged.
+	if changed := changedRoleIDs(current, ids); len(changed) > 0 {
+		perms, err := s.roleRepo.FindPermissionIDsByRoleIDs(ctx, changed)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.ensureActorHolds(ctx, actorID, perms); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := s.ensureAdminRetained(ctx, userID, current, ids); err != nil {
 		return nil, err
 	}
 
@@ -126,11 +155,7 @@ func (s *roleServiceImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs
 
 // ensureAdminRetained rejects a change that would leave no active user with the
 // admin role, since nobody could then manage roles through the API.
-func (s *roleServiceImpl) ensureAdminRetained(ctx context.Context, userID uint, newRoleIDs []uint) error {
-	current, err := s.roleRepo.FindByUserID(ctx, userID)
-	if err != nil {
-		return err
-	}
+func (s *roleServiceImpl) ensureAdminRetained(ctx context.Context, userID uint, current []models.Role, newRoleIDs []uint) error {
 	for _, role := range current {
 		if role.Name != models.RoleAdmin {
 			continue
@@ -148,6 +173,51 @@ func (s *roleServiceImpl) ensureAdminRetained(ctx context.Context, userID uint, 
 		return nil
 	}
 	return nil
+}
+
+// ensureActorHolds rejects the change unless the actor holds every permission
+// in permissionIDs. Without it, a user allowed to assign roles could assign
+// themselves the admin role.
+func (s *roleServiceImpl) ensureActorHolds(ctx context.Context, actorID uint, permissionIDs []uint) error {
+	if len(permissionIDs) == 0 {
+		return nil
+	}
+	held, err := s.roleRepo.FindPermissionIDsByUserID(ctx, actorID)
+	if err != nil {
+		return err
+	}
+	for _, id := range permissionIDs {
+		if !slices.Contains(held, id) {
+			return apperror.NewForbiddenError("You cannot grant or remove permissions you do not have")
+		}
+	}
+	return nil
+}
+
+// changedRoleIDs returns the roles in exactly one of current and newRoleIDs.
+func changedRoleIDs(current []models.Role, newRoleIDs []uint) []uint {
+	changed := []uint{}
+	currentIDs := make([]uint, 0, len(current))
+	for _, role := range current {
+		currentIDs = append(currentIDs, role.ID)
+		if !slices.Contains(newRoleIDs, role.ID) {
+			changed = append(changed, role.ID)
+		}
+	}
+	for _, id := range newRoleIDs {
+		if !slices.Contains(currentIDs, id) {
+			changed = append(changed, id)
+		}
+	}
+	return changed
+}
+
+func permissionIDs(perms []models.Permission) []uint {
+	ids := make([]uint, len(perms))
+	for i, p := range perms {
+		ids[i] = p.ID
+	}
+	return ids
 }
 
 // ensureNameFree returns a conflict error when another role (not exceptID)

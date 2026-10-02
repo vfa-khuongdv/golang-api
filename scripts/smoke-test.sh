@@ -51,17 +51,27 @@ curl -fs "http://127.0.0.1:${PORT}/healthz" >/dev/null || fail "server did not b
 
 go run ./cmd/seeder
 
+# Public endpoints allow 10 requests per minute per IP; this script makes 10.
+
 # The first seeded user is the admin, the second has no role.
 admin_token="$(login john@example.com password123 200)"
+admin_refresh="$(jq -r '.refresh_token.token' "$BODY_FILE")"
+
+# The refresh token is rotated: the new one works, the old one no longer does.
+refresh_body() { echo "{\"refresh_token\":\"$1\",\"access_token\":\"$admin_token\"}"; }
+expect 200 "refresh token" -X POST "$BASE_URL/refresh-token" -H 'Content-Type: application/json' -d "$(refresh_body "$admin_refresh")"
+expect 401 "reuse rotated refresh token" -X POST "$BASE_URL/refresh-token" -H 'Content-Type: application/json' -d "$(refresh_body "$admin_refresh")"
 expect 200 "admin GET /profile" "$BASE_URL/profile" -H "Authorization: Bearer $admin_token"
 expect 200 "admin GET /roles" "$BASE_URL/roles" -H "Authorization: Bearer $admin_token"
 
 user_token="$(login jane@example.com password123 200)"
 expect 403 "user without role GET /roles" "$BASE_URL/roles" -H "Authorization: Bearer $user_token"
 
-# Five wrong passwords lock the account, even for the right password afterwards.
+# Five wrong passwords lock the account: the right password is then refused
+# too, with the same answer as a wrong one.
 for _ in 1 2 3 4 5; do login jane@example.com wrong-password 400; done
-login jane@example.com password123 429
-grep -q "locked" "$BODY_FILE" || fail "expected the account lockout, got: $(cat "$BODY_FILE")"
+wrong_answer="$(cat "$BODY_FILE")"
+login jane@example.com password123 400
+[ "$(cat "$BODY_FILE")" = "$wrong_answer" ] || fail "a locked account must answer like a wrong password, got: $(cat "$BODY_FILE")"
 
 echo "Smoke test passed"

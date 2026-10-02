@@ -35,7 +35,7 @@ func createUserWithPermissions(t *testing.T, db *gorm.DB, email string, permissi
 	require.NoError(t, db.Create(&role).Error)
 	require.NoError(t, db.Create(&models.UserRole{UserID: user.ID, RoleID: role.ID}).Error)
 
-	jwtService, err := services.NewJWTService()
+	jwtService, err := services.NewJWTService(testJWTKey)
 	require.NoError(t, err)
 	token, err := jwtService.GenerateAccessToken(user.ID)
 	require.NoError(t, err)
@@ -174,5 +174,32 @@ func TestRBAC(t *testing.T) {
 		require.NoError(t, db.Create(&models.UserRole{UserID: actor.ID, RoleID: adminRole.ID}).Error)
 		w = rbacRequest(router, "PUT", fmt.Sprintf("/api/v1/users/%d/roles", onlyAdmin.ID), actorToken, `{"role_ids":[]}`)
 		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	})
+}
+
+func TestRBAC_NoPrivilegeEscalation(t *testing.T) {
+	router, db := setupTestRouter()
+	var settingsUpdate models.Permission
+	require.NoError(t, db.Where("name = ?", constants.PermissionSettingsUpdate).FirstOrCreate(&settingsUpdate, models.Permission{Name: constants.PermissionSettingsUpdate}).Error)
+	powerful := models.Role{Name: "rbac-escalation-powerful", Permissions: []models.Permission{settingsUpdate}}
+	require.NoError(t, db.Create(&powerful).Error)
+
+	t.Run("A User Who Can Assign Roles Cannot Give Themselves A Stronger Role", func(t *testing.T) {
+		assigner, token := createUserWithPermissions(t, db, "rbac-escalation-assigner@example.com", constants.PermissionUsersAssign)
+
+		w := rbacRequest(router, "PUT", fmt.Sprintf("/api/v1/users/%d/roles", assigner.ID), token, fmt.Sprintf(`{"role_ids":[%d]}`, powerful.ID))
+
+		assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+		var n int64
+		db.Model(&models.UserRole{}).Where("user_id = ? AND role_id = ?", assigner.ID, powerful.ID).Count(&n)
+		assert.Zero(t, n, "the role must not have been assigned")
+	})
+
+	t.Run("A User Who Can Create Roles Cannot Grant A Permission They Lack", func(t *testing.T) {
+		_, token := createUserWithPermissions(t, db, "rbac-escalation-creator@example.com", constants.PermissionRolesCreate)
+
+		w := rbacRequest(router, "POST", "/api/v1/roles", token, fmt.Sprintf(`{"name":"rbac-escalation-new","permission_ids":[%d]}`, settingsUpdate.ID))
+
+		assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
 	})
 }
