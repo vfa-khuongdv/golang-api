@@ -1,6 +1,6 @@
 CREATE TABLE `refresh_tokens` (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `refresh_token` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE,
+  `refresh_token` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL UNIQUE, -- SHA-256 hex of the token
   `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL,
   `expired_at` bigint NOT NULL,
   `user_id` bigint UNSIGNED NOT NULL,

@@ -33,8 +33,10 @@ func NewRefreshTokenService(repo repositories.RefreshTokenRepository) RefreshTok
 func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models.User, ipAddress string) (*dto.JwtResult, error) {
 	tokenString := utils.GenerateRandomString(60)
 	expiredAt := time.Now().Add(time.Hour * 24 * 30).Unix()
+	// Only the hash is stored, like reset tokens, so a database leak does not
+	// hand out working sessions. The raw token goes to the client only.
 	token := models.RefreshToken{
-		RefreshToken: tokenString,
+		RefreshToken: utils.HashToken(tokenString),
 		IpAddress:    ipAddress,
 		ExpiredAt:    expiredAt,
 		UserID:       user.ID,
@@ -61,7 +63,7 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 		return nil, apperror.NewDBUpdateError("Failed to update refresh token")
 	}
 
-	result, err := service.repo.FindByTokenWithTx(ctx, tx, tokenString)
+	result, err := service.repo.FindByTokenWithTx(ctx, tx, utils.HashToken(tokenString))
 	if err != nil {
 		if rerr := tx.Rollback().Error; rerr != nil {
 			logger.WithContext(ctx).Errorf("Rollback failed: %v", rerr)
@@ -81,7 +83,7 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 	newToken := utils.GenerateRandomString(60)
 	expiredAt := time.Now().Add(time.Hour * 24 * 30).Unix()
 
-	result.RefreshToken = newToken
+	result.RefreshToken = utils.HashToken(newToken)
 	result.ExpiredAt = expiredAt
 	result.IpAddress = ipAddress
 

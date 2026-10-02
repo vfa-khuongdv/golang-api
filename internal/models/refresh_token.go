@@ -8,7 +8,7 @@ import (
 
 type RefreshToken struct {
 	ID           uint           `gorm:"column:id;primaryKey" json:"id"`
-	RefreshToken string         `gorm:"column:refresh_token;type:varchar(60);not null;unique" json:"refresh_token"`
+	RefreshToken string         `gorm:"column:refresh_token;type:varchar(64);not null;unique" json:"refresh_token"`
 	IpAddress    string         `gorm:"column:ip_address;type:varchar(45);not null" json:"ip_address"`
 	ExpiredAt    int64          `gorm:"column:expired_at;not null" json:"expired_at"`
 	UserID       uint           `gorm:"column:user_id;not null" json:"user_id"`

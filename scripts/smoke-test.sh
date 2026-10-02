@@ -51,8 +51,16 @@ curl -fs "http://127.0.0.1:${PORT}/healthz" >/dev/null || fail "server did not b
 
 go run ./cmd/seeder
 
+# Public endpoints allow 10 requests per minute per IP; this script makes 10.
+
 # The first seeded user is the admin, the second has no role.
 admin_token="$(login john@example.com password123 200)"
+admin_refresh="$(jq -r '.refresh_token.token' "$BODY_FILE")"
+
+# The refresh token is rotated: the new one works, the old one no longer does.
+refresh_body() { echo "{\"refresh_token\":\"$1\",\"access_token\":\"$admin_token\"}"; }
+expect 200 "refresh token" -X POST "$BASE_URL/refresh-token" -H 'Content-Type: application/json' -d "$(refresh_body "$admin_refresh")"
+expect 401 "reuse rotated refresh token" -X POST "$BASE_URL/refresh-token" -H 'Content-Type: application/json' -d "$(refresh_body "$admin_refresh")"
 expect 200 "admin GET /profile" "$BASE_URL/profile" -H "Authorization: Bearer $admin_token"
 expect 200 "admin GET /roles" "$BASE_URL/roles" -H "Authorization: Bearer $admin_token"
 
