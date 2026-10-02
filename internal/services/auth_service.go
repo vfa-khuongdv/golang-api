@@ -46,6 +46,16 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 		return nil, apperror.NewAccountLockedError("Account is temporarily locked due to too many failed attempts. Try again later.")
 	}
 
+	// An expired lock starts a fresh count, otherwise one wrong password right
+	// after the lock ends would lock the account again.
+	if user.LockedUntil != nil {
+		if updateErr := service.repo.ResetFailedLogins(ctx, user.ID); updateErr != nil {
+			logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to reset expired lock for user ID %d: %v", user.ID, updateErr)
+		}
+		user.FailedAttempts = 0
+		user.LockedUntil = nil
+	}
+
 	// The counters are updated with targeted, atomic queries rather than saving the
 	// whole user: concurrent failures must all be counted, and a stale copy of the
 	// user must never overwrite a password changed while bcrypt was running.

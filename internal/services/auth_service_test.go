@@ -633,6 +633,32 @@ func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
 	assert.NotNil(s.T(), resp)
 }
 
+func (s *AuthServiceTestSuite) TestLogin_ExpiredLockRestartsTheCount() {
+	email := "expired-relock@example.com"
+	ipAddress := "127.0.0.1"
+
+	// The lock has expired but the counter is still at the maximum. One wrong
+	// password must count as the first attempt again, not lock the account.
+	expiredLock := time.Now().Add(-time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: services.MaxFailedAttempts, LockedUntil: &expiredLock}
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
+	var calls []string
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once().Run(func(mock.Arguments) { calls = append(calls, "reset") })
+	expectedLock := time.Now().Add(services.LockoutDurationMinutes * time.Minute).Unix()
+	s.repo.On("RecordFailedLogin", mock.Anything, user.ID, services.MaxFailedAttempts, mock.MatchedBy(func(lockUntil int64) bool {
+		return lockUntil >= expectedLock-5 && lockUntil <= expectedLock+5
+	})).Return(nil).Once().Run(func(mock.Arguments) { calls = append(calls, "record") })
+
+	resp, err := s.service.Login(context.Background(), email, "password123", ipAddress)
+
+	assert.Nil(s.T(), resp)
+	if appErr, ok := err.(*apperror.AppError); s.True(ok) {
+		assert.Equal(s.T(), apperror.ErrInvalidPassword, appErr.Code, "a wrong password, not a lock")
+	}
+	assert.Equal(s.T(), []string{"reset", "record"}, calls)
+	s.repo.AssertExpectations(s.T())
+}
+
 // --------------------- RUN TEST SUITE ---------------------
 func TestAuthServiceTestSuite(t *testing.T) {
 	suite.Run(t, new(AuthServiceTestSuite))

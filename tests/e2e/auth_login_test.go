@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -223,4 +224,32 @@ func TestAuthLoginLockout(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &errResp)
 	require.NoError(t, err)
 	assert.Equal(t, apperror.ErrAccountLocked, errResp.Code)
+}
+
+func TestAuthLogin_ExpiredLockRestartsTheCount(t *testing.T) {
+	router, db := setupTestRouter()
+	hashed, err := utils.HashPassword("password123")
+	require.NoError(t, err)
+	expired := time.Now().Add(-time.Minute).Unix()
+	user := models.User{Name: "Locked", Email: "expired-lock@example.com", Password: hashed, Gender: 1,
+		FailedAttempts: services.MaxFailedAttempts, LockedUntil: &expired}
+	require.NoError(t, db.Create(&user).Error)
+
+	login := func(password string) int {
+		body, _ := json.Marshal(map[string]string{"email": user.Email, "password": password})
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = "192.0.2.10:1234" // its own rate limit bucket
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	assert.Equal(t, http.StatusBadRequest, login("wrong-password"), "one wrong password after the lock ends is not a new lock")
+
+	var got models.User
+	require.NoError(t, db.First(&got, user.ID).Error)
+	assert.Equal(t, 1, got.FailedAttempts)
+	assert.Nil(t, got.LockedUntil)
+	assert.Equal(t, http.StatusOK, login("password123"))
 }
