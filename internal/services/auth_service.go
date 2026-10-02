@@ -112,15 +112,11 @@ func (service *authServiceImpl) RefreshToken(ctx context.Context, refreshToken, 
 		return nil, apperror.NewUnauthorizedError("Invalid access token scope")
 	}
 
-	refreshResult, err := service.refreshTokenService.Update(ctx, refreshToken, ipAddress)
+	// Update also refuses a refresh token that does not belong to claims.ID.
+	refreshResult, err := service.refreshTokenService.Update(ctx, refreshToken, ipAddress, claims.ID)
 	if err != nil {
-		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - invalid refresh token")
+		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - invalid refresh token: %v", err)
 		return nil, apperror.NewUnauthorizedError("Invalid refresh token")
-	}
-
-	if claims.ID != refreshResult.UserId {
-		logger.WithEvent(ctx, logger.EventTokenRefreshFailed).Warnf("Token refresh failed - token mismatch")
-		return nil, apperror.NewUnauthorizedError("Token mismatch: refresh and access tokens belong to different users")
 	}
 
 	user, err := service.repo.GetByID(ctx, refreshResult.UserId)

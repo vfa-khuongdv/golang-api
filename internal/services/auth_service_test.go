@@ -177,7 +177,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				user := &models.User{ID: userID, Email: "user@example.com"}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress, userID).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 				s.repo.On("GetByID", mock.Anything, userID).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
@@ -191,7 +191,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 			setupMocks: func() {
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress, userID).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 			},
 			expectErr: true,
 			errCode:   apperror.ErrUnauthorized,
@@ -203,7 +203,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				mockRes := &dto.RefreshTokenResult{UserId: userID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress, userID).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 				s.repo.On("GetByID", mock.Anything, userID).Return((*models.User)(nil), gorm.ErrRecordNotFound)
 			},
@@ -218,7 +218,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 				user := &models.User{ID: userID, Email: "user@example.com"}
 				claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress, userID).Return(mockRes, nil)
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 				s.repo.On("GetByID", mock.Anything, userID).Return(user, nil)
 				s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{}, errors.New("Failed to generate JWT token"))
@@ -239,13 +239,12 @@ func (s *AuthServiceTestSuite) TestRefreshToken() {
 		{
 			name: "TokenMismatch",
 			setupMocks: func() {
-				refreshUserID := userID
+				// The refresh token belongs to userID but the access token to
+				// another user: the rotation must be refused, not done then rejected.
 				accessUserID := uint(2)
-				mockRefreshToken := &dto.JwtResult{Token: "new-refresh-token", ExpiresAt: time.Now().Add(24 * time.Hour).Unix()}
-				mockRes := &dto.RefreshTokenResult{UserId: refreshUserID, Token: mockRefreshToken}
 				claims := &services.CustomClaims{ID: accessUserID, Scope: services.TokenScopeAccess}
 
-				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(mockRes, nil)
+				s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress, accessUserID).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 				s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
 			},
 			expectErr: true,
@@ -307,7 +306,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_EmptyAccessToken() {
 	if appErr, ok := err.(*apperror.AppError); ok {
 		assert.Equal(s.T(), apperror.ErrUnauthorized, appErr.Code)
 	}
-	s.refreshTokenService.AssertNotCalled(s.T(), "Update", mock.Anything, oldRefreshToken, ipAddress)
+	s.refreshTokenService.AssertNotCalled(s.T(), "Update", mock.Anything, oldRefreshToken, ipAddress, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestRefreshToken_EmptyRefreshToken() {
@@ -320,7 +319,7 @@ func (s *AuthServiceTestSuite) TestRefreshToken_EmptyRefreshToken() {
 	// is validated first), which must fail without rotating a new access token.
 	claims := &services.CustomClaims{ID: userID, Scope: services.TokenScopeAccess}
 	s.jwtService.On("ValidateTokenIgnoreExpiration", oldAccessToken).Return(claims, nil)
-	s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
+	s.refreshTokenService.On("Update", mock.Anything, oldRefreshToken, ipAddress, userID).Return(nil, apperror.NewUnauthorizedError("Invalid refresh token"))
 
 	result, err := s.service.RefreshToken(context.Background(), oldRefreshToken, oldAccessToken, ipAddress)
 
@@ -352,7 +351,7 @@ func (s *AuthServiceTestSuite) TestRefreshTokenSkipsRotationOnInvalidAccessToken
 	}
 
 	s.jwtService.AssertExpectations(s.T())
-	s.refreshTokenService.AssertNotCalled(s.T(), "Update", mock.Anything, oldRefreshToken, ipAddress)
+	s.refreshTokenService.AssertNotCalled(s.T(), "Update", mock.Anything, oldRefreshToken, ipAddress, mock.Anything)
 	s.refreshTokenService.AssertExpectations(s.T())
 	s.repo.AssertExpectations(s.T())
 }

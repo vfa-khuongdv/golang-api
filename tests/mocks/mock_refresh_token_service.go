@@ -21,8 +21,8 @@ func (m *MockRefreshTokenService) Create(ctx context.Context, user *models.User,
 	return result, args.Error(1)
 }
 
-func (m *MockRefreshTokenService) Update(ctx context.Context, token string, ipAddress string) (*dto.RefreshTokenResult, error) {
-	args := m.Called(ctx, token, ipAddress)
+func (m *MockRefreshTokenService) Update(ctx context.Context, token string, ipAddress string, userID uint) (*dto.RefreshTokenResult, error) {
+	args := m.Called(ctx, token, ipAddress, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
