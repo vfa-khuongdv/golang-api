@@ -212,18 +212,27 @@ func TestAuthLoginLockout(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	}
 
-	// The next attempt should hit the account lockout path (429).
-	w := httptest.NewRecorder()
-	req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(payloadBytes))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
+	login := func(email, password string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]string{"email": email, "password": password})
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("POST", "/api/v1/login", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		return w
+	}
 
-	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+	// The account is now locked. Whatever the password, the answer is the same
+	// as for an unknown email: a distinct one would reveal the account exists,
+	// and one that differs for the right password would let guessing go on.
+	unknown := login("nobody-lockout@example.com", "wrongpassword")
+	lockedWrong := login("test_lockout@example.com", "wrongpassword")
+	lockedRight := login("test_lockout@example.com", password)
 
-	var errResp ErrorResponse
-	err := json.Unmarshal(w.Body.Bytes(), &errResp)
-	require.NoError(t, err)
-	assert.Equal(t, apperror.ErrAccountLocked, errResp.Code)
+	assert.Equal(t, http.StatusBadRequest, unknown.Code)
+	assert.Equal(t, unknown.Code, lockedWrong.Code)
+	assert.Equal(t, unknown.Body.String(), lockedWrong.Body.String())
+	assert.Equal(t, unknown.Code, lockedRight.Code)
+	assert.Equal(t, unknown.Body.String(), lockedRight.Body.String())
 }
 
 func TestAuthLogin_ExpiredLockRestartsTheCount(t *testing.T) {

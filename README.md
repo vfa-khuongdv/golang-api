@@ -309,7 +309,7 @@ Every response carries an `X-Request-ID` header (the client's value is reused if
 
 #### Authentication (Public)
 
-These four endpoints share a per-IP rate limit of 10 requests per minute (`429` with `X-RateLimit-*` headers when exceeded). After 5 failed logins an account is locked for 15 minutes; once the lock ends, the count starts again from zero.
+These four endpoints share a per-IP rate limit of 10 requests per minute (`429` with `X-RateLimit-*` headers when exceeded). After 5 failed logins an account is locked for 15 minutes; once the lock ends, the count starts again from zero. Every failed login (unknown email, wrong password, locked account, even with the right password) gets the same `400` answer, so it does not reveal which emails are registered.
 
 - `POST /api/v1/login` - User login (returns access and refresh tokens)
 - `POST /api/v1/refresh-token` - Exchange a refresh token and the (possibly expired) access token for a new pair; the refresh token is rotated

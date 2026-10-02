@@ -388,12 +388,45 @@ func (s *AuthServiceTestSuite) TestLogin_AccountLocked() {
 	user := &models.User{ID: 1, Email: email, Password: "irrelevant", LockedUntil: &lockedUntil}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 
+	s.repo.On("FindByEmail", mock.Anything, "nobody@example.com").Return((*models.User)(nil), gorm.ErrRecordNotFound)
+	_, unknownErr := s.service.Login(context.Background(), "nobody@example.com", password, ipAddress)
+
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
-	assert.Error(s.T(), err)
+	// A distinct "locked" answer would reveal that the email is registered.
 	assert.Nil(s.T(), resp)
-	if appErr, ok := err.(*apperror.AppError); ok {
-		assert.Equal(s.T(), apperror.ErrAccountLocked, appErr.Code)
+	assert.Equal(s.T(), unknownErr, err)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_AccountLockedDoesNotRevealACorrectPassword() {
+	email := "locked-correct@example.com"
+	password := "password123"
+	hashed, _ := utils.HashPassword(password)
+	lockedUntil := time.Now().Add(30 * time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: hashed, LockedUntil: &lockedUntil}
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
+
+	_, wrongErr := s.service.Login(context.Background(), email, "wrong-password", "127.0.0.1")
+	resp, rightErr := s.service.Login(context.Background(), email, password, "127.0.0.1")
+
+	// Otherwise guessing could go on during the lock.
+	assert.Nil(s.T(), resp)
+	assert.Equal(s.T(), wrongErr, rightErr)
+	s.jwtService.AssertNotCalled(s.T(), "GenerateAccessToken", mock.Anything)
+	s.repo.AssertNotCalled(s.T(), "RecordFailedLogin", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_WrongPasswordMessageMentionsTheLockout() {
+	user := &models.User{ID: 1, Email: "hint@example.com", Password: "wrong-hashed"}
+	s.repo.On("FindByEmail", mock.Anything, user.Email).Return(user, nil)
+	s.expectFailedLogin(user.ID, nil)
+
+	_, err := s.service.Login(context.Background(), user.Email, "password123", "127.0.0.1")
+
+	appErr, ok := err.(*apperror.AppError)
+	if s.True(ok) {
+		assert.Equal(s.T(), apperror.ErrInvalidPassword, appErr.Code)
+		assert.Contains(s.T(), appErr.Message, "locked")
 	}
 }
 

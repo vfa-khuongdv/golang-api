@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -32,6 +33,15 @@ func NewAuthService(repo repositories.UserRepository, refreshTokenService Refres
 	}
 }
 
+// errInvalidCredentials is the one answer to every failed login (unknown
+// email, wrong password, locked account), so the answer reveals nothing; the
+// message tells a legitimate user why the right password may still fail.
+func errInvalidCredentials() error {
+	return apperror.NewInvalidPasswordError(fmt.Sprintf(
+		"Invalid credentials. After %d failed attempts the account is locked for %d minutes.",
+		MaxFailedAttempts, LockoutDurationMinutes))
+}
+
 // dummyPasswordHash is a bcrypt hash checked when the email is unknown. It is
 // computed once, on the first such login.
 var dummyPasswordHash = sync.OnceValue(func() string {
@@ -52,12 +62,17 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 		// does not reveal which emails are registered.
 		utils.CheckPasswordHash(password, dummyPasswordHash())
 		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - user not found: %s", utils.MaskWithPrefix(email, 4))
-		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
+		return nil, errInvalidCredentials()
 	}
 
+	// A locked account is answered exactly like a wrong password: a distinct
+	// answer would reveal that the email is registered, and the password is not
+	// checked, so guessing during the lock learns nothing. The dummy check keeps
+	// the timing the same.
 	if user.LockedUntil != nil && time.Now().Unix() < *user.LockedUntil {
+		utils.CheckPasswordHash(password, dummyPasswordHash())
 		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - account locked for email: %s", utils.MaskWithPrefix(email, 4))
-		return nil, apperror.NewAccountLockedError("Account is temporarily locked due to too many failed attempts. Try again later.")
+		return nil, errInvalidCredentials()
 	}
 
 	// An expired lock starts a fresh count, otherwise one wrong password right
@@ -79,7 +94,7 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 			logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to update user after failed login: %v", updateErr)
 		}
 		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - invalid password for email: %s (attempt %d/%d)", utils.MaskWithPrefix(email, 4), user.FailedAttempts+1, MaxFailedAttempts)
-		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
+		return nil, errInvalidCredentials()
 	}
 
 	if user.FailedAttempts > 0 || user.LockedUntil != nil {

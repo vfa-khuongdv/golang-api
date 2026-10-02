@@ -67,9 +67,11 @@ expect 200 "admin GET /roles" "$BASE_URL/roles" -H "Authorization: Bearer $admin
 user_token="$(login jane@example.com password123 200)"
 expect 403 "user without role GET /roles" "$BASE_URL/roles" -H "Authorization: Bearer $user_token"
 
-# Five wrong passwords lock the account, even for the right password afterwards.
+# Five wrong passwords lock the account: the right password is then refused
+# too, with the same answer as a wrong one.
 for _ in 1 2 3 4 5; do login jane@example.com wrong-password 400; done
-login jane@example.com password123 429
-grep -q "locked" "$BODY_FILE" || fail "expected the account lockout, got: $(cat "$BODY_FILE")"
+wrong_answer="$(cat "$BODY_FILE")"
+login jane@example.com password123 400
+[ "$(cat "$BODY_FILE")" = "$wrong_answer" ] || fail "a locked account must answer like a wrong password, got: $(cat "$BODY_FILE")"
 
 echo "Smoke test passed"
