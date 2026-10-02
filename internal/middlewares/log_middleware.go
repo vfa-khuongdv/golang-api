@@ -183,7 +183,11 @@ func LogMiddleware() gin.HandlerFunc {
 				if err != nil {
 					logger.WithField("request_id", logEntry.RequestID).Errorf("Failed to read request body: %v", err)
 				}
-				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+				// Only the first MAX_BODY_SIZE bytes are logged; the handler still reads the whole body.
+				c.Request.Body = struct {
+					io.Reader
+					io.Closer
+				}{io.MultiReader(bytes.NewReader(bodyBytes), c.Request.Body), c.Request.Body}
 			}
 
 			if strings.Contains(c.Request.Header.Get("Content-Type"), "application/json") {

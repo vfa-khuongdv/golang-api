@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -567,4 +568,25 @@ func TestLogMiddleware(t *testing.T) {
 		assert.NotEqual(t, "session_token_abc", respMap["session"])
 		assert.Contains(t, respMap["session"], "*")
 	})
+}
+
+func TestLogMiddleware_HandlerReadsFullBodyLargerThanLogLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	_, restore := setupLogCapture()
+	defer restore()
+
+	router := gin.New()
+	router.Use(middlewares.LogMiddleware())
+	var received int
+	router.POST("/test", func(c *gin.Context) {
+		body, _ := io.ReadAll(c.Request.Body)
+		received = len(body)
+		c.Status(http.StatusOK)
+	})
+
+	body := strings.Repeat("a", middlewares.MAX_BODY_SIZE+1000)
+	req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(body))
+	router.ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, len(body), received)
 }
