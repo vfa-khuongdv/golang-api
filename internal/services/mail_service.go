@@ -27,7 +27,12 @@ type mailerServiceImpl struct {
 
 var (
 	newEmailSender = func(config mailer.GomailSenderConfig) mailer.EmailSender {
-		return mailer.NewGomailSender(config)
+		// Return a nil interface, not an interface holding a nil *GomailSender,
+		// so the caller's nil check catches an invalid mail configuration.
+		if sender := mailer.NewGomailSender(config); sender != nil {
+			return sender
+		}
+		return nil
 	}
 	parseForgotTemplate = func() (*template.Template, error) {
 		return template.ParseFS(mailer.ForgotTemplate, "templates/forgot_template.html")

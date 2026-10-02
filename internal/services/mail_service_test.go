@@ -50,6 +50,26 @@ func (s *mailerServiceTestSuite) TestSendMailForgotPassword() {
 			assert.Equal(t, apperror.ErrInternalServer, appErr.Code)
 		}
 	})
+
+	s.T().Run("Empty Host Returns Error Instead Of Panicking", func(t *testing.T) {
+		s.settingRepo.On("GetValues", mock.Anything, mock.Anything).Return(map[string]string{
+			"mail.host":        "",
+			"mail.port":        "587",
+			"mail.from":        "noreply@example.com",
+			"app.frontend_url": "https://example.com",
+		}, nil).Once()
+		token := "raw-token"
+		user := &models.User{ID: 1, Email: "user@example.com", Name: "Test User", ResetToken: &token}
+
+		var err error
+		assert.NotPanics(t, func() {
+			err = s.mailerService.SendMailForgotPassword(context.Background(), user)
+		})
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrInternalServer, appErr.Code)
+		}
+	})
 }
 
 func TestMailerServiceTestSuite(t *testing.T) {
