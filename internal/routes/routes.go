@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"os"
 	"strings"
 	"time"
 
@@ -46,6 +47,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 
 	stage := configs.GetEnv("STAGE", "dev")
+
+	// The default is kept so existing deployments behind a load balancer keep
+	// working, but in prod it lets clients spoof their IP, so say so.
+	if _, set := os.LookupEnv("TRUSTED_PROXIES"); !set && stage == "prod" {
+		logger.Warnf("TRUSTED_PROXIES is not set, so X-Forwarded-For is trusted from every peer: clients can spoof their IP and bypass the per-IP rate limit. Set it to the load balancer CIDR, e.g. 10.0.0.0/16")
+	}
 
 	// Set up Swagger documentation only in non-production environments
 	if stage != "prod" {

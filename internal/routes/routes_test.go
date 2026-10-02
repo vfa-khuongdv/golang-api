@@ -1,6 +1,7 @@
 package routes_test
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/routes"
@@ -74,4 +76,45 @@ func TestSetupRouter_NullInJSONArrayGetsAResponse(t *testing.T) {
 
 	assert.NotPanics(t, func() { router.ServeHTTP(w, req) })
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// captureLogs sends the global logger's output to a buffer for the test.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	logrus.SetOutput(buf)
+	t.Cleanup(func() { logrus.SetOutput(os.Stderr) })
+	return buf
+}
+
+func TestSetupRouter_WarnsAboutTheDefaultTrustedProxiesInProd(t *testing.T) {
+	t.Run("Warns In Prod When TRUSTED_PROXIES Is Not Set", func(t *testing.T) {
+		t.Setenv("STAGE", "prod")
+		require.NoError(t, os.Unsetenv("TRUSTED_PROXIES"))
+		logs := captureLogs(t)
+
+		newRouter(t)
+
+		assert.Contains(t, logs.String(), "TRUSTED_PROXIES")
+	})
+
+	t.Run("No Warning When TRUSTED_PROXIES Is Set", func(t *testing.T) {
+		t.Setenv("STAGE", "prod")
+		t.Setenv("TRUSTED_PROXIES", "10.0.0.0/8")
+		logs := captureLogs(t)
+
+		newRouter(t)
+
+		assert.NotContains(t, logs.String(), "TRUSTED_PROXIES")
+	})
+
+	t.Run("No Warning Outside Prod", func(t *testing.T) {
+		t.Setenv("STAGE", "dev")
+		require.NoError(t, os.Unsetenv("TRUSTED_PROXIES"))
+		logs := captureLogs(t)
+
+		newRouter(t)
+
+		assert.NotContains(t, logs.String(), "TRUSTED_PROXIES")
+	})
 }
