@@ -129,12 +129,15 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 		})).Return(nil).Once()
 
 		// Act
-		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
+		sent := make(chan struct{})
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once().
+			Run(func(mock.Arguments) { close(sent) })
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
 		// Assert
 		s.NoError(err)
+		waitFor(t, sent)
 		s.NotNil(user.ResetToken)
 		s.Len(*user.ResetToken, 64) // SHA-256 hash is 64 hex characters
 		s.NotNil(user.ResetExpiredAt)
@@ -184,11 +187,38 @@ func (s *UserServiceTestSuite) TestForgotPassword() {
 
 		s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil).Once()
 		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
-		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once()
+		sent := make(chan struct{})
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(errors.New("send mail failed")).Once().
+			Run(func(mock.Arguments) { close(sent) })
 
 		err := s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email})
 
-		s.Error(err)
+		// Like for an unknown email: an error here would reveal the account exists.
+		s.NoError(err)
+		waitFor(t, sent)
+	})
+
+	s.T().Run("Answers Without Waiting For The Mail", func(t *testing.T) {
+		email := "slow-mail@example.com"
+		user := &models.User{Email: email}
+		s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil).Once()
+		s.repo.On("Update", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once()
+		release, sent := make(chan struct{}), make(chan struct{})
+		s.mailer.On("SendMailForgotPassword", mock.Anything, mock.AnythingOfType("*models.User")).Return(nil).Once().
+			Run(func(mock.Arguments) { <-release; close(sent) })
+
+		done := make(chan error)
+		go func() { done <- s.service.ForgotPassword(context.Background(), &dto.ForgotPasswordInput{Email: email}) }()
+
+		// The SMTP delay would otherwise tell registered emails apart.
+		select {
+		case err := <-done:
+			s.NoError(err)
+		case <-time.After(time.Second):
+			t.Fatal("ForgotPassword waited for the mail to be sent")
+		}
+		close(release)
+		waitFor(t, sent)
 	})
 }
 
@@ -468,4 +498,14 @@ func (s *UserServiceTestSuite) TestUpdateProfileErrors() {
 
 func TestUserServiceTestSuite(t *testing.T) {
 	suite.Run(t, new(UserServiceTestSuite))
+}
+
+// waitFor fails the test unless ch is closed within a second.
+func waitFor(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(time.Second):
+		t.Fatal("timed out")
+	}
 }

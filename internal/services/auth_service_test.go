@@ -659,6 +659,25 @@ func (s *AuthServiceTestSuite) TestLogin_ExpiredLockRestartsTheCount() {
 	s.repo.AssertExpectations(s.T())
 }
 
+func (s *AuthServiceTestSuite) TestLogin_UnknownEmailStillChecksAPassword() {
+	// Skipping bcrypt for an unknown email makes that answer much faster, which
+	// tells registered emails apart.
+	var checked []string
+	original := utils.CheckPasswordHash
+	utils.CheckPasswordHash = func(password, hash string) bool {
+		checked = append(checked, password)
+		return original(password, hash)
+	}
+	defer func() { utils.CheckPasswordHash = original }()
+	s.repo.On("FindByEmail", mock.Anything, "nobody@example.com").Return((*models.User)(nil), gorm.ErrRecordNotFound)
+
+	resp, err := s.service.Login(context.Background(), "nobody@example.com", "password123", "127.0.0.1")
+
+	assert.Nil(s.T(), resp)
+	assert.Error(s.T(), err)
+	assert.Equal(s.T(), []string{"password123"}, checked)
+}
+
 // --------------------- RUN TEST SUITE ---------------------
 func TestAuthServiceTestSuite(t *testing.T) {
 	suite.Run(t, new(AuthServiceTestSuite))

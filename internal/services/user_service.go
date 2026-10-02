@@ -63,12 +63,18 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 		return apperror.NewDBUpdateError("Failed to save reset token")
 	}
 
-	// Send raw token to user via email (never store raw token in DB)
+	// Send raw token to user via email (never store raw token in DB). The mail
+	// goes out in the background and a failure is only logged: answering at
+	// once, and the same way as for an unknown email, keeps the endpoint from
+	// revealing which emails are registered, by status code or by SMTP delay.
 	userWithRawToken := *user
 	userWithRawToken.ResetToken = &rawToken
-	if err := service.mailerService.SendMailForgotPassword(ctx, &userWithRawToken); err != nil {
-		return err
-	}
+	mailCtx := context.WithoutCancel(ctx) // keeps the request ID, outlives the request
+	go func() {
+		if err := service.mailerService.SendMailForgotPassword(mailCtx, &userWithRawToken); err != nil {
+			logger.WithEvent(mailCtx, logger.EventPasswordResetRequest).Errorf("Failed to send forgot password email to %s: %v", utils.MaskWithPrefix(user.Email, 4), err)
+		}
+	}()
 
 	return nil
 }

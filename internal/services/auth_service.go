@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
@@ -31,12 +32,25 @@ func NewAuthService(repo repositories.UserRepository, refreshTokenService Refres
 	}
 }
 
+// dummyPasswordHash is a bcrypt hash checked when the email is unknown. It is
+// computed once, on the first such login.
+var dummyPasswordHash = sync.OnceValue(func() string {
+	hash, err := utils.HashPassword("dummy-password-for-constant-time-login")
+	if err != nil {
+		logger.Errorf("Failed to compute the dummy password hash: %v", err)
+	}
+	return hash
+})
+
 func (service *authServiceImpl) Login(ctx context.Context, email, password string, ipAddress string) (*dto.LoginResponse, error) {
 	start := time.Now()
 	logger.WithEvent(ctx, logger.EventLoginAttempt).Infof("Login attempt for email: %s", utils.MaskWithPrefix(email, 4))
 
 	user, err := service.repo.FindByEmail(ctx, email)
 	if err != nil {
+		// Spend the same bcrypt time as for a real account, so the response time
+		// does not reveal which emails are registered.
+		utils.CheckPasswordHash(password, dummyPasswordHash())
 		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - user not found: %s", utils.MaskWithPrefix(email, 4))
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
