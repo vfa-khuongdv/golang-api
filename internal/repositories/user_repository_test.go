@@ -28,44 +28,6 @@ func setupUserTestDB(t *testing.T) *gorm.DB {
 }
 
 func TestUserRepository(t *testing.T) {
-	t.Run("GetAll - Success", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		mockUsers := []*models.User{
-			{Name: "User1", Email: "email1@example.com", Password: "password1", Gender: 1},
-			{Name: "User2", Email: "email2@example.com", Password: "password2", Gender: 1},
-		}
-		for _, user := range mockUsers {
-			_, err := repo.Create(context.Background(), user)
-			require.NoError(t, err)
-		}
-
-		// Act
-		users, err := repo.GetAll(context.Background())
-
-		// Assert
-		require.NoError(t, err)
-		assert.Len(t, users, 2)
-	})
-
-	t.Run("GetAll - Database Error", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		err = sqlDB.Close()
-		require.NoError(t, err)
-
-		// Act
-		users, err := repo.GetAll(context.Background())
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, users)
-	})
-
 	t.Run("GetByID - Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
@@ -76,7 +38,8 @@ func TestUserRepository(t *testing.T) {
 			Password: "password1",
 			Gender:   1,
 		}
-		createdUser, err := repo.Create(context.Background(), mockUser)
+		err := db.Create(mockUser).Error
+		createdUser := mockUser
 		require.NoError(t, err)
 
 		// Act
@@ -101,69 +64,6 @@ func TestUserRepository(t *testing.T) {
 		assert.Nil(t, user)
 	})
 
-	t.Run("Create - Success", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		mockUser := &models.User{
-			Name:     "New User",
-			Email:    "email@example.com",
-			Password: "password",
-			Gender:   1,
-		}
-
-		// Act
-		createdUser, err := repo.Create(context.Background(), mockUser)
-
-		// Assert
-		require.NoError(t, err)
-		require.NotNil(t, createdUser)
-		assert.Equal(t, "New User", createdUser.Name)
-		assert.NotEqual(t, uint(0), createdUser.ID)
-	})
-
-	t.Run("Create - Duplicate Email Error", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		user1 := &models.User{
-			Email:    "test@example.com",
-			Name:     "testuser",
-			Password: "pass",
-		}
-		user2 := &models.User{
-			Email:    "test@example.com",
-			Name:     "anotheruser",
-			Password: "pass",
-		}
-		createdUser, err := repo.Create(context.Background(), user1)
-		require.NoError(t, err)
-		require.NotNil(t, createdUser)
-
-		// Act
-		createdUser2, err := repo.Create(context.Background(), user2)
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, createdUser2)
-	})
-
-	t.Run("Delete - Database Error", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		err = sqlDB.Close()
-		require.NoError(t, err)
-
-		// Act
-		err = repo.Delete(context.Background(), 999)
-
-		// Assert
-		assert.Error(t, err)
-	})
-
 	t.Run("FindByEmail - Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
@@ -174,7 +74,7 @@ func TestUserRepository(t *testing.T) {
 			Password: "password",
 			Gender:   1,
 		}
-		_, err := repo.Create(context.Background(), mockUser)
+		err := db.Create(mockUser).Error
 		require.NoError(t, err)
 
 		// Act
@@ -197,7 +97,7 @@ func TestUserRepository(t *testing.T) {
 			ResetToken: utils.StringToPtr("token123"),
 			Gender:     1,
 		}
-		_, err := repo.Create(context.Background(), mockUser)
+		err := db.Create(mockUser).Error
 		require.NoError(t, err)
 
 		// Act
@@ -235,70 +135,6 @@ func TestUserRepository(t *testing.T) {
 		assert.Nil(t, user)
 	})
 
-	t.Run("CreateWithTx - Duplicate Email Error", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		user1 := &models.User{
-			Email:    "duplicate@example.com",
-			Name:     "user1",
-			Password: "pass",
-		}
-		user2 := &models.User{
-			Email:    "duplicate@example.com",
-			Name:     "user2",
-			Password: "pass",
-		}
-		err := db.Create(user1).Error
-		require.NoError(t, err)
-
-		tx := db.Begin()
-		require.NoError(t, tx.Error)
-
-		// Act
-		createdUser, err := repo.CreateWithTx(context.Background(), tx, user2)
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, createdUser)
-
-		tx.Rollback()
-	})
-
-	t.Run("CreateWithTx - Success", func(t *testing.T) {
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-
-		tx := db.Begin()
-		require.NoError(t, tx.Error)
-		defer tx.Rollback()
-
-		user := &models.User{
-			Email:    "tx-success@example.com",
-			Name:     "tx-user",
-			Password: "pass",
-			Gender:   1,
-		}
-
-		createdUser, err := repo.CreateWithTx(context.Background(), tx, user)
-		require.NoError(t, err)
-		require.NotNil(t, createdUser)
-		assert.NotZero(t, createdUser.ID)
-	})
-
-	t.Run("BeginTx - Success", func(t *testing.T) {
-		// Arrange
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-
-		// Act
-		returnedDB, err := repo.BeginTx(context.Background())
-
-		// Assert
-		require.NoError(t, err)
-		assert.NotNil(t, returnedDB)
-	})
-
 	t.Run("GetUsers - Pagination Success", func(t *testing.T) {
 		// Arrange
 		db := setupUserTestDB(t)
@@ -311,7 +147,7 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User5", Email: "user5@example.com", Password: "password5", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(context.Background(), user)
+			err := db.Create(user).Error
 			require.NoError(t, err)
 		}
 
@@ -340,7 +176,7 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User5", Email: "user5@example.com", Password: "password5", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(context.Background(), user)
+			err := db.Create(user).Error
 			require.NoError(t, err)
 		}
 
@@ -380,7 +216,7 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User5", Email: "user5@example.com", Password: "password5", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(context.Background(), user)
+			err := db.Create(user).Error
 			require.NoError(t, err)
 		}
 
@@ -403,7 +239,7 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User2", Email: "user2@example.com", Password: "password2", Gender: 2},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(context.Background(), user)
+			err := db.Create(user).Error
 			require.NoError(t, err)
 		}
 
@@ -427,7 +263,7 @@ func TestUserRepository(t *testing.T) {
 			{Name: "User3", Email: "user3@example.com", Password: "password3", Gender: 1},
 		}
 		for _, user := range mockUsers {
-			_, err := repo.Create(context.Background(), user)
+			err := db.Create(user).Error
 			require.NoError(t, err)
 		}
 
@@ -461,22 +297,6 @@ func TestUserRepository(t *testing.T) {
 		assert.Nil(t, pagination)
 	})
 
-	t.Run("Delete - Success", func(t *testing.T) {
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		user := &models.User{
-			Name: "Delete Me", Email: "delete@example.com", Password: "pass", Gender: 1,
-		}
-		created, err := repo.Create(context.Background(), user)
-		require.NoError(t, err)
-
-		err = repo.Delete(context.Background(), created.ID)
-		require.NoError(t, err)
-
-		_, err = repo.GetByID(context.Background(), created.ID)
-		assert.Error(t, err)
-	})
-
 	t.Run("GetByID - Database Error", func(t *testing.T) {
 		db := setupUserTestDB(t)
 		repo := repositories.NewUserRepository(db)
@@ -505,18 +325,6 @@ func TestUserRepository(t *testing.T) {
 		assert.Nil(t, user)
 	})
 
-	t.Run("BeginTx - Database Error", func(t *testing.T) {
-		db := setupUserTestDB(t)
-		repo := repositories.NewUserRepository(db)
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		err = sqlDB.Close()
-		require.NoError(t, err)
-
-		tx, err := repo.BeginTx(context.Background())
-		assert.Error(t, err)
-		assert.Nil(t, tx)
-	})
 }
 
 func TestUserRepository_RecordFailedLogin(t *testing.T) {

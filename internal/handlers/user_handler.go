@@ -12,18 +12,11 @@ import (
 )
 
 type userHandlerImpl struct {
-	userService   services.UserService
-	mailerService services.MailerService
+	userService services.UserService
 }
 
-func NewUserHandler(
-	userService services.UserService,
-	mailerService services.MailerService,
-) *userHandlerImpl {
-	return &userHandlerImpl{
-		userService:   userService,
-		mailerService: mailerService,
-	}
+func NewUserHandler(userService services.UserService) *userHandlerImpl {
+	return &userHandlerImpl{userService: userService}
 }
 
 func (handler *userHandlerImpl) ForgotPassword(ctx *gin.Context) {

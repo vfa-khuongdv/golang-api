@@ -69,6 +69,7 @@ func TestDTOStructs(t *testing.T) {
 		assert.Contains(t, string(b), `"total_items":100`)
 		assert.Contains(t, string(b), `"data":["a"]`)
 	})
+
 }
 
 func TestDTOBindingRules(t *testing.T) {
@@ -99,46 +100,21 @@ func TestDTOBindingRules(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("CreateUserInput gender oneof", func(t *testing.T) {
-		valid := dto.CreateUserInput{
-			Email:    "a@b.com",
-			Password: "Secret@1",
-			Name:     "John",
-			Birthday: strPtr("2000-01-01"),
-			Address:  strPtr("HN"),
-			Gender:   2,
-		}
-		assert.NoError(t, v.Struct(valid))
-
-		valid.Gender = 4
-		assert.Error(t, v.Struct(valid))
+	t.Run("UpdateProfileInput gender oneof", func(t *testing.T) {
+		assert.NoError(t, v.Struct(dto.UpdateProfileInput{Gender: int16Ptr(2)}))
+		assert.Error(t, v.Struct(dto.UpdateProfileInput{Gender: int16Ptr(4)}))
 	})
 
-	t.Run("CreateUserInput weak password rejected", func(t *testing.T) {
-		in := dto.CreateUserInput{
-			Email:    "a@b.com",
-			Password: "lowercaseonly",
-			Name:     "John",
-			Birthday: strPtr("2000-01-01"),
-			Address:  strPtr("HN"),
-			Gender:   1,
-		}
-		err := v.Struct(in)
+	t.Run("ResetPasswordInput weak password rejected", func(t *testing.T) {
+		err := v.Struct(dto.ResetPasswordInput{Token: "t", NewPassword: "lowercaseonly"})
 		assert.Error(t, err)
 		// The error must be the password_complexity rule, not a generic one.
 		assert.Contains(t, err.Error(), "password_complexity")
 	})
 
-	t.Run("CreateUserInput invalid birthday", func(t *testing.T) {
-		in := dto.CreateUserInput{
-			Email:    "a@b.com",
-			Password: "Secret@1",
-			Name:     "John",
-			Birthday: strPtr("2000-13-01"),
-			Address:  strPtr("HN"),
-			Gender:   1,
-		}
-		assert.Error(t, v.Struct(in))
+	t.Run("UpdateProfileInput invalid birthday", func(t *testing.T) {
+		assert.NoError(t, v.Struct(dto.UpdateProfileInput{Birthday: strPtr("2000-01-01")}))
+		assert.Error(t, v.Struct(dto.UpdateProfileInput{Birthday: strPtr("2000-13-01")}))
 	})
 
 	t.Run("UpdateProfileInput omitempty fields pass when empty", func(t *testing.T) {
@@ -149,4 +125,8 @@ func TestDTOBindingRules(t *testing.T) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func int16Ptr(i int16) *int16 {
+	return &i
 }

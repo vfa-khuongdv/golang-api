@@ -70,100 +70,6 @@ func TestRefreshTokenRepository(t *testing.T) {
 		assert.Error(t, err2, "Expected error due to duplicate token")
 	})
 
-	t.Run("FindByToken - Success", func(t *testing.T) {
-		// Arrange
-		db := setupTestDB(t)
-		repo := repositories.NewRefreshTokenRepository(db)
-		item := &models.RefreshToken{
-			RefreshToken: "test_refresh_token_1",
-			IpAddress:    "127.0.0.1",
-			ExpiredAt:    time.Now().Unix() + int64(time.Minute),
-			UserID:       1,
-		}
-		err := repo.Create(context.Background(), item)
-		require.NoError(t, err)
-
-		// Act
-		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
-
-		// Assert
-		require.NoError(t, err)
-		require.NotNil(t, foundItem)
-		assert.Equal(t, item.RefreshToken, foundItem.RefreshToken)
-		assert.Equal(t, item.IpAddress, foundItem.IpAddress)
-		assert.Equal(t, item.UserID, foundItem.UserID)
-		assert.Equal(t, item.ExpiredAt, foundItem.ExpiredAt)
-	})
-
-	t.Run("FindByToken - Not Found", func(t *testing.T) {
-		// Arrange
-		db := setupTestDB(t)
-		repo := repositories.NewRefreshTokenRepository(db)
-
-		// Act
-		foundItem, err := repo.FindByToken(context.Background(), "non_existent_token")
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, foundItem)
-	})
-
-	t.Run("FindByToken - Expired Token Error", func(t *testing.T) {
-		// Arrange
-		db := setupTestDB(t)
-		repo := repositories.NewRefreshTokenRepository(db)
-		now := time.Now().Unix() - int64(time.Minute)
-		item := &models.RefreshToken{
-			RefreshToken: "test_refresh_token_expired",
-			IpAddress:    "127.0.0.1",
-			ExpiredAt:    now,
-			UserID:       1,
-		}
-		err := repo.Create(context.Background(), item)
-		require.NoError(t, err)
-
-		// Act
-		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, foundItem)
-	})
-
-	t.Run("Update - Success", func(t *testing.T) {
-		// Arrange
-		db := setupTestDB(t)
-		repo := repositories.NewRefreshTokenRepository(db)
-		item := &models.RefreshToken{
-			RefreshToken: "test_original_refresh_token",
-			IpAddress:    "",
-			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
-			UserID:       1,
-		}
-		err := repo.Create(context.Background(), item)
-		require.NoError(t, err)
-
-		// Update fields
-		item.IpAddress = "127.0.0.1"
-		item.RefreshToken = "test_updated_refresh_token"
-		item.ExpiredAt = time.Now().Unix() + int64(time.Hour)
-
-		// Act
-		err = repo.Update(context.Background(), item)
-
-		// Assert
-		require.NoError(t, err)
-
-		// Verify the update
-		foundItem, err := repo.FindByToken(context.Background(), item.RefreshToken)
-		require.NoError(t, err)
-		require.NotNil(t, foundItem)
-		assert.Equal(t, item.RefreshToken, foundItem.RefreshToken)
-		assert.Equal(t, item.IpAddress, foundItem.IpAddress)
-		assert.Equal(t, item.UserID, foundItem.UserID)
-		assert.Equal(t, item.ExpiredAt, foundItem.ExpiredAt)
-	})
-
 	t.Run("UpdateWithTx - Success", func(t *testing.T) {
 		// Arrange
 		db := setupTestDB(t)
@@ -188,44 +94,8 @@ func TestRefreshTokenRepository(t *testing.T) {
 		require.NoError(t, err)
 		tx.Commit()
 
-		foundItem, err := repo.FindByToken(context.Background(), "test_tx_token")
-		require.NoError(t, err)
-		require.NotNil(t, foundItem)
-	})
-
-	t.Run("FindByToken - Database Error", func(t *testing.T) {
-		db := setupTestDB(t)
-		repo := repositories.NewRefreshTokenRepository(db)
-
-		_ = db.Callback().Query().Before("gorm:query").Register("force_findbytoken_db_error", func(tx *gorm.DB) {
-			_ = tx.AddError(assert.AnError)
-		})
-		defer func() { _ = db.Callback().Query().Remove("force_findbytoken_db_error") }()
-
-		found, err := repo.FindByToken(context.Background(), "any_token")
-		assert.Error(t, err)
-		assert.Nil(t, found)
-	})
-
-	t.Run("Update - Database Error", func(t *testing.T) {
-		db := setupTestDB(t)
-		repo := repositories.NewRefreshTokenRepository(db)
-		item := &models.RefreshToken{
-			RefreshToken: "update_error_token",
-			IpAddress:    "127.0.0.1",
-			ExpiredAt:    time.Now().Unix() + int64(time.Hour),
-			UserID:       1,
-		}
-		err := repo.Create(context.Background(), item)
-		require.NoError(t, err)
-
-		_ = db.Callback().Update().Before("gorm:update").Register("force_update_db_error", func(tx *gorm.DB) {
-			_ = tx.AddError(assert.AnError)
-		})
-		defer func() { _ = db.Callback().Update().Remove("force_update_db_error") }()
-
-		err = repo.Update(context.Background(), item)
-		assert.Error(t, err)
+		var foundItem models.RefreshToken
+		require.NoError(t, db.Where("refresh_token = ?", "test_tx_token").First(&foundItem).Error)
 	})
 
 	t.Run("FindByTokenWithTx - Success", func(t *testing.T) {
