@@ -43,7 +43,7 @@ go test ./... -race
 
 ## Coverage
 
-Targets: handlers 95%, services 85%, repositories 90%, middlewares 85%, utils 80%. CI runs the unit tests of every package except `cmd`, `docs` and `tests` and fails below **70%** total. `internal/models`, `internal/routes` and the seeders have no unit tests (routes are covered by e2e).
+Targets: handlers 95%, services 85%, repositories 90%, middlewares 85%, utils 80%. CI measures coverage on the unit tests of every package except `cmd`, `docs` and `tests` and fails below **70%** total; it also runs the e2e tests, all with `-race`. `internal/models`, `internal/routes` and the seeders have no unit tests (routes are covered by e2e).
 
 ## Patterns
 

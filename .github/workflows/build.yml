@@ -5,11 +5,24 @@ on:
     branches:
       - main
       - master
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+# A new push to the same PR or branch cancels the run still in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
     name: 🔎 Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v4
@@ -20,9 +33,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: 📦 Download Go modules
-        run: go mod download
+      - name: 📦 Check go.mod and go.sum are tidy
+        run: go mod tidy -diff
 
+      # Also checks gofmt and gosec (see .golangci.yml).
       - name: ✅ Run golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
@@ -31,9 +45,9 @@ jobs:
           only-new-issues: false
 
   test:
-    name: ✅ Unit Tests
-    needs: lint
+    name: ✅ Tests & Coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v4
@@ -44,18 +58,23 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: 📦 Install gotestsum for Test Reporting
+      - name: 🧪 Run Unit Tests with Race Detector and Coverage
         run: |
-          go install gotest.tools/gotestsum@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          go test -race -covermode=atomic -coverprofile=coverage.out \
+            $(go list ./... | grep -v -E '/(cmd|docs|tests)')
 
-      - name: 📦 Download Go modules
-        run: go mod download
+      - name: 🧪 Run E2E Tests
+        run: go test -race ./tests/...
 
-      - name: 🧪 Run Unit Tests with Coverage
+      - name: 📊 Enforce Coverage Threshold (70%)
         run: |
-          gotestsum --format=standard-verbose -- -coverprofile=coverage.out $(go list ./... | grep -v -E '/(cmd|docs|tests)')
-          go tool cover -func=coverage.out
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ { sub("%", "", $3); print $3 }')
+          echo "Total coverage: ${total}%"
+          echo "### Coverage: ${total}%" >> "$GITHUB_STEP_SUMMARY"
+          if awk -v total="$total" 'BEGIN { exit !(total + 0 < 70) }'; then
+            echo "::error::Coverage ${total}% is below 70%"
+            exit 1
+          fi
 
       - name: ⬆️ Upload coverage artifact
         uses: actions/upload-artifact@v4
@@ -63,10 +82,56 @@ jobs:
           name: coverage
           path: coverage.out
 
-  measure:
-    name: 📊 Coverage / Measuring Unit
-    needs: test
+  security:
+    name: 🛡 Security
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 📥 Checkout Source Code (full history for secret scanning)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🛠 Setup Go (from go.mod) with cache
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Fails only on vulnerabilities in code the application actually calls.
+      - name: 🔍 Scan dependencies for known vulnerabilities (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+
+      # Same version as the pre-commit hook in .pre-commit-config.yaml.
+      - name: 🔑 Scan git history for secrets (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git --no-banner /repo
+
+  integration:
+    name: 🗄 Integration (MySQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: golang_cms
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: "3306"
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      DB_DATABASE: golang_cms
+      PORT: "3000"
+      STAGE: ci
+      TRUSTED_PROXIES: ""
     steps:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v4
@@ -77,42 +142,22 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: ⬇️ Download coverage artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: coverage
-          path: .
-
-      - name: 📊 Enforce Coverage Threshold
+      # Random per run, so no key is ever committed.
+      - name: 🔑 Generate throwaway secrets
         run: |
-          go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' \
-          | awk '{ if ($1+0 < 70) { print "Coverage too low!"; exit 1 } }'
+          echo "JWT_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "SETTINGS_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
-  db:
-    name: 🗄 Database Script (Placeholder)
-    needs: measure
+      - name: 🗄 Apply migrations, seed and smoke test the API
+        run: scripts/smoke-test.sh
+
+  docker:
+    name: 🐳 Docker Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: 📥 Checkout Source Code
         uses: actions/checkout@v4
-      - name: 🗄 Run Database Migration Script
-        run: |
-          echo "Placeholder: run migration script here"
 
-  sast:
-    name: 🛡 SAST (Placeholder)
-    needs: db
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🔍 Static Application Security Testing
-        run: |
-          echo "Placeholder: SAST tool integration"
-
-  integration:
-    name: 🔗 Integration Tests (Placeholder)
-    needs: sast
-    runs-on: ubuntu-latest
-    steps:
-      - name: 🧪 Run Integration Tests
-        run: |
-          echo "Placeholder: run integration tests here"
+      - name: 🐳 Build image (not pushed)
+        run: docker build -t golang-cms:${{ github.sha }} .
