@@ -130,3 +130,15 @@ func TestSetupRouter_RejectsOversizedBodies(t *testing.T) {
 
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
 }
+
+func TestSetupRouter_SwaggerRoutesGoThroughTheMiddleware(t *testing.T) {
+	t.Setenv("STAGE", "dev")
+	router := newRouter(t)
+
+	for _, path := range []string{"/swagger", "/api-docs", "/docs/swagger.json"} {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+
+		assert.NotEmpty(t, w.Header().Get("X-Request-ID"), path)
+	}
+}

@@ -57,13 +57,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		logger.Warnf("TRUSTED_PROXIES is not set, so X-Forwarded-For is trusted from every peer: clients can spoof their IP and bypass the per-IP rate limit. Set it to the load balancer CIDR, e.g. 10.0.0.0/16")
 	}
 
-	// Set up Swagger documentation only in non-production environments
-	if stage != "prod" {
-		router.StaticFile("/docs/swagger.json", "./docs/swagger.json")
-		router.StaticFile("/swagger", "./docs/swagger.html")
-		router.StaticFile("/api-docs", "./docs/swagger.html")
-	}
-
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
 	refreshRepo := repositories.NewRefreshTokenRepository(db)
@@ -102,6 +95,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		middlewares.BodySizeLimit(maxRequestBodyBytes),
 		middlewares.LogMiddleware(),
 	)
+
+	// Swagger documentation only in non-production environments. Registered
+	// after router.Use, so these routes get the middleware too.
+	if stage != "prod" {
+		router.StaticFile("/docs/swagger.json", "./docs/swagger.json")
+		router.StaticFile("/swagger", "./docs/swagger.html")
+		router.StaticFile("/api-docs", "./docs/swagger.html")
+	}
 
 	router.GET("/healthz", handlers.HealthCheck)
 	router.GET("/api/v1/version", handlers.VersionInfo)
