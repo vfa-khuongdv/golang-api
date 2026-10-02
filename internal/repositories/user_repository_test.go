@@ -564,3 +564,81 @@ func TestUserRepository(t *testing.T) {
 		assert.Nil(t, tx)
 	})
 }
+
+func TestUserRepository_RecordFailedLogin(t *testing.T) {
+	t.Run("increments the counter without overwriting other columns", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		user := &models.User{Name: "User", Email: "fail1@example.com", Password: "current-hash", Gender: 1}
+		require.NoError(t, db.Create(user).Error)
+
+		err := repo.RecordFailedLogin(context.Background(), user.ID, 5, 999)
+
+		require.NoError(t, err)
+		var got models.User
+		require.NoError(t, db.First(&got, user.ID).Error)
+		assert.Equal(t, 1, got.FailedAttempts)
+		assert.Nil(t, got.LockedUntil)
+		assert.Equal(t, "current-hash", got.Password)
+	})
+
+	t.Run("locks the account when the counter reaches the maximum", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		user := &models.User{Name: "User", Email: "fail2@example.com", Password: "hash", Gender: 1, FailedAttempts: 4}
+		require.NoError(t, db.Create(user).Error)
+
+		err := repo.RecordFailedLogin(context.Background(), user.ID, 5, 999)
+
+		require.NoError(t, err)
+		var got models.User
+		require.NoError(t, db.First(&got, user.ID).Error)
+		assert.Equal(t, 5, got.FailedAttempts)
+		if assert.NotNil(t, got.LockedUntil) {
+			assert.Equal(t, int64(999), *got.LockedUntil)
+		}
+	})
+
+	t.Run("Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+
+		err = repo.RecordFailedLogin(context.Background(), 1, 5, 999)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestUserRepository_ResetFailedLogins(t *testing.T) {
+	t.Run("clears the counter and lock without overwriting other columns", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		lockedUntil := int64(999)
+		user := &models.User{Name: "User", Email: "reset1@example.com", Password: "current-hash", Gender: 1, FailedAttempts: 5, LockedUntil: &lockedUntil}
+		require.NoError(t, db.Create(user).Error)
+
+		err := repo.ResetFailedLogins(context.Background(), user.ID)
+
+		require.NoError(t, err)
+		var got models.User
+		require.NoError(t, db.First(&got, user.ID).Error)
+		assert.Equal(t, 0, got.FailedAttempts)
+		assert.Nil(t, got.LockedUntil)
+		assert.Equal(t, "current-hash", got.Password)
+	})
+
+	t.Run("Database Error", func(t *testing.T) {
+		db := setupUserTestDB(t)
+		repo := repositories.NewUserRepository(db)
+		sqlDB, err := db.DB()
+		require.NoError(t, err)
+		require.NoError(t, sqlDB.Close())
+
+		err = repo.ResetFailedLogins(context.Background(), 1)
+
+		assert.Error(t, err)
+	})
+}

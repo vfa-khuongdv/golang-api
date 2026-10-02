@@ -38,6 +38,15 @@ func (s *AuthServiceTestSuite) SetupTest() {
 	)
 }
 
+// expectFailedLogin expects the failed attempt to be recorded atomically, with
+// a lock of LockoutDurationMinutes from now, and returns err from the repository.
+func (s *AuthServiceTestSuite) expectFailedLogin(userID uint, err error) {
+	expectedLock := time.Now().Add(services.LockoutDurationMinutes * time.Minute).Unix()
+	s.repo.On("RecordFailedLogin", mock.Anything, userID, services.MaxFailedAttempts, mock.MatchedBy(func(lockUntil int64) bool {
+		return lockUntil >= expectedLock-5 && lockUntil <= expectedLock+5
+	})).Return(err).Once()
+}
+
 // ------------------------ LOGIN TESTS ------------------------
 func (s *AuthServiceTestSuite) TestLogin() {
 	email := "test@example.com"
@@ -80,7 +89,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 			setupMocks: func() {
 				user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
 				s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-				s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+				s.expectFailedLogin(user.ID, nil)
 			},
 			expectErr: true,
 			errCode:   apperror.ErrInvalidPassword,
@@ -138,6 +147,7 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				assert.Equal(t, "mocked-refresh-token", resp.RefreshToken.Token)
 				assert.NotZero(t, resp.RefreshToken.ExpiresAt)
 				s.repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+				s.repo.AssertNotCalled(t, "ResetFailedLogins", mock.Anything, mock.Anything)
 			}
 			s.repo.AssertExpectations(t)
 			s.refreshTokenService.AssertExpectations(t)
@@ -397,7 +407,7 @@ func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -411,8 +421,8 @@ func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
 
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
-	assert.Equal(s.T(), 0, user.FailedAttempts)
-	assert.Nil(s.T(), user.LockedUntil)
+	s.repo.AssertExpectations(s.T())
+	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
@@ -424,7 +434,7 @@ func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
 	expiredLock := time.Now().Add(-30 * time.Minute).Unix()
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 3, LockedUntil: &expiredLock}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -438,8 +448,8 @@ func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
 
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
-	assert.Equal(s.T(), 0, user.FailedAttempts)
-	assert.Nil(s.T(), user.LockedUntil)
+	s.repo.AssertExpectations(s.T())
+	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_InvalidPasswordUpdateError() {
@@ -449,7 +459,7 @@ func (s *AuthServiceTestSuite) TestLogin_InvalidPasswordUpdateError() {
 
 	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed-password"}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update error"))
+	s.expectFailedLogin(user.ID, errors.New("update error"))
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
@@ -464,18 +474,14 @@ func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
 
 	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: 4}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.expectFailedLogin(user.ID, nil)
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
-	assert.Equal(s.T(), 5, user.FailedAttempts)
-	if s.NotNil(user.LockedUntil) {
-		// LockedUntil should be ~ now + LockoutDurationMinutes
-		expected := time.Now().Add(time.Duration(services.LockoutDurationMinutes) * time.Minute).Unix()
-		assert.InDelta(s.T(), expected, *user.LockedUntil, 60)
-	}
+	s.repo.AssertExpectations(s.T())
+	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_LockedUntilExactlyNow() {
@@ -493,7 +499,7 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilExactlyNow() {
 	lockedUntil := time.Now().Unix()
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 0, LockedUntil: &lockedUntil}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -537,7 +543,7 @@ func (s *AuthServiceTestSuite) TestLogin_ValidLoginAtMaxFailedAttemptsResets() {
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: services.MaxFailedAttempts}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -551,8 +557,8 @@ func (s *AuthServiceTestSuite) TestLogin_ValidLoginAtMaxFailedAttemptsResets() {
 
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
-	assert.Equal(s.T(), 0, user.FailedAttempts)
-	assert.Nil(s.T(), user.LockedUntil)
+	s.repo.AssertExpectations(s.T())
+	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
@@ -564,17 +570,14 @@ func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
 	// account must stay locked (FailedAttempts stays >= max, LockedUntil set).
 	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: services.MaxFailedAttempts}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.expectFailedLogin(user.ID, nil)
 
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
-	assert.Equal(s.T(), services.MaxFailedAttempts+1, user.FailedAttempts)
-	if s.NotNil(user.LockedUntil) {
-		expected := time.Now().Add(time.Duration(services.LockoutDurationMinutes) * time.Minute).Unix()
-		assert.InDelta(s.T(), expected, *user.LockedUntil, 60)
-	}
+	s.repo.AssertExpectations(s.T())
+	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
@@ -589,7 +592,7 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
 	expiredLock := time.Now().Add(-10 * time.Minute).Unix()
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 0, LockedUntil: &expiredLock}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(nil)
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
@@ -603,8 +606,8 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
 
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
-	assert.Equal(s.T(), 0, user.FailedAttempts)
-	assert.Nil(s.T(), user.LockedUntil)
+	s.repo.AssertExpectations(s.T())
+	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
@@ -615,7 +618,7 @@ func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
 	hashedPassword, _ := utils.HashPassword(password)
 	user := &models.User{ID: 1, Email: email, Password: hashedPassword, FailedAttempts: 2}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
-	s.repo.On("Update", mock.Anything, mock.Anything).Return(errors.New("update error"))
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(errors.New("update error")).Once()
 	s.jwtService.On("GenerateAccessToken", user.ID).Return(&dto.JwtResult{
 		Token:     "token",
 		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),

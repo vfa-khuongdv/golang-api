@@ -46,24 +46,20 @@ func (service *authServiceImpl) Login(ctx context.Context, email, password strin
 		return nil, apperror.NewAccountLockedError("Account is temporarily locked due to too many failed attempts. Try again later.")
 	}
 
+	// The counters are updated with targeted, atomic queries rather than saving the
+	// whole user: concurrent failures must all be counted, and a stale copy of the
+	// user must never overwrite a password changed while bcrypt was running.
 	if isValid := utils.CheckPasswordHash(password, user.Password); !isValid {
-		user.FailedAttempts++
-		lockUntil := time.Now().Unix()
-		if user.FailedAttempts >= MaxFailedAttempts {
-			lockUntil = time.Now().Add(time.Minute * LockoutDurationMinutes).Unix()
-			user.LockedUntil = &lockUntil
-		}
-		if updateErr := service.repo.Update(ctx, user); updateErr != nil {
+		lockUntil := time.Now().Add(time.Minute * LockoutDurationMinutes).Unix()
+		if updateErr := service.repo.RecordFailedLogin(ctx, user.ID, MaxFailedAttempts, lockUntil); updateErr != nil {
 			logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to update user after failed login: %v", updateErr)
 		}
-		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - invalid password for email: %s (attempt %d/%d)", utils.MaskWithPrefix(email, 4), user.FailedAttempts, MaxFailedAttempts)
+		logger.WithEvent(ctx, logger.EventLoginFailed).Warnf("Login failed - invalid password for email: %s (attempt %d/%d)", utils.MaskWithPrefix(email, 4), user.FailedAttempts+1, MaxFailedAttempts)
 		return nil, apperror.NewInvalidPasswordError("Invalid credentials")
 	}
 
 	if user.FailedAttempts > 0 || user.LockedUntil != nil {
-		user.FailedAttempts = 0
-		user.LockedUntil = nil
-		if updateErr := service.repo.Update(ctx, user); updateErr != nil {
+		if updateErr := service.repo.ResetFailedLogins(ctx, user.ID); updateErr != nil {
 			logger.WithEvent(ctx, logger.EventLoginFailed).Errorf("Failed to reset failed attempts for user ID %d: %v", user.ID, updateErr)
 		}
 	}
