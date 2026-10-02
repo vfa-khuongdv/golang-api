@@ -94,7 +94,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		}
 		assert.NoError(t, repo.Create(context.Background(), orig))
 
-		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.2")
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.2", 1)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -108,6 +108,29 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		assert.Equal(t, "127.0.0.2", stored.IpAddress)
 	})
 
+	s.T().Run("TokenOwnedByAnotherUserIsNotRotated", func(t *testing.T) {
+		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+		require.NoError(t, err)
+		require.NoError(t, db.AutoMigrate(&models.RefreshToken{}))
+
+		repo := repositories.NewRefreshTokenRepository(db)
+		svc := services.NewRefreshTokenService(repo)
+
+		orig := &models.RefreshToken{RefreshToken: "victim_token", ExpiredAt: 9999999999, UserID: 1}
+		require.NoError(t, repo.Create(context.Background(), orig))
+
+		result, err := svc.Update(context.Background(), "victim_token", "127.0.0.1", 2)
+
+		assert.Nil(t, result)
+		var appErr *apperror.AppError
+		if assert.ErrorAs(t, err, &appErr) {
+			assert.Equal(t, apperror.ErrUnauthorized, appErr.Code)
+		}
+		// The victim's token must still be usable.
+		var stored models.RefreshToken
+		assert.NoError(t, db.Where("refresh_token = ?", "victim_token").First(&stored).Error)
+	})
+
 	s.T().Run("TokenNotFound", func(t *testing.T) {
 		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 		assert.NoError(t, err)
@@ -117,7 +140,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		repo := repositories.NewRefreshTokenRepository(db)
 		svc := services.NewRefreshTokenService(repo)
 
-		result, err := svc.Update(context.Background(), "missing_token", "127.0.0.1")
+		result, err := svc.Update(context.Background(), "missing_token", "127.0.0.1", 1)
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -145,7 +168,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		assert.NoError(t, errr)
 		_ = sqlDB.Close()
 
-		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1", 1)
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -168,7 +191,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		}
 		assert.NoError(t, repo.Create(context.Background(), orig))
 
-		result, err := svc.Update(context.Background(), "expired_token", "127.0.0.1")
+		result, err := svc.Update(context.Background(), "expired_token", "127.0.0.1", 1)
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -187,7 +210,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		mockRepo.On("FindByTokenWithTx", mock.Anything, mock.Anything, "some_token").Return((*models.RefreshToken)(nil), errors.New("find error"))
 		svc := services.NewRefreshTokenService(mockRepo)
 
-		result, err := svc.Update(context.Background(), "some_token", "127.0.0.1")
+		result, err := svc.Update(context.Background(), "some_token", "127.0.0.1", 1)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		mockRepo.AssertExpectations(t)
@@ -208,7 +231,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		mockRepo.On("UpdateWithTx", mock.Anything, mock.Anything, mock.Anything).Return(errors.New("update error"))
 		svc := services.NewRefreshTokenService(mockRepo)
 
-		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1", 1)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		var appErr *apperror.AppError
@@ -233,7 +256,7 @@ func (s *RefreshTokenServiceTestSuite) TestUpdate() {
 		mockRepo.On("UpdateWithTx", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		svc := services.NewRefreshTokenService(mockRepo)
 
-		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1")
+		result, err := svc.Update(context.Background(), "existing_token", "127.0.0.1", 1)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		var appErr *apperror.AppError

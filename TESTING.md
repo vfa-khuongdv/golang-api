@@ -57,7 +57,7 @@ package services_test
 func TestUserService(t *testing.T) {
     t.Run("GetProfile - Success", func(t *testing.T) {
         repo := new(mocks.MockUserRepository)
-        service := services.NewUserService(repo, new(mocks.MockMailerService))
+        service := services.NewUserService(repo, new(mocks.MockMailerService), new(mocks.MockRefreshTokenService))
         user := &models.User{ID: 1, Email: "test@example.com"}
         repo.On("GetByID", mock.Anything, uint(1)).Return(user, nil).Once()
 

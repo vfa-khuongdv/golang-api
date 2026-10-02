@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
@@ -19,6 +20,11 @@ type UserRepository interface {
 	Create(ctx context.Context, user *models.User) (*models.User, error)
 	CreateWithTx(ctx context.Context, tx *gorm.DB, user *models.User) (*models.User, error)
 	Update(ctx context.Context, user *models.User) error
+	// RecordFailedLogin atomically increments failed_attempts and sets
+	// locked_until to lockUntil once the counter reaches maxAttempts.
+	RecordFailedLogin(ctx context.Context, userID uint, maxAttempts int, lockUntil int64) error
+	// ResetFailedLogins clears failed_attempts and locked_until.
+	ResetFailedLogins(ctx context.Context, userID uint) error
 	Delete(ctx context.Context, userId uint) error
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
 	FindByResetToken(ctx context.Context, token string) (*models.User, error)
@@ -100,6 +106,32 @@ func (repo *userRepositoryImpl) CreateWithTx(ctx context.Context, tx *gorm.DB, u
 func (repo *userRepositoryImpl) Update(ctx context.Context, user *models.User) error {
 	if err := repo.db.WithContext(ctx).Save(user).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to update user id %d: %v", user.ID, err)
+		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update user", err)
+	}
+	return nil
+}
+
+func (repo *userRepositoryImpl) RecordFailedLogin(ctx context.Context, userID uint, maxAttempts int, lockUntil int64) error {
+	// A single UPDATE so concurrent failures are all counted and no other column
+	// is overwritten. locked_until is assigned first: MySQL evaluates SET
+	// assignments left to right, so the CASE must see the old failed_attempts.
+	err := repo.db.WithContext(ctx).Exec(
+		"UPDATE users SET locked_until = CASE WHEN failed_attempts + 1 >= ? THEN ? ELSE locked_until END, "+
+			"failed_attempts = failed_attempts + 1, updated_at = ? WHERE id = ?",
+		maxAttempts, lockUntil, time.Now(), userID,
+	).Error
+	if err != nil {
+		logger.WithContext(ctx).Errorf("DB error: failed to record failed login for user id %d: %v", userID, err)
+		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update user", err)
+	}
+	return nil
+}
+
+func (repo *userRepositoryImpl) ResetFailedLogins(ctx context.Context, userID uint) error {
+	err := repo.db.WithContext(ctx).Model(&models.User{}).Where("id = ?", userID).
+		Updates(map[string]any{"failed_attempts": 0, "locked_until": nil}).Error
+	if err != nil {
+		logger.WithContext(ctx).Errorf("DB error: failed to reset failed logins for user id %d: %v", userID, err)
 		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update user", err)
 	}
 	return nil

@@ -44,6 +44,16 @@ func (m *MockUserRepository) Update(ctx context.Context, user *models.User) erro
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) RecordFailedLogin(ctx context.Context, userID uint, maxAttempts int, lockUntil int64) error {
+	args := m.Called(ctx, userID, maxAttempts, lockUntil)
+	return args.Error(0)
+}
+
+func (m *MockUserRepository) ResetFailedLogins(ctx context.Context, userID uint) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func (m *MockUserRepository) Delete(ctx context.Context, userId uint) error {
 	args := m.Called(ctx, userId)
 	return args.Error(0)

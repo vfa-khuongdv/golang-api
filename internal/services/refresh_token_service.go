@@ -14,7 +14,9 @@ import (
 
 type RefreshTokenService interface {
 	Create(ctx context.Context, user *models.User, ipAddress string) (*dto.JwtResult, error)
-	Update(ctx context.Context, token string, ipAddress string) (*dto.RefreshTokenResult, error)
+	// Update rotates the refresh token. It is refused, leaving the token intact,
+	// when the token does not belong to userID (the owner of the access token).
+	Update(ctx context.Context, token string, ipAddress string, userID uint) (*dto.RefreshTokenResult, error)
 	DeleteByUserID(ctx context.Context, userID uint) error
 }
 
@@ -52,7 +54,7 @@ func (service *refreshTokenServiceImpl) Create(ctx context.Context, user *models
 	}, nil
 }
 
-func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString string, ipAddress string) (*dto.RefreshTokenResult, error) {
+func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString string, ipAddress string, userID uint) (*dto.RefreshTokenResult, error) {
 	tx, err := service.repo.BeginTx(ctx)
 	if err != nil {
 		logger.WithContext(ctx).Errorf("Failed to begin transaction: %v", err)
@@ -65,6 +67,15 @@ func (service *refreshTokenServiceImpl) Update(ctx context.Context, tokenString 
 			logger.WithContext(ctx).Errorf("Rollback failed: %v", rerr)
 		}
 		return nil, err
+	}
+
+	// Checked before rotating: otherwise anyone with their own valid access
+	// token could burn a stolen refresh token and sign its owner out.
+	if result.UserID != userID {
+		if rerr := tx.Rollback().Error; rerr != nil {
+			logger.WithContext(ctx).Errorf("Rollback failed: %v", rerr)
+		}
+		return nil, apperror.NewUnauthorizedError("Token mismatch: refresh and access tokens belong to different users")
 	}
 
 	newToken := utils.GenerateRandomString(60)

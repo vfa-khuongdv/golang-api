@@ -78,7 +78,7 @@ func censorSlice(data any, maskFields []string) any {
 	for i := 0; i < val.Len(); i++ {
 		item := val.Index(i).Interface()
 		censoredItem := CensorSensitiveData(item, maskFields)
-		censoredSlice.Index(i).Set(reflect.ValueOf(censoredItem))
+		censoredSlice.Index(i).Set(valueOrZero(censoredItem, val.Type().Elem()))
 	}
 
 	return censoredSlice.Interface()
@@ -99,9 +99,9 @@ func censorMap(data any, maskFields []string) any {
 		var censoredValue reflect.Value
 		if containsSensitiveKey(maskFields, keyStr) {
 			// Mask the entire value if key is sensitive
-			censoredValue = reflect.ValueOf(maskValue(value.Interface()))
+			censoredValue = valueOrZero(maskValue(value.Interface()), val.Type().Elem())
 		} else {
-			censoredValue = reflect.ValueOf(CensorSensitiveData(value.Interface(), maskFields))
+			censoredValue = valueOrZero(CensorSensitiveData(value.Interface(), maskFields), val.Type().Elem())
 		}
 
 		censoredMap.SetMapIndex(key, censoredValue)
@@ -158,6 +158,15 @@ func censorStruct(data any, maskFields []string) any {
 	}
 
 	return censoredStruct.Interface()
+}
+
+// valueOrZero returns v as a reflect.Value, or the zero value of typ when v is
+// nil (e.g. a JSON null), since reflect.ValueOf(nil) cannot be Set or stored.
+func valueOrZero(v any, typ reflect.Type) reflect.Value {
+	if v == nil {
+		return reflect.Zero(typ)
+	}
+	return reflect.ValueOf(v)
 }
 
 // matchedValOrZero attempts to assign val to typ if compatible, otherwise returns zero value.

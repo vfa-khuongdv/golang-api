@@ -639,4 +639,20 @@ func TestCensorSensitiveData(t *testing.T) {
 		assert.Equal(t, "se*****", got.Password)
 		assert.Empty(t, got.hidden)
 	})
+
+	t.Run("JSON null inside an array does not panic and is kept", func(t *testing.T) {
+		input := map[string]any{"ids": []any{float64(1), nil}}
+
+		result := utils.CensorSensitiveData(input, maskFields)
+
+		assert.Equal(t, map[string]any{"ids": []any{float64(1), nil}}, result)
+	})
+
+	t.Run("JSON null map value is kept", func(t *testing.T) {
+		input := map[string]any{"name": nil, "password": nil}
+
+		result := utils.CensorSensitiveData(input, maskFields)
+
+		assert.Equal(t, map[string]any{"name": nil, "password": nil}, result)
+	})
 }
