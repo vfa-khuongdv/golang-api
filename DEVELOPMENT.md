@@ -116,7 +116,14 @@ Do not write production code without a failing test first. Patterns, mocks, e2e 
 - Branches: `feat/…`, `fix/…`, `chore/…`, `docs/…`; open PRs against `main`.
 - Conventional commits: `<type>(<scope>): <subject>` with types `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `chore`.
 - One feature or fix per PR; include tests; update docs when the API or configuration changes.
-- CI (`.github/workflows/build.yml`) runs lint, unit tests with coverage, and the 70% gate. `make pre-push` (fmt, vet, lint, test) runs the same locally. A gitleaks pre-commit hook is configured in `.pre-commit-config.yaml`.
+- CI (`.github/workflows/build.yml`) runs on every PR and push to `main`, with these jobs in parallel:
+  - **Lint**: `go mod tidy -diff`, then golangci-lint (including gofmt and gosec, see `.golangci.yml`).
+  - **Tests & Coverage**: unit and e2e tests with `-race`, and the 70% coverage gate.
+  - **Security**: govulncheck (vulnerabilities in code the app calls) and gitleaks over the git history.
+  - **Integration (MySQL)**: `scripts/smoke-test.sh` applies the migrations on MySQL 8.0, seeds, and calls the API (login, permissions, lockout). The other tests use SQLite, so this catches MySQL-only problems. Run it locally against an empty database with the `DB_*`, `JWT_KEY` and `SETTINGS_ENCRYPTION_KEY` variables set.
+  - **Docker Build**: builds the image without pushing it.
+
+  `make pre-push` (fmt, vet, lint, test) covers the lint and unit-test part locally. A gitleaks pre-commit hook is configured in `.pre-commit-config.yaml`.
 
 ## API Documentation
 
