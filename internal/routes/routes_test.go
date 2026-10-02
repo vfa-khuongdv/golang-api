@@ -64,3 +64,14 @@ func TestSetupRouter_TrustedProxies(t *testing.T) {
 		assert.Equal(t, "8", remainingFor(router, "203.0.113.9:1234", "198.51.100.2"))
 	})
 }
+
+func TestSetupRouter_NullInJSONArrayGetsAResponse(t *testing.T) {
+	router := newRouter(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/login", strings.NewReader(`{"ids":[null]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	assert.NotPanics(t, func() { router.ServeHTTP(w, req) })
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}

@@ -83,11 +83,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	roleHandler := handlers.NewRoleHandler(roleService)
 
 	// Add middleware
+	// Recovery goes first so a panic in any later middleware still gets a response.
 	router.Use(
+		gin.Recovery(),
 		middlewares.RequestIDMiddleware(),
 		middlewares.CORSMiddleware(),
 		middlewares.LogMiddleware(),
-		gin.Recovery(),
 	)
 
 	router.GET("/healthz", handlers.HealthCheck)
