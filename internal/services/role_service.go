@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
@@ -143,36 +144,27 @@ func (s *roleServiceImpl) SetUserRoles(ctx context.Context, actorID uint, userID
 		}
 	}
 
-	if err := s.ensureAdminRetained(ctx, userID, current, ids); err != nil {
-		return nil, err
+	// The last admin must keep the role, or nobody could manage roles through
+	// the API; the repository checks it in the same transaction as the write.
+	err = s.roleRepo.SetUserRoles(ctx, userID, ids, removedAdminRoleID(current, ids))
+	if errors.Is(err, repositories.ErrLastRoleHolder) {
+		return nil, apperror.NewForbiddenError("Cannot remove the admin role from the last admin")
 	}
-
-	if err := s.roleRepo.SetUserRoles(ctx, userID, ids); err != nil {
+	if err != nil {
 		return nil, err
 	}
 	return s.roleRepo.FindByUserID(ctx, userID)
 }
 
-// ensureAdminRetained rejects a change that would leave no active user with the
-// admin role, since nobody could then manage roles through the API.
-func (s *roleServiceImpl) ensureAdminRetained(ctx context.Context, userID uint, current []models.Role, newRoleIDs []uint) error {
+// removedAdminRoleID returns the ID of the admin role when current holds it and
+// newRoleIDs drops it, and 0 otherwise.
+func removedAdminRoleID(current []models.Role, newRoleIDs []uint) uint {
 	for _, role := range current {
-		if role.Name != models.RoleAdmin {
-			continue
+		if role.Name == models.RoleAdmin && !slices.Contains(newRoleIDs, role.ID) {
+			return role.ID
 		}
-		if slices.Contains(newRoleIDs, role.ID) {
-			return nil
-		}
-		others, err := s.roleRepo.CountUsersWithRole(ctx, role.ID, userID)
-		if err != nil {
-			return err
-		}
-		if others == 0 {
-			return apperror.NewForbiddenError("Cannot remove the admin role from the last admin")
-		}
-		return nil
 	}
-	return nil
+	return 0
 }
 
 // ensureActorHolds rejects the change unless the actor holds every permission

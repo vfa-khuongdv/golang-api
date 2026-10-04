@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -215,7 +216,7 @@ func TestRoleRepository_SetUserRoles(t *testing.T) {
 		require.NoError(t, db.Create(&models.UserRole{UserID: 7, RoleID: r1.ID}).Error)
 		repo := repositories.NewRoleRepository(db)
 
-		require.NoError(t, repo.SetUserRoles(ctx, 7, []uint{r2.ID}))
+		require.NoError(t, repo.SetUserRoles(ctx, 7, []uint{r2.ID}, 0))
 
 		var rows []models.UserRole
 		require.NoError(t, db.Where("user_id = ?", 7).Find(&rows).Error)
@@ -228,7 +229,7 @@ func TestRoleRepository_SetUserRoles(t *testing.T) {
 		require.NoError(t, db.Create(&models.UserRole{UserID: 7, RoleID: 1}).Error)
 		repo := repositories.NewRoleRepository(db)
 
-		require.NoError(t, repo.SetUserRoles(ctx, 7, nil))
+		require.NoError(t, repo.SetUserRoles(ctx, 7, nil, 0))
 
 		var n int64
 		db.Model(&models.UserRole{}).Where("user_id = ?", 7).Count(&n)
@@ -250,36 +251,56 @@ func TestRoleRepository_SetUserRoles(t *testing.T) {
 	})
 }
 
-func TestRoleRepository_CountUsersWithRole(t *testing.T) {
+func TestRoleRepository_SetUserRoles_KeepsAHolderOfKeepRole(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("Counts Other Active Users Only", func(t *testing.T) {
+	// setup makes active and a soft-deleted user hold the admin role.
+	setup := func(t *testing.T, activeAdmins int) (*gorm.DB, models.Role, []models.User) {
 		db := setupRoleTestDB(t)
-		role := models.Role{Name: "admin"}
-		require.NoError(t, db.Create(&role).Error)
-		active1 := models.User{Email: "a1@example.com", Name: "a1", Password: "x"}
-		active2 := models.User{Email: "a2@example.com", Name: "a2", Password: "x"}
-		deleted := models.User{Email: "d@example.com", Name: "d", Password: "x"}
-		require.NoError(t, db.Create(&[]*models.User{&active1, &active2, &deleted}).Error)
-		require.NoError(t, db.Delete(&deleted).Error)
-		for _, u := range []models.User{active1, active2, deleted} {
-			require.NoError(t, db.Create(&models.UserRole{UserID: u.ID, RoleID: role.ID}).Error)
+		admin := models.Role{Name: "admin"}
+		require.NoError(t, db.Create(&admin).Error)
+		users := make([]models.User, activeAdmins)
+		for i := range users {
+			users[i] = models.User{Email: fmt.Sprintf("a%d@example.com", i), Name: "a", Password: "x"}
+			require.NoError(t, db.Create(&users[i]).Error)
+			require.NoError(t, db.Create(&models.UserRole{UserID: users[i].ID, RoleID: admin.ID}).Error)
 		}
-		repo := repositories.NewRoleRepository(db)
+		deleted := models.User{Email: "d@example.com", Name: "d", Password: "x"}
+		require.NoError(t, db.Create(&deleted).Error)
+		require.NoError(t, db.Create(&models.UserRole{UserID: deleted.ID, RoleID: admin.ID}).Error)
+		require.NoError(t, db.Delete(&deleted).Error)
+		return db, admin, users
+	}
 
-		n, err := repo.CountUsersWithRole(ctx, role.ID, active1.ID)
+	t.Run("Refuses To Remove The Last Active Holder", func(t *testing.T) {
+		db, admin, users := setup(t, 1)
 
-		require.NoError(t, err)
-		assert.EqualValues(t, 1, n, "excludes the given user and soft-deleted users")
+		err := repositories.NewRoleRepository(db).SetUserRoles(ctx, users[0].ID, nil, admin.ID)
+
+		assert.ErrorIs(t, err, repositories.ErrLastRoleHolder)
+		var n int64
+		db.Model(&models.UserRole{}).Where("user_id = ?", users[0].ID).Count(&n)
+		assert.EqualValues(t, 1, n, "the roles are left unchanged")
+	})
+
+	t.Run("Removes It When Another Active User Holds The Role", func(t *testing.T) {
+		db, admin, users := setup(t, 2)
+
+		require.NoError(t, repositories.NewRoleRepository(db).SetUserRoles(ctx, users[0].ID, nil, admin.ID))
+
+		var n int64
+		db.Model(&models.UserRole{}).Where("user_id = ?", users[0].ID).Count(&n)
+		assert.Zero(t, n)
 	})
 
 	t.Run("DB Error", func(t *testing.T) {
 		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{}) // no tables
 		require.NoError(t, err)
 
-		_, err = repositories.NewRoleRepository(db).CountUsersWithRole(ctx, 1, 2)
+		err = repositories.NewRoleRepository(db).SetUserRoles(ctx, 1, nil, 2)
 
 		assert.Error(t, err)
+		assert.NotErrorIs(t, err, repositories.ErrLastRoleHolder)
 	})
 }
 

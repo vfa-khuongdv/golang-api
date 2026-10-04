@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type RoleRepository interface {
@@ -29,16 +31,19 @@ type RoleRepository interface {
 	FindPermissionsByIDs(ctx context.Context, ids []uint) ([]models.Permission, error)
 	// CountRolesByIDs counts how many of the IDs exist.
 	CountRolesByIDs(ctx context.Context, ids []uint) (int64, error)
-	// CountUsersWithRole counts the active (not soft-deleted) users that hold
-	// the role, not counting excludeUserID.
-	CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error)
 	// FindPermissionIDsByUserID returns the distinct permissions granted by the user's roles.
 	FindPermissionIDsByUserID(ctx context.Context, userID uint) ([]uint, error)
 	// FindPermissionIDsByRoleIDs returns the distinct permissions of the roles.
 	FindPermissionIDsByRoleIDs(ctx context.Context, roleIDs []uint) ([]uint, error)
-	// SetUserRoles replaces all roles of the user atomically.
-	SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error
+	// SetUserRoles replaces all roles of the user atomically. When keepRoleID is
+	// not 0 it returns ErrLastRoleHolder, changing nothing, if no other active
+	// (not soft-deleted) user holds that role.
+	SetUserRoles(ctx context.Context, userID uint, roleIDs []uint, keepRoleID uint) error
 }
+
+// ErrLastRoleHolder is returned by SetUserRoles when the change would leave no
+// active user holding keepRoleID.
+var ErrLastRoleHolder = errors.New("no other active user holds the role")
 
 type roleRepositoryImpl struct {
 	db *gorm.DB
@@ -171,18 +176,6 @@ func (repo *roleRepositoryImpl) CountRolesByIDs(ctx context.Context, ids []uint)
 	return count, nil
 }
 
-func (repo *roleRepositoryImpl) CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error) {
-	var count int64
-	err := repo.db.WithContext(ctx).Model(&models.UserRole{}).
-		Joins("JOIN users ON users.id = user_roles.user_id AND users.deleted_at IS NULL").
-		Where("user_roles.role_id = ? AND user_roles.user_id <> ?", roleID, excludeUserID).
-		Count(&count).Error
-	if err != nil {
-		return 0, dbError(ctx, "Failed to count users with role", err)
-	}
-	return count, nil
-}
-
 func (repo *roleRepositoryImpl) FindPermissionIDsByUserID(ctx context.Context, userID uint) ([]uint, error) {
 	var ids []uint
 	err := repo.db.WithContext(ctx).Table("role_permissions").Distinct("role_permissions.permission_id").
@@ -207,8 +200,24 @@ func (repo *roleRepositoryImpl) FindPermissionIDsByRoleIDs(ctx context.Context, 
 	return ids, nil
 }
 
-func (repo *roleRepositoryImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error {
+func (repo *roleRepositoryImpl) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint, keepRoleID uint) error {
 	err := repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if keepRoleID != 0 {
+			// Every holder, this user included, is locked before counting, so a
+			// concurrent change of another holder waits for this one to commit
+			// and then sees it; two changes cannot each count the other and
+			// together remove the last holder.
+			var holders []uint
+			if err := tx.Model(&models.UserRole{}).Clauses(clause.Locking{Strength: "UPDATE"}).
+				Joins("JOIN users ON users.id = user_roles.user_id AND users.deleted_at IS NULL").
+				Where("user_roles.role_id = ?", keepRoleID).
+				Pluck("user_roles.user_id", &holders).Error; err != nil {
+				return err
+			}
+			if !slices.ContainsFunc(holders, func(id uint) bool { return id != userID }) {
+				return ErrLastRoleHolder
+			}
+		}
 		if err := tx.Where("user_id = ?", userID).Delete(&models.UserRole{}).Error; err != nil {
 			return err
 		}
@@ -221,6 +230,9 @@ func (repo *roleRepositoryImpl) SetUserRoles(ctx context.Context, userID uint, r
 		}
 		return tx.Create(&rows).Error
 	})
+	if errors.Is(err, ErrLastRoleHolder) {
+		return err
+	}
 	if err != nil {
 		return dbError(ctx, "Failed to set user roles", err)
 	}

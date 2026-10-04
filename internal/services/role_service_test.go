@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
+	"github.com/vfa-khuongdv/golang-cms/internal/repositories"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
@@ -258,7 +259,7 @@ func TestRoleService_SetUserRoles(t *testing.T) {
 		svc, roleRepo, userRepo := newRoleService()
 		userRepo.On("GetByID", ctx, uint(3)).Return(&models.User{ID: 3}, nil)
 		roleRepo.On("CountRolesByIDs", ctx, []uint{1, 2}).Return(int64(2), nil)
-		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{1, 2}).Return(nil)
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{1, 2}, uint(0)).Return(nil)
 		roleRepo.On("FindByUserID", ctx, uint(3)).Return([]models.Role{{ID: 1}, {ID: 2}}, nil)
 
 		roles, err := svc.SetUserRoles(ctx, actorID, 3, []uint{1, 2, 1})
@@ -270,7 +271,7 @@ func TestRoleService_SetUserRoles(t *testing.T) {
 	t.Run("Empty Clears Roles Without Counting", func(t *testing.T) {
 		svc, roleRepo, userRepo := newRoleService()
 		userRepo.On("GetByID", ctx, uint(3)).Return(&models.User{ID: 3}, nil)
-		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{}).Return(nil)
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{}, uint(0)).Return(nil)
 		roleRepo.On("FindByUserID", ctx, uint(3)).Return([]models.Role{}, nil)
 
 		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{})
@@ -296,7 +297,7 @@ func TestRoleService_SetUserRoles(t *testing.T) {
 		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{1, 2})
 
 		assertAppError(t, err, http.StatusBadRequest)
-		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything)
+		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Repository Error", func(t *testing.T) {
@@ -314,50 +315,49 @@ func TestRoleService_SetUserRoles_KeepsAnAdmin(t *testing.T) {
 	ctx := context.Background()
 	admin := models.Role{ID: 1, Name: models.RoleAdmin}
 
-	setup := func(others int64) (services.RoleService, *mocks.MockRoleRepository) {
+	setup := func() (services.RoleService, *mocks.MockRoleRepository) {
 		svc, roleRepo, userRepo := newRoleService()
 		userRepo.On("GetByID", ctx, uint(3)).Return(&models.User{ID: 3}, nil)
 		roleRepo.On("FindByUserID", ctx, uint(3)).Return([]models.Role{admin}, nil)
-		roleRepo.On("CountUsersWithRole", ctx, uint(1), uint(3)).Return(others, nil)
 		return svc, roleRepo
 	}
 
+	t.Run("Removing The Admin Role Asks The Repository To Keep An Admin", func(t *testing.T) {
+		svc, roleRepo := setup()
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{}, admin.ID).Return(nil)
+
+		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{})
+
+		require.NoError(t, err)
+	})
+
 	t.Run("Removing The Last Admin Is Forbidden", func(t *testing.T) {
-		svc, roleRepo := setup(0)
+		svc, roleRepo := setup()
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{}, admin.ID).Return(repositories.ErrLastRoleHolder)
 
 		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{})
 
 		assertAppError(t, err, http.StatusForbidden)
-		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Swapping The Last Admin For Another Role Is Forbidden", func(t *testing.T) {
-		svc, roleRepo := setup(0)
+		svc, roleRepo := setup()
 		roleRepo.On("CountRolesByIDs", ctx, []uint{2}).Return(int64(1), nil)
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{2}, admin.ID).Return(repositories.ErrLastRoleHolder)
 
 		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{2})
 
 		assertAppError(t, err, http.StatusForbidden)
 	})
 
-	t.Run("Removing An Admin Is Allowed When Another Admin Exists", func(t *testing.T) {
-		svc, roleRepo := setup(1)
-		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{}).Return(nil)
-
-		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{})
-
-		require.NoError(t, err)
-	})
-
-	t.Run("Keeping The Admin Role Is Allowed", func(t *testing.T) {
-		svc, roleRepo := setup(0)
+	t.Run("Keeping The Admin Role Needs No Guard", func(t *testing.T) {
+		svc, roleRepo := setup()
 		roleRepo.On("CountRolesByIDs", ctx, []uint{1, 2}).Return(int64(2), nil)
-		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{1, 2}).Return(nil)
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{1, 2}, uint(0)).Return(nil)
 
 		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{1, 2})
 
 		require.NoError(t, err)
-		roleRepo.AssertNotCalled(t, "CountUsersWithRole", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Repository Errors Are Returned", func(t *testing.T) {
@@ -370,15 +370,13 @@ func TestRoleService_SetUserRoles_KeepsAnAdmin(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("Count Error Is Returned", func(t *testing.T) {
-		svc, roleRepo, userRepo := newRoleService()
-		userRepo.On("GetByID", ctx, uint(3)).Return(&models.User{ID: 3}, nil)
-		roleRepo.On("FindByUserID", ctx, uint(3)).Return([]models.Role{admin}, nil)
-		roleRepo.On("CountUsersWithRole", ctx, uint(1), uint(3)).Return(int64(0), errors.New("db down"))
+	t.Run("Write Error Is Returned", func(t *testing.T) {
+		svc, roleRepo := setup()
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{}, admin.ID).Return(errors.New("db down"))
 
 		_, err := svc.SetUserRoles(ctx, actorID, 3, []uint{})
 
-		assert.Error(t, err)
+		assert.EqualError(t, err, "db down")
 	})
 }
 
@@ -452,7 +450,7 @@ func TestRoleService_PreventsPrivilegeEscalation(t *testing.T) {
 		_, err := svc.SetUserRoles(ctx, limitedActorID, limitedActorID, []uint{1})
 
 		forbidden(t, err)
-		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything)
+		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Removing A Role With A Permission The Actor Lacks", func(t *testing.T) {
@@ -463,7 +461,7 @@ func TestRoleService_PreventsPrivilegeEscalation(t *testing.T) {
 		_, err := svc.SetUserRoles(ctx, limitedActorID, 3, []uint{})
 
 		forbidden(t, err)
-		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything)
+		roleRepo.AssertNotCalled(t, "SetUserRoles", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Only Changed Roles Are Checked", func(t *testing.T) {
@@ -471,7 +469,7 @@ func TestRoleService_PreventsPrivilegeEscalation(t *testing.T) {
 		userRepo.On("GetByID", ctx, uint(3)).Return(&models.User{ID: 3}, nil)
 		roleRepo.On("CountRolesByIDs", ctx, []uint{1, 2}).Return(int64(2), nil)
 		roleRepo.On("FindByUserID", ctx, uint(3)).Return([]models.Role{{ID: 1, Name: "editor"}}, nil)
-		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{1, 2}).Return(nil)
+		roleRepo.On("SetUserRoles", ctx, uint(3), []uint{1, 2}, uint(0)).Return(nil)
 
 		// Role 1 is kept as it is, so only role 2 is checked.
 		_, err := svc.SetUserRoles(ctx, limitedActorID, 3, []uint{1, 2})
