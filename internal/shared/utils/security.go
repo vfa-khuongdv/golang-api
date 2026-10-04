@@ -207,7 +207,7 @@ func containsSensitiveKey(maskFields []string, item string) bool {
 	if cache, exists := sensitiveKeyCache[cacheKey]; exists {
 		_, found := cache[strings.ToLower(item)]
 		cacheMutex.RUnlock()
-		return found
+		return found || matchesWildcard(maskFields, item)
 	}
 	cacheMutex.RUnlock()
 
@@ -219,7 +219,7 @@ func containsSensitiveKey(maskFields []string, item string) bool {
 	// Double-check after acquiring write lock (another goroutine might have added it)
 	if cache, exists := sensitiveKeyCache[cacheKey]; exists {
 		_, found := cache[strings.ToLower(item)]
-		return found
+		return found || matchesWildcard(maskFields, item)
 	}
 
 	// Implement cache size limit to prevent memory leaks
@@ -243,7 +243,37 @@ func containsSensitiveKey(maskFields []string, item string) bool {
 	sensitiveKeyCache[cacheKey] = cache
 
 	_, found := cache[strings.ToLower(item)]
-	return found
+	return found || matchesWildcard(maskFields, item)
+}
+
+// MatchesSensitiveKey reports whether key matches pattern, ignoring case. A
+// pattern wrapped in '*' (e.g. "*password*") matches any key containing the
+// word between them; any other pattern must equal the key.
+func MatchesSensitiveKey(pattern, key string) bool {
+	pattern, key = strings.ToLower(pattern), strings.ToLower(key)
+	if word, ok := wildcardWord(pattern); ok {
+		return strings.Contains(key, word)
+	}
+	return pattern == key
+}
+
+// matchesWildcard reports whether item matches one of the "*word*" patterns
+// in maskFields; exact patterns are covered by the cache.
+func matchesWildcard(maskFields []string, item string) bool {
+	for _, field := range maskFields {
+		if _, ok := wildcardWord(field); ok && MatchesSensitiveKey(field, item) {
+			return true
+		}
+	}
+	return false
+}
+
+// wildcardWord returns the word inside a "*word*" pattern.
+func wildcardWord(pattern string) (string, bool) {
+	if len(pattern) > 2 && strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") {
+		return pattern[1 : len(pattern)-1], true
+	}
+	return "", false
 }
 
 // maskValue masks sensitive values based on their type.

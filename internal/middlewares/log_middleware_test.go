@@ -627,3 +627,24 @@ func TestLogMiddleware_WritesTheLogBeforeTheRequestReturns(t *testing.T) {
 	// another request's logs.
 	assert.Contains(t, string(buf.Bytes()), `"url":"/sync"`)
 }
+
+func TestLogMiddleware_MasksKeysThatContainASensitiveWord(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	buf, restore := setupLogCapture()
+	defer restore()
+
+	router := gin.New()
+	router.Use(middlewares.LogMiddleware())
+	router.PUT("/settings", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	body := `{"mail_password":"smtp-plain-pass","api_secret_value":"s3cr3t-value","reset_token_x":"tok-value","mail_host":"smtp.example.com"}`
+	req := httptest.NewRequest(http.MethodPut, "/settings", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(httptest.NewRecorder(), req)
+
+	logLine := waitForLog(t, buf, time.Second)
+	assert.NotContains(t, string(logLine), "smtp-plain-pass")
+	assert.NotContains(t, string(logLine), "s3cr3t-value")
+	assert.NotContains(t, string(logLine), "tok-value")
+	assert.Contains(t, string(logLine), "smtp.example.com")
+}

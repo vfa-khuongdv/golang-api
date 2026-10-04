@@ -84,6 +84,12 @@ func TestContainsIgnoreCase(t *testing.T) {
 		assert.True(t, containsIgnoreCase([]string{"api-key"}, "API-KEY"))
 	})
 
+	t.Run("wildcard pattern matches keys containing the word", func(t *testing.T) {
+		// Assert
+		assert.True(t, containsIgnoreCase([]string{"*password*"}, "Mail_Password"))
+		assert.False(t, containsIgnoreCase([]string{"*password*"}, "username"))
+	})
+
 	t.Run("no match", func(t *testing.T) {
 		// Assert
 		assert.False(t, containsIgnoreCase([]string{"Password", "Token"}, "username"))

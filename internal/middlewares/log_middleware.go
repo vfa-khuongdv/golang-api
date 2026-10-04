@@ -23,8 +23,10 @@ const (
 	NotLoggedResponse = "<not_log>"
 )
 
-// sensitiveKeys are field names that contain sensitive data and should be censored in logs
+// sensitiveKeys are field names that contain sensitive data and should be censored in logs.
+// A "*word*" entry matches any field whose name contains the word (e.g. mail_password).
 var sensitiveKeys = []string{
+	"*password*", "*secret*", "*token*",
 	"password", "api-key", "token", "access_token", "refresh_token",
 	"ccv", "credit_card", "debit_card", "social_security_number",
 	"ssn", "bank_account", "bank_account_number",
@@ -95,9 +97,8 @@ func censorQueryParams(queryParams map[string][]string) map[string][]string {
 }
 
 func containsIgnoreCase(keys []string, target string) bool {
-	targetLower := strings.ToLower(target)
 	for _, k := range keys {
-		if strings.ToLower(k) == targetLower {
+		if utils.MatchesSensitiveKey(k, target) {
 			return true
 		}
 	}
