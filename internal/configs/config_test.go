@@ -296,3 +296,27 @@ func TestLoadCORSAllowedOriginsDefault(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"http://localhost:5173"}, cfg.CORS.AllowedOrigins)
 }
+
+func TestLoadRejectsPlaceholderSecretsInProd(t *testing.T) {
+	for _, key := range []string{"JWT_KEY", "SETTINGS_ENCRYPTION_KEY"} {
+		t.Run(key, func(t *testing.T) {
+			setRequiredEnv(t)
+			t.Setenv("STAGE", "prod")
+			t.Setenv(key, "change-me-to-a-secret-at-least-32-chars-long!!")
+
+			_, err := configs.Load()
+
+			assert.ErrorContains(t, err, key)
+		})
+	}
+}
+
+func TestLoadAllowsPlaceholderSecretsOutsideProd(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("STAGE", "dev")
+	t.Setenv("JWT_KEY", "change-me-to-a-secret-at-least-32-chars-long!!")
+
+	_, err := configs.Load()
+
+	assert.NoError(t, err)
+}

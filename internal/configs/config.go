@@ -102,6 +102,9 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// placeholderSecretPrefix starts every example secret in .env.example.
+const placeholderSecretPrefix = "change-me"
+
 func (c *Config) validate() error {
 	var missing []string
 
@@ -131,6 +134,11 @@ func (c *Config) validate() error {
 	for name, secret := range map[string]string{"JWT_KEY": c.JWT.Secret, "SETTINGS_ENCRYPTION_KEY": c.Settings.EncryptionKey} {
 		if len(secret) < utils.MinSecretKeyLength {
 			return fmt.Errorf("%s must be at least %d characters", name, utils.MinSecretKeyLength)
+		}
+		// The .env.example values are public, so a prod deploy copied from it
+		// would sign tokens anyone can forge.
+		if c.Server.Stage == "prod" && strings.HasPrefix(strings.ToLower(secret), placeholderSecretPrefix) {
+			return fmt.Errorf("%s still has the placeholder value from .env.example; set a random secret", name)
 		}
 	}
 
