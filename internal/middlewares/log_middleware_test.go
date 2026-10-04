@@ -181,6 +181,24 @@ func TestLogMiddleware(t *testing.T) {
 		assert.Empty(t, buf.Bytes())
 	})
 
+	t.Run("readiness probe requests are not logged", func(t *testing.T) {
+		buf, restore := setupLogCapture()
+		defer restore()
+
+		router := gin.New()
+		router.Use(middlewares.LogMiddleware())
+		router.GET("/readyz", func(c *gin.Context) {
+			c.String(http.StatusOK, "ok")
+		})
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		time.Sleep(100 * time.Millisecond)
+		assert.Empty(t, buf.Bytes())
+	})
+
 	t.Run("large request body truncated to 64KB", func(t *testing.T) {
 		buf, restore := setupLogCapture()
 		defer restore()

@@ -175,3 +175,11 @@ func TestSwaggerDocumentsEveryAPIRoute(t *testing.T) {
 		assert.True(t, ok, "%s %s is not in docs/swagger.json", route.Method, path)
 	}
 }
+
+func TestSetupRouter_ReadyzPingsTheDatabase(t *testing.T) {
+	w := httptest.NewRecorder()
+	newRouter(t).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, `{"status":"ready"}`, w.Body.String())
+}

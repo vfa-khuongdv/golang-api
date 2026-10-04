@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -89,6 +90,13 @@ func SetupRouter(db *gorm.DB, cfg *configs.Config) *gin.Engine {
 	}
 
 	router.GET("/healthz", handlers.HealthCheck)
+	router.GET("/readyz", handlers.ReadinessCheck(func(ctx context.Context) error {
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		return sqlDB.PingContext(ctx)
+	}))
 	router.GET("/api/v1/version", handlers.VersionInfo)
 
 	// Setup API routes

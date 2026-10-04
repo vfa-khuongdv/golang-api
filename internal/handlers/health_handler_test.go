@@ -1,7 +1,9 @@
 package handlers_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -43,4 +45,37 @@ func TestVersionInfo(t *testing.T) {
 	assert.Equal(t, "1.0.0", response["version"])
 	assert.NotEmpty(t, response["build_time"])
 	assert.NotEmpty(t, response["uptime"])
+}
+
+func serveReadiness(ping func(context.Context) error) *httptest.ResponseRecorder {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/readyz", handlers.ReadinessCheck(ping))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	return w
+}
+
+func TestReadinessCheck_ReadyWhenTheDatabaseAnswers(t *testing.T) {
+	w := serveReadiness(func(context.Context) error { return nil })
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.JSONEq(t, `{"status":"ready"}`, w.Body.String())
+}
+
+func TestReadinessCheck_UnavailableWhenTheDatabaseFails(t *testing.T) {
+	w := serveReadiness(func(context.Context) error { return errors.New("connection refused") })
+
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.NotContains(t, w.Body.String(), "connection refused")
+}
+
+func TestReadinessCheck_PingsWithADeadline(t *testing.T) {
+	var hasDeadline bool
+	serveReadiness(func(ctx context.Context) error {
+		_, hasDeadline = ctx.Deadline()
+		return nil
+	})
+
+	assert.True(t, hasDeadline)
 }

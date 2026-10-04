@@ -305,6 +305,7 @@ Every response carries an `X-Request-ID` header (the client's value is reused if
 
 #### Health and Version (Public)
 - `GET /healthz` - Health status check
+- `GET /readyz` - Readiness check (pings the database, 503 when it is unreachable)
 - `GET /api/v1/version` - API version, build time, and uptime
 
 #### Authentication (Public)

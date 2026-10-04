@@ -161,7 +161,7 @@ func filterSensitiveHeaders(headers map[string][]string) map[string][]string {
 func LogMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Load balancer probes hit this every few seconds on every task.
-		if c.Request.URL.Path == "/healthz" {
+		if path := c.Request.URL.Path; path == "/healthz" || path == "/readyz" {
 			c.Next()
 			return
 		}
