@@ -5,11 +5,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Run executes all seed functions to populate the database with initial data
-// It takes a GORM database connection as input and panics if any seeding operation fails
-func Run(db *gorm.DB) {
+// Run executes all seed functions to populate the database with initial data.
+// password is the password of the sample users (see SeedPassword).
+func Run(db *gorm.DB, password string) {
 	// SeedUsers seeds the users table
-	if err := SeedUsers(db); err != nil {
+	if err := SeedUsers(db, password); err != nil {
 		logger.Errorf("Failed to seed users: %+v", err)
 	}
 

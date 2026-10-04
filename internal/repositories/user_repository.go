@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
@@ -15,21 +16,18 @@ import (
 )
 
 type UserRepository interface {
-	GetAll(ctx context.Context) ([]*models.User, error)
+	GetUsers(ctx context.Context, page int, limit int) (*dto.Pagination[*models.User], error)
 	GetByID(ctx context.Context, id uint) (*models.User, error)
-	Create(ctx context.Context, user *models.User) (*models.User, error)
-	CreateWithTx(ctx context.Context, tx *gorm.DB, user *models.User) (*models.User, error)
-	Update(ctx context.Context, user *models.User) error
+	// UpdateColumns writes only the given columns of user (zero values
+	// included), so a stale copy cannot overwrite columns changed elsewhere.
+	UpdateColumns(ctx context.Context, user *models.User, columns ...string) error
 	// RecordFailedLogin atomically increments failed_attempts and sets
 	// locked_until to lockUntil once the counter reaches maxAttempts.
 	RecordFailedLogin(ctx context.Context, userID uint, maxAttempts int, lockUntil int64) error
 	// ResetFailedLogins clears failed_attempts and locked_until.
 	ResetFailedLogins(ctx context.Context, userID uint) error
-	Delete(ctx context.Context, userId uint) error
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
 	FindByResetToken(ctx context.Context, token string) (*models.User, error)
-	GetUsers(ctx context.Context, page int, limit int) (*dto.Pagination[*models.User], error)
-	BeginTx(ctx context.Context) (*gorm.DB, error)
 }
 
 type userRepositoryImpl struct {
@@ -66,15 +64,6 @@ func (repo *userRepositoryImpl) GetUsers(ctx context.Context, page, limit int) (
 	return pagination, nil
 }
 
-func (repo *userRepositoryImpl) GetAll(ctx context.Context) ([]*models.User, error) {
-	var users []*models.User
-	if err := repo.db.WithContext(ctx).Find(&users).Error; err != nil {
-		logger.WithContext(ctx).Errorf("DB error: failed to fetch users: %v", err)
-		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch users", err)
-	}
-	return users, nil
-}
-
 func (repo *userRepositoryImpl) GetByID(ctx context.Context, id uint) (*models.User, error) {
 	var user models.User
 	if err := repo.db.WithContext(ctx).First(&user, id).Error; err != nil {
@@ -87,24 +76,8 @@ func (repo *userRepositoryImpl) GetByID(ctx context.Context, id uint) (*models.U
 	return &user, nil
 }
 
-func (repo *userRepositoryImpl) Create(ctx context.Context, user *models.User) (*models.User, error) {
-	if err := repo.db.WithContext(ctx).Create(user).Error; err != nil {
-		logger.WithContext(ctx).Errorf("DB error: failed to create user: %v", err)
-		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to create user", err)
-	}
-	return user, nil
-}
-
-func (repo *userRepositoryImpl) CreateWithTx(ctx context.Context, tx *gorm.DB, user *models.User) (*models.User, error) {
-	if err := tx.WithContext(ctx).Create(user).Error; err != nil {
-		logger.WithContext(ctx).Errorf("DB error: failed to create user with tx: %v", err)
-		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to create user", err)
-	}
-	return user, nil
-}
-
-func (repo *userRepositoryImpl) Update(ctx context.Context, user *models.User) error {
-	if err := repo.db.WithContext(ctx).Save(user).Error; err != nil {
+func (repo *userRepositoryImpl) UpdateColumns(ctx context.Context, user *models.User, columns ...string) error {
+	if err := repo.db.WithContext(ctx).Model(user).Select(append(slices.Clip(columns), "updated_at")).Updates(user).Error; err != nil {
 		logger.WithContext(ctx).Errorf("DB error: failed to update user id %d: %v", user.ID, err)
 		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to update user", err)
 	}
@@ -137,15 +110,6 @@ func (repo *userRepositoryImpl) ResetFailedLogins(ctx context.Context, userID ui
 	return nil
 }
 
-func (repo *userRepositoryImpl) Delete(ctx context.Context, userId uint) error {
-	var user models.User
-	if err := repo.db.WithContext(ctx).Delete(&user, userId).Error; err != nil {
-		logger.WithContext(ctx).Errorf("DB error: failed to delete user id %d: %v", userId, err)
-		return apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to delete user", err)
-	}
-	return nil
-}
-
 func (repo *userRepositoryImpl) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	return repo.first(ctx, "email", repo.db.WithContext(ctx).Where("email = ?", email))
 }
@@ -165,13 +129,4 @@ func (repo *userRepositoryImpl) first(ctx context.Context, field string, query *
 		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to fetch user", err)
 	}
 	return &user, nil
-}
-
-func (repo *userRepositoryImpl) BeginTx(ctx context.Context) (*gorm.DB, error) {
-	tx := repo.db.WithContext(ctx).Begin()
-	if tx.Error != nil {
-		logger.WithContext(ctx).Errorf("DB error: failed to begin transaction: %v", tx.Error)
-		return nil, apperror.Wrap(http.StatusInternalServerError, apperror.ErrInternalServer, "Failed to begin transaction", tx.Error)
-	}
-	return tx, nil
 }

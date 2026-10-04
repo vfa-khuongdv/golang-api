@@ -1,6 +1,8 @@
 package middlewares
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/vfa-khuongdv/golang-cms/pkg/logger"
@@ -22,9 +24,10 @@ const (
 // - Injected into ctx.Request.Context() for automatic logging
 func RequestIDMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// A client ID is only kept when it is safe to log and echo back:
+		// otherwise a header with a newline or quotes could forge log lines.
 		requestID := c.GetHeader(RequestIDHeader)
-
-		if requestID == "" {
+		if !isSafeRequestID(requestID) {
 			requestID = uuid.New().String()
 		}
 
@@ -47,4 +50,25 @@ func GetRequestID(c *gin.Context) string {
 		}
 	}
 	return ""
+}
+
+// maxRequestIDLength bounds a client-provided request ID.
+const maxRequestIDLength = 128
+
+// isSafeRequestID reports whether id is non-empty, at most maxRequestIDLength
+// long, and made only of letters, digits and -_.:= (enough for UUIDs and load
+// balancer trace IDs such as "Root=1-...").
+func isSafeRequestID(id string) bool {
+	if id == "" || len(id) > maxRequestIDLength {
+		return false
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case strings.ContainsRune("-_.:=", r):
+		default:
+			return false
+		}
+	}
+	return true
 }

@@ -147,7 +147,7 @@ Do not write production code without a failing test first. Patterns, mocks, e2e 
 
 ## Deployment
 
-The `Dockerfile` builds a static binary (`golang:1.27-alpine`) and runs it from `alpine:3.21` as a non-root user on port 3000. It copies `internal/` (for migrations) but not `docs/`, so Swagger is unavailable in the image unless you add it. There is no `HEALTHCHECK`; probe `GET /healthz` if you need one. `docker-compose.yml` only provides local dependencies (MySQL, phpMyAdmin, Mailpit), not the app.
+The `Dockerfile` builds a static binary (`golang:1.27-alpine`) and runs it from `alpine:3.21` as a non-root user on port 3000. It copies `internal/` (for migrations) but not `docs/`, so Swagger is unavailable in the image unless you add it. There is no `HEALTHCHECK`; probe `GET /healthz` for liveness, or `GET /readyz` to also check the database. `docker-compose.yml` only provides local dependencies (MySQL, phpMyAdmin, Mailpit), not the app.
 
 ## Code Review Checklist
 

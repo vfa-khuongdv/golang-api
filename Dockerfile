@@ -37,6 +37,9 @@ COPY --from=builder /app/main .
 # Copy the internal directory which includes migrations
 COPY --from=builder /app/internal ./internal
 
+# Copy the API documentation served at /swagger when STAGE is not prod
+COPY --from=builder /app/docs ./docs
+
 # Change ownership of the application files to the non-root user
 RUN chown -R appuser:appuser /home/appuser
 

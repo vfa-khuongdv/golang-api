@@ -32,6 +32,17 @@ func parseIDParam(ctx *gin.Context) (uint, bool) {
 	return uint(id), true
 }
 
+// actorID returns the authenticated user making the change. On failure it
+// writes a 401 response and returns false.
+func actorID(ctx *gin.Context) (uint, bool) {
+	id, err := utils.GetUserIDFromContext(ctx)
+	if err != nil {
+		utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Unauthorized"))
+		return 0, false
+	}
+	return id, true
+}
+
 func (handler *roleHandlerImpl) ListRoles(ctx *gin.Context) {
 	roles, err := handler.roleService.ListRoles(ctx.Request.Context())
 	if err != nil {
@@ -57,12 +68,16 @@ func (handler *roleHandlerImpl) GetRole(ctx *gin.Context) {
 }
 
 func (handler *roleHandlerImpl) CreateRole(ctx *gin.Context) {
+	actor, ok := actorID(ctx)
+	if !ok {
+		return
+	}
 	var input dto.RoleInput
 	if err := ctx.ShouldBindJSON(&input); err != nil {
 		utils.RespondWithError(ctx, utils.TranslateValidationErrors(err, input))
 		return
 	}
-	role, err := handler.roleService.CreateRole(ctx.Request.Context(), &input)
+	role, err := handler.roleService.CreateRole(ctx.Request.Context(), actor, &input)
 	if err != nil {
 		logger.WithContext(ctx.Request.Context()).Errorf("Create role failed: %v", err)
 		utils.RespondWithError(ctx, err)
@@ -72,6 +87,10 @@ func (handler *roleHandlerImpl) CreateRole(ctx *gin.Context) {
 }
 
 func (handler *roleHandlerImpl) UpdateRole(ctx *gin.Context) {
+	actor, ok := actorID(ctx)
+	if !ok {
+		return
+	}
 	id, ok := parseIDParam(ctx)
 	if !ok {
 		return
@@ -81,7 +100,7 @@ func (handler *roleHandlerImpl) UpdateRole(ctx *gin.Context) {
 		utils.RespondWithError(ctx, utils.TranslateValidationErrors(err, input))
 		return
 	}
-	role, err := handler.roleService.UpdateRole(ctx.Request.Context(), id, &input)
+	role, err := handler.roleService.UpdateRole(ctx.Request.Context(), actor, id, &input)
 	if err != nil {
 		logger.WithContext(ctx.Request.Context()).Errorf("Update role failed: %v", err)
 		utils.RespondWithError(ctx, err)
@@ -91,11 +110,15 @@ func (handler *roleHandlerImpl) UpdateRole(ctx *gin.Context) {
 }
 
 func (handler *roleHandlerImpl) DeleteRole(ctx *gin.Context) {
+	actor, ok := actorID(ctx)
+	if !ok {
+		return
+	}
 	id, ok := parseIDParam(ctx)
 	if !ok {
 		return
 	}
-	if err := handler.roleService.DeleteRole(ctx.Request.Context(), id); err != nil {
+	if err := handler.roleService.DeleteRole(ctx.Request.Context(), actor, id); err != nil {
 		logger.WithContext(ctx.Request.Context()).Errorf("Delete role failed: %v", err)
 		utils.RespondWithError(ctx, err)
 		return
@@ -114,6 +137,10 @@ func (handler *roleHandlerImpl) ListPermissions(ctx *gin.Context) {
 }
 
 func (handler *roleHandlerImpl) SetUserRoles(ctx *gin.Context) {
+	actor, ok := actorID(ctx)
+	if !ok {
+		return
+	}
 	id, ok := parseIDParam(ctx)
 	if !ok {
 		return
@@ -123,7 +150,7 @@ func (handler *roleHandlerImpl) SetUserRoles(ctx *gin.Context) {
 		utils.RespondWithError(ctx, utils.TranslateValidationErrors(err, input))
 		return
 	}
-	roles, err := handler.roleService.SetUserRoles(ctx.Request.Context(), id, input.RoleIDs)
+	roles, err := handler.roleService.SetUserRoles(ctx.Request.Context(), actor, id, input.RoleIDs)
 	if err != nil {
 		logger.WithContext(ctx.Request.Context()).Errorf("Set user roles failed: %v", err)
 		utils.RespondWithError(ctx, err)

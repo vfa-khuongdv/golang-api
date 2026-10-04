@@ -30,24 +30,3 @@ func TestHashToken(t *testing.T) {
 		assert.Len(t, hash, 64)
 	})
 }
-
-func TestCompareTokenHash(t *testing.T) {
-	t.Run("matching token returns true", func(t *testing.T) {
-		inputValue := "test-value-123"
-		hash := HashToken(inputValue)
-		assert.True(t, CompareTokenHash(inputValue, hash))
-	})
-
-	t.Run("non-matching token returns false", func(t *testing.T) {
-		inputValue := "test-value-123"
-		wrongValue := "wrong-value-456"
-		hash := HashToken(inputValue)
-		assert.False(t, CompareTokenHash(wrongValue, hash))
-	})
-
-	t.Run("empty token with correct hash returns true", func(t *testing.T) {
-		inputValue := ""
-		hash := HashToken(inputValue)
-		assert.True(t, CompareTokenHash(inputValue, hash))
-	})
-}

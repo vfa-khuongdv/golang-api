@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Golang CMS API",
-    "description": "A content management system API built with Go, featuring JWT authentication with refresh tokens, password reset by email, and user profile management.",
+    "description": "A content management system API built with Go, featuring JWT authentication with refresh tokens, password reset by email, and user profile management. Request bodies are limited to 1 MB (413 when larger).",
     "version": "1.0.0",
     "x-api-version": "v1",
     "contact": {
@@ -32,6 +32,10 @@
     {
       "name": "Settings",
       "description": "Mail and frontend settings"
+    },
+    {
+      "name": "Roles",
+      "description": "Role-based access control: roles, permissions, and the roles of a user. A user can only create, change, delete, assign or remove a role whose permissions they all hold."
     }
   ],
   "paths": {
@@ -60,7 +64,47 @@
               }
             }
           }
-        }
+        },
+        "security": []
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness check",
+        "description": "Pings the database with a short timeout. Returns 503 when the database is unreachable, so a load balancer stops routing traffic to this instance.",
+        "operationId": "readinessCheck",
+        "responses": {
+          "200": {
+            "description": "Service is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ready"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": []
       }
     },
     "/api/v1/version": {
@@ -99,7 +143,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/login": {
@@ -132,11 +177,11 @@
             }
           },
           "400": {
-            "description": "Validation error, or invalid credentials (code 3002)",
+            "description": "Validation error, or invalid credentials (code 3002). Unknown emails, wrong passwords and locked accounts all get this same answer; an account is locked for 15 minutes after 5 failed attempts.",
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
+                  "anyOf": [
                     {
                       "$ref": "#/components/schemas/ValidationErrorResponse"
                     },
@@ -149,7 +194,7 @@
             }
           },
           "429": {
-            "description": "Account temporarily locked (code 3006), or rate limit exceeded (code 1006)",
+            "description": "Rate limit exceeded (code 1006)",
             "content": {
               "application/json": {
                 "schema": {
@@ -172,7 +217,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/refresh-token": {
@@ -286,7 +332,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/forgot-password": {
@@ -378,7 +425,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/reset-password": {
@@ -421,7 +469,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
+                  "anyOf": [
                     {
                       "$ref": "#/components/schemas/ValidationErrorResponse"
                     },
@@ -491,7 +539,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/logout": {
@@ -776,7 +825,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
+                  "anyOf": [
                     {
                       "$ref": "#/components/schemas/ValidationErrorResponse"
                     },
@@ -839,7 +888,7 @@
           "Settings"
         ],
         "summary": "Get settings",
-        "description": "The mail password is never returned; mail_password_set tells whether one is stored.",
+        "description": "The mail password is never returned; mail_password_set tells whether one is stored. Needs `settings:read`.",
         "operationId": "getSettings",
         "security": [
           {
@@ -870,6 +919,20 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `settings:read` permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
           }
         }
       },
@@ -878,7 +941,7 @@
           "Settings"
         ],
         "summary": "Update settings",
-        "description": "Only the provided fields are changed. mail_password is stored encrypted; send an empty string to clear it.",
+        "description": "Only the provided fields are changed. mail_password is stored encrypted; send an empty string to clear it. Needs `settings:update`.",
         "operationId": "updateSettings",
         "security": [
           {
@@ -932,6 +995,655 @@
                 "example": {
                   "code": 1003,
                   "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `settings:update` permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "List roles",
+        "description": "Needs `roles:read`.",
+        "operationId": "listRoles",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Roles with their permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Role"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `roles:read` permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Create a role",
+        "description": "Needs `roles:create`, and every permission given to the role.",
+        "operationId": "createRole",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Role created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or an unknown permission ID (code 1002)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `roles:create` permission, or the change involves a permission the user does not hold",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Role name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1005,
+                  "message": "Role name already exists"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/roles/{id}": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Get a role",
+        "description": "Needs `roles:read`.",
+        "operationId": "getRole",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Role ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The role with its permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1002,
+                  "message": "Invalid id"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `roles:read` permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Role not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "Role not found"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Update a role",
+        "description": "Needs `roles:update`, and every permission the role loses or gains. The `admin` role cannot be changed.",
+        "operationId": "updateRole",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Role ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, invalid id, or an unknown permission ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `roles:update` permission, or the change involves a permission the user does not hold, or the role is `admin`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Role not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "Role not found"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Role name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1005,
+                  "message": "Role name already exists"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Delete a role",
+        "description": "Needs `roles:delete`, and every permission of the role. The role is removed from its users. The `admin` role cannot be deleted.",
+        "operationId": "deleteRole",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Role ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Delete role successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1002,
+                  "message": "Invalid id"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `roles:delete` permission, or the change involves a permission the user does not hold, or the role is `admin`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Role not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "Role not found"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/permissions": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "List permissions",
+        "description": "Needs `permissions:read`.",
+        "operationId": "listPermissions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Permission"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `permissions:read` permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}/roles": {
+      "put": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Replace the roles of a user",
+        "description": "Needs `users:assign-roles`, and every permission of the roles the user gains or loses. The last admin cannot lose the `admin` role.",
+        "operationId": "setUserRoles",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "User ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetUserRolesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's roles after the change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Role"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, invalid id, or an unknown role ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationErrorResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - missing, invalid, or expired access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1003,
+                  "message": "Unauthorized"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - the user lacks the `users:assign-roles` permission, or the change involves a permission the user does not hold, or it would remove the last admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1004,
+                  "message": "You do not have permission to perform this action"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "code": 1001,
+                  "message": "User not found"
                 }
               }
             }
@@ -1260,6 +1972,111 @@
             "type": "string",
             "format": "uri",
             "description": "http(s) URL; used in password reset links"
+          }
+        }
+      },
+      "Permission": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "roles:read"
+          },
+          "description": {
+            "type": "string",
+            "example": "View roles"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Role": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 2
+          },
+          "name": {
+            "type": "string",
+            "example": "editor"
+          },
+          "description": {
+            "type": "string",
+            "example": "Can edit settings"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RoleRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "example": "editor"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "example": "Can edit settings"
+          },
+          "permission_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Replaces the role's permissions; omit or leave empty for none",
+            "example": [
+              7,
+              8
+            ]
+          }
+        }
+      },
+      "SetUserRolesRequest": {
+        "type": "object",
+        "required": [
+          "role_ids"
+        ],
+        "properties": {
+          "role_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Replaces all roles of the user; an empty list removes every role",
+            "example": [
+              2
+            ]
           }
         }
       }

@@ -177,7 +177,6 @@ func TestInitDB_InternalBranches(t *testing.T) {
 		result := InitDB(config)
 		assert.NotNil(t, result)
 		assert.Equal(t, gdb, result)
-		assert.Equal(t, gdb, DB)
 		assert.True(t, infoCalled)
 	})
 
@@ -204,4 +203,13 @@ func TestGormConfig(t *testing.T) {
 	// two round trips to RDS per write for no benefit.
 	assert.True(t, gormConfig().SkipDefaultTransaction)
 	assert.False(t, gormConfig().PrepareStmt)
+}
+
+func TestBuildDSN_SetsConnectAndIOTimeouts(t *testing.T) {
+	dsn := buildDSN(DatabaseConfig{User: "u", Password: "p", Host: "db", Port: "3306", DBName: "cms"})
+
+	assert.Contains(t, dsn, "u:p@tcp(db:3306)/cms?")
+	assert.Contains(t, dsn, "timeout="+DB_CONNECT_TIMEOUT.String())
+	assert.Contains(t, dsn, "readTimeout="+DB_IO_TIMEOUT.String())
+	assert.Contains(t, dsn, "writeTimeout="+DB_IO_TIMEOUT.String())
 }

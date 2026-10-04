@@ -133,3 +133,21 @@ func TestCensorInternalBranches(t *testing.T) {
 		assert.Nil(t, out.Name)
 	})
 }
+
+func TestContainsSensitiveKey_WildcardPattern(t *testing.T) {
+	resetSensitiveKeyCache()
+	maskFields := []string{"email", "*password*"}
+
+	assert.True(t, containsSensitiveKey(maskFields, "MAIL_PASSWORD"))
+	assert.True(t, containsSensitiveKey(maskFields, "password"))
+	assert.True(t, containsSensitiveKey(maskFields, "email"))
+	assert.False(t, containsSensitiveKey(maskFields, "email_verified"))
+	assert.False(t, containsSensitiveKey(maskFields, "username"))
+}
+
+func TestMatchesSensitiveKey(t *testing.T) {
+	assert.True(t, MatchesSensitiveKey("Token", "token"))
+	assert.False(t, MatchesSensitiveKey("token", "token_type_hint"))
+	assert.True(t, MatchesSensitiveKey("*token*", "reset_TOKEN_x"))
+	assert.False(t, MatchesSensitiveKey("*token*", "tok"))
+}

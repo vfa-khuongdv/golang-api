@@ -15,13 +15,13 @@ import (
 // Responds 401 without a user, 403 without the permission, 500 on lookup errors.
 func RequirePermission(roleService services.RoleService, permission string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		userID, ok := ctx.Get("UserID")
-		if !ok {
+		userID, err := utils.GetUserIDFromContext(ctx)
+		if err != nil {
 			utils.RespondWithError(ctx, apperror.NewUnauthorizedError("Unauthorized"))
 			return
 		}
 
-		allowed, err := roleService.HasPermission(ctx.Request.Context(), userID.(uint), permission)
+		allowed, err := roleService.HasPermission(ctx.Request.Context(), userID, permission)
 		if err != nil {
 			logger.WithContext(ctx.Request.Context()).Errorf("Permission check failed: %v", err)
 			utils.RespondWithError(ctx, err)

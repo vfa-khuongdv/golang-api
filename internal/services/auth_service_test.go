@@ -146,7 +146,6 @@ func (s *AuthServiceTestSuite) TestLogin() {
 				assert.NotZero(t, resp.AccessToken.ExpiresAt)
 				assert.Equal(t, "mocked-refresh-token", resp.RefreshToken.Token)
 				assert.NotZero(t, resp.RefreshToken.ExpiresAt)
-				s.repo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
 				s.repo.AssertNotCalled(t, "ResetFailedLogins", mock.Anything, mock.Anything)
 			}
 			s.repo.AssertExpectations(t)
@@ -389,12 +388,45 @@ func (s *AuthServiceTestSuite) TestLogin_AccountLocked() {
 	user := &models.User{ID: 1, Email: email, Password: "irrelevant", LockedUntil: &lockedUntil}
 	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
 
+	s.repo.On("FindByEmail", mock.Anything, "nobody@example.com").Return((*models.User)(nil), gorm.ErrRecordNotFound)
+	_, unknownErr := s.service.Login(context.Background(), "nobody@example.com", password, ipAddress)
+
 	resp, err := s.service.Login(context.Background(), email, password, ipAddress)
 
-	assert.Error(s.T(), err)
+	// A distinct "locked" answer would reveal that the email is registered.
 	assert.Nil(s.T(), resp)
-	if appErr, ok := err.(*apperror.AppError); ok {
-		assert.Equal(s.T(), apperror.ErrAccountLocked, appErr.Code)
+	assert.Equal(s.T(), unknownErr, err)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_AccountLockedDoesNotRevealACorrectPassword() {
+	email := "locked-correct@example.com"
+	password := "password123"
+	hashed, _ := utils.HashPassword(password)
+	lockedUntil := time.Now().Add(30 * time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: hashed, LockedUntil: &lockedUntil}
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
+
+	_, wrongErr := s.service.Login(context.Background(), email, "wrong-password", "127.0.0.1")
+	resp, rightErr := s.service.Login(context.Background(), email, password, "127.0.0.1")
+
+	// Otherwise guessing could go on during the lock.
+	assert.Nil(s.T(), resp)
+	assert.Equal(s.T(), wrongErr, rightErr)
+	s.jwtService.AssertNotCalled(s.T(), "GenerateAccessToken", mock.Anything)
+	s.repo.AssertNotCalled(s.T(), "RecordFailedLogin", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_WrongPasswordMessageMentionsTheLockout() {
+	user := &models.User{ID: 1, Email: "hint@example.com", Password: "wrong-hashed"}
+	s.repo.On("FindByEmail", mock.Anything, user.Email).Return(user, nil)
+	s.expectFailedLogin(user.ID, nil)
+
+	_, err := s.service.Login(context.Background(), user.Email, "password123", "127.0.0.1")
+
+	appErr, ok := err.(*apperror.AppError)
+	if s.True(ok) {
+		assert.Equal(s.T(), apperror.ErrInvalidPassword, appErr.Code)
+		assert.Contains(s.T(), appErr.Message, "locked")
 	}
 }
 
@@ -421,7 +453,6 @@ func (s *AuthServiceTestSuite) TestLogin_WithFailedAttemptsResetOnSuccess() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
@@ -448,7 +479,6 @@ func (s *AuthServiceTestSuite) TestLogin_ExpiredLockResetOnSuccess() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_InvalidPasswordUpdateError() {
@@ -480,7 +510,6 @@ func (s *AuthServiceTestSuite) TestLogin_LockoutAfterMaxFailedAttempts() {
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_LockedUntilExactlyNow() {
@@ -557,7 +586,6 @@ func (s *AuthServiceTestSuite) TestLogin_ValidLoginAtMaxFailedAttemptsResets() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
@@ -576,7 +604,6 @@ func (s *AuthServiceTestSuite) TestLogin_FailedAttemptsAtMaxRelocks() {
 	assert.Error(s.T(), err)
 	assert.Nil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
@@ -606,7 +633,6 @@ func (s *AuthServiceTestSuite) TestLogin_LockedUntilOnlyResetOnSuccess() {
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
 	s.repo.AssertExpectations(s.T())
-	s.repo.AssertNotCalled(s.T(), "Update", mock.Anything, mock.Anything)
 }
 
 func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
@@ -631,6 +657,51 @@ func (s *AuthServiceTestSuite) TestLogin_ResetFailedAttemptsUpdateError() {
 
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), resp)
+}
+
+func (s *AuthServiceTestSuite) TestLogin_ExpiredLockRestartsTheCount() {
+	email := "expired-relock@example.com"
+	ipAddress := "127.0.0.1"
+
+	// The lock has expired but the counter is still at the maximum. One wrong
+	// password must count as the first attempt again, not lock the account.
+	expiredLock := time.Now().Add(-time.Minute).Unix()
+	user := &models.User{ID: 1, Email: email, Password: "wrong-hashed", FailedAttempts: services.MaxFailedAttempts, LockedUntil: &expiredLock}
+	s.repo.On("FindByEmail", mock.Anything, email).Return(user, nil)
+	var calls []string
+	s.repo.On("ResetFailedLogins", mock.Anything, user.ID).Return(nil).Once().Run(func(mock.Arguments) { calls = append(calls, "reset") })
+	expectedLock := time.Now().Add(services.LockoutDurationMinutes * time.Minute).Unix()
+	s.repo.On("RecordFailedLogin", mock.Anything, user.ID, services.MaxFailedAttempts, mock.MatchedBy(func(lockUntil int64) bool {
+		return lockUntil >= expectedLock-5 && lockUntil <= expectedLock+5
+	})).Return(nil).Once().Run(func(mock.Arguments) { calls = append(calls, "record") })
+
+	resp, err := s.service.Login(context.Background(), email, "password123", ipAddress)
+
+	assert.Nil(s.T(), resp)
+	if appErr, ok := err.(*apperror.AppError); s.True(ok) {
+		assert.Equal(s.T(), apperror.ErrInvalidPassword, appErr.Code, "a wrong password, not a lock")
+	}
+	assert.Equal(s.T(), []string{"reset", "record"}, calls)
+	s.repo.AssertExpectations(s.T())
+}
+
+func (s *AuthServiceTestSuite) TestLogin_UnknownEmailStillChecksAPassword() {
+	// Skipping bcrypt for an unknown email makes that answer much faster, which
+	// tells registered emails apart.
+	var checked []string
+	original := utils.CheckPasswordHash
+	utils.CheckPasswordHash = func(password, hash string) bool {
+		checked = append(checked, password)
+		return original(password, hash)
+	}
+	defer func() { utils.CheckPasswordHash = original }()
+	s.repo.On("FindByEmail", mock.Anything, "nobody@example.com").Return((*models.User)(nil), gorm.ErrRecordNotFound)
+
+	resp, err := s.service.Login(context.Background(), "nobody@example.com", "password123", "127.0.0.1")
+
+	assert.Nil(s.T(), resp)
+	assert.Error(s.T(), err)
+	assert.Equal(s.T(), []string{"password123"}, checked)
 }
 
 // --------------------- RUN TEST SUITE ---------------------

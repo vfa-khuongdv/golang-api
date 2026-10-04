@@ -33,7 +33,7 @@ func TestUsersGetProfile(t *testing.T) {
 	db.Create(&testUser)
 
 	// Generate access token for test user
-	jwtService, err := services.NewJWTService()
+	jwtService, err := services.NewJWTService(testJWTKey)
 	if err != nil {
 		t.Fatalf("Failed to create JWT service: %v", err)
 	}

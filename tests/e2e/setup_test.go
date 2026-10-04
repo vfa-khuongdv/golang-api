@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/vfa-khuongdv/golang-cms/internal/configs"
 	"github.com/vfa-khuongdv/golang-cms/internal/models"
 	"github.com/vfa-khuongdv/golang-cms/internal/routes"
 	"github.com/vfa-khuongdv/golang-cms/internal/services"
@@ -25,7 +26,7 @@ func generateExpiredToken(userID uint) string {
 			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
 		},
 	})
-	signed, err := token.SignedString([]byte("this-is-a-very-long-secret-key-for-e2e-testing-purposes-32-chars"))
+	signed, err := token.SignedString([]byte(testJWTKey))
 	if err != nil {
 		panic("failed to sign expired token: " + err.Error())
 	}
@@ -43,10 +44,21 @@ func init() {
 	_ = os.Chdir("../..")
 }
 
+// testJWTKey signs the access tokens in the e2e tests.
+const testJWTKey = "this-is-a-very-long-secret-key-for-e2e-testing-purposes-32-chars"
+
+// testConfig is the configuration the e2e router runs with.
+func testConfig() *configs.Config {
+	return &configs.Config{
+		Server:   configs.ServerConfig{GinMode: gin.TestMode, Stage: "test", TrustedProxies: []string{"0.0.0.0/0"}},
+		JWT:      configs.JWTConfig{Secret: testJWTKey},
+		Settings: configs.SettingsConfig{EncryptionKey: strings.Repeat("e", 40)},
+		CORS:     configs.CORSConfig{AllowedOrigins: []string{"http://localhost:5173"}},
+	}
+}
+
 // setupTestRouter initializes the router with an in-memory SQLite database
 func setupTestRouter() (*gin.Engine, *gorm.DB) {
-	_ = os.Setenv("JWT_KEY", "this-is-a-very-long-secret-key-for-e2e-testing-purposes-32-chars")
-	_ = os.Setenv("SETTINGS_ENCRYPTION_KEY", strings.Repeat("e", 40))
 
 	// Set Gin to Test Mode
 	gin.SetMode(gin.TestMode)
@@ -81,7 +93,7 @@ func setupTestRouter() (*gin.Engine, *gorm.DB) {
 	utils.InitValidator()
 
 	// Setup Router
-	router := routes.SetupRouter(db)
+	router := routes.SetupRouter(db, testConfig())
 
 	return router, db
 }

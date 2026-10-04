@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/vfa-khuongdv/golang-cms/internal/handlers"
 	"github.com/vfa-khuongdv/golang-cms/internal/shared/dto"
-	"github.com/vfa-khuongdv/golang-cms/internal/shared/utils"
 	"github.com/vfa-khuongdv/golang-cms/pkg/apperror"
 	"github.com/vfa-khuongdv/golang-cms/tests/mocks"
 )
@@ -245,7 +244,7 @@ func TestLogin(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
-				assert.Equal(t, expectedBody["fields"], utils.ToFieldErrors(actualBody["fields"]))
+				assert.Equal(t, expectedBody["fields"], toFieldErrors(actualBody["fields"]))
 
 				// Assert mocks
 				mockService.AssertExpectations(t)
@@ -444,7 +443,7 @@ func TestRefreshToken(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
-				assert.Equal(t, expectedBody["fields"], utils.ToFieldErrors(actualBody["fields"]))
+				assert.Equal(t, expectedBody["fields"], toFieldErrors(actualBody["fields"]))
 
 				// Assert mocks
 				mockService.AssertExpectations(t)

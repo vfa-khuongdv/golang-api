@@ -18,7 +18,7 @@ import (
 func TestLogout(t *testing.T) {
 	router, db := setupTestRouter()
 
-	jwtService, err := services.NewJWTService()
+	jwtService, err := services.NewJWTService(testJWTKey)
 	require.NoError(t, err)
 
 	hashedPassword, _ := utils.HashPassword("Password@123")

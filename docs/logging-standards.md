@@ -86,7 +86,7 @@ Example Kibana query: `event: login_failed AND latency_ms: > 1000`
 - `utils.MaskWithPrefix(value, 4)` keeps the first 4 characters and replaces the rest with `*****` (values of 4 characters or fewer keep only the first). It is used for emails in service logs, for headers, and for query parameters.
 - `utils.CensorSensitiveData` masks the matching fields of JSON request/response bodies, keeping only the first 2 characters.
 
-Field names masked in bodies and query parameters (case-insensitive, see `sensitiveKeys` in `internal/middlewares/log_middleware.go`): `password`, `new_password`, `old_password`, `confirm_password`, `token`, `access_token`, `refresh_token`, `email`, `phone`, `address`, `otp`, `totp`, `mfa_code`, `mfa_secret`, `verification_code`, `secret`, `api-key`, `credit_card`, `debit_card`, `cvv`, `ccv`, `ssn`, `social_security_number`, `bank_account`, `bank_account_number`, `session`, `session_id`, `sessionid`, and `sid`.
+Field names masked in bodies and query parameters (case-insensitive, see `sensitiveKeys` in `internal/middlewares/log_middleware.go`): `password`, `new_password`, `old_password`, `confirm_password`, `token`, `access_token`, `refresh_token`, `email`, `phone`, `address`, `otp`, `totp`, `mfa_code`, `mfa_secret`, `verification_code`, `secret`, `api-key`, `credit_card`, `debit_card`, `cvv`, `ccv`, `ssn`, `social_security_number`, `bank_account`, `bank_account_number`, `session`, `session_id`, `sessionid`, and `sid`. Any field whose name contains `password`, `secret`, or `token` (e.g. `mail_password`) is masked too.
 
 ```
 Service log (MaskWithPrefix, 4)

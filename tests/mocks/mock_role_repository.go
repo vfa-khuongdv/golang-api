@@ -70,12 +70,18 @@ func (m *MockRoleRepository) CountRolesByIDs(ctx context.Context, ids []uint) (i
 	return n, args.Error(1)
 }
 
-func (m *MockRoleRepository) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint) error {
-	return m.Called(ctx, userID, roleIDs).Error(0)
+func (m *MockRoleRepository) SetUserRoles(ctx context.Context, userID uint, roleIDs []uint, keepRoleID uint) error {
+	return m.Called(ctx, userID, roleIDs, keepRoleID).Error(0)
 }
 
-func (m *MockRoleRepository) CountUsersWithRole(ctx context.Context, roleID uint, excludeUserID uint) (int64, error) {
-	args := m.Called(ctx, roleID, excludeUserID)
-	n, _ := args.Get(0).(int64)
-	return n, args.Error(1)
+func (m *MockRoleRepository) FindPermissionIDsByUserID(ctx context.Context, userID uint) ([]uint, error) {
+	args := m.Called(ctx, userID)
+	ids, _ := args.Get(0).([]uint)
+	return ids, args.Error(1)
+}
+
+func (m *MockRoleRepository) FindPermissionIDsByRoleIDs(ctx context.Context, roleIDs []uint) ([]uint, error) {
+	args := m.Called(ctx, roleIDs)
+	ids, _ := args.Get(0).([]uint)
+	return ids, args.Error(1)
 }

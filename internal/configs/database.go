@@ -23,8 +23,6 @@ type DatabaseConfig struct {
 	ConnMaxIdleTime time.Duration
 }
 
-var DB *gorm.DB
-
 var (
 	openGormConnection = func(dsn string) (*gorm.DB, error) {
 		return gorm.Open(mysql.Open(dsn), gormConfig())
@@ -52,19 +50,32 @@ const (
 	DEFAULT_CONN_MAX_LIFETIME  = 30 * time.Minute
 )
 
-// InitDB initializes MySQL with GORM and configures a resilient connection pool
-func InitDB(config DatabaseConfig) *gorm.DB {
-	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC",
+// Without these a hung MySQL holds every pooled connection forever: the
+// connect timeout bounds dialing, the I/O timeout bounds each read or write.
+const (
+	DB_CONNECT_TIMEOUT = 5 * time.Second
+	DB_IO_TIMEOUT      = 30 * time.Second
+)
+
+// buildDSN returns the MySQL DSN for config.
+func buildDSN(config DatabaseConfig) string {
+	return fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=UTC&timeout=%s&readTimeout=%s&writeTimeout=%s",
 		config.User,
 		config.Password,
 		config.Host,
 		config.Port,
 		config.DBName,
+		DB_CONNECT_TIMEOUT,
+		DB_IO_TIMEOUT,
+		DB_IO_TIMEOUT,
 	)
+}
 
+// InitDB initializes MySQL with GORM and configures a resilient connection pool
+func InitDB(config DatabaseConfig) *gorm.DB {
 	// Open GORM connection
-	db, err := openGormConnection(dsn)
+	db, err := openGormConnection(buildDSN(config))
 	if err != nil {
 		logFatalf("Failed to connect to MySQL: %+v", err)
 	}
@@ -98,7 +109,6 @@ func InitDB(config DatabaseConfig) *gorm.DB {
 		config.ConnMaxIdleTime,
 	)
 
-	DB = db
 	return db
 }
 

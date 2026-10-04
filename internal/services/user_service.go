@@ -57,18 +57,26 @@ func (service *userServiceImpl) ForgotPassword(ctx context.Context, input *dto.F
 	user.ResetToken = &hashedToken
 	user.ResetExpiredAt = &expiredAt
 
-	err = service.repo.Update(ctx, user)
+	// Only the columns changed here, so a stale copy of the user never
+	// overwrites a concurrent change (e.g. a new password).
+	err = service.repo.UpdateColumns(ctx, user, "reset_token", "reset_expired_at")
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventPasswordResetRequest).Errorf("Failed to update user with reset token: %v", err)
 		return apperror.NewDBUpdateError("Failed to save reset token")
 	}
 
-	// Send raw token to user via email (never store raw token in DB)
+	// Send raw token to user via email (never store raw token in DB). The mail
+	// goes out in the background and a failure is only logged: answering at
+	// once, and the same way as for an unknown email, keeps the endpoint from
+	// revealing which emails are registered, by status code or by SMTP delay.
 	userWithRawToken := *user
 	userWithRawToken.ResetToken = &rawToken
-	if err := service.mailerService.SendMailForgotPassword(ctx, &userWithRawToken); err != nil {
-		return err
-	}
+	mailCtx := context.WithoutCancel(ctx) // keeps the request ID, outlives the request
+	go func() {
+		if err := service.mailerService.SendMailForgotPassword(mailCtx, &userWithRawToken); err != nil {
+			logger.WithEvent(mailCtx, logger.EventPasswordResetRequest).Errorf("Failed to send forgot password email to %s: %v", utils.MaskWithPrefix(user.Email, 4), err)
+		}
+	}()
 
 	return nil
 }
@@ -98,7 +106,7 @@ func (service *userServiceImpl) ResetPassword(ctx context.Context, input *dto.Re
 	user.FailedAttempts = 0
 	user.LockedUntil = nil
 
-	err = service.repo.Update(ctx, user)
+	err = service.repo.UpdateColumns(ctx, user, "password", "reset_token", "reset_expired_at", "failed_attempts", "locked_until")
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventPasswordReset).Errorf("Failed to update user password: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update password")
@@ -135,7 +143,7 @@ func (service *userServiceImpl) ChangePassword(ctx context.Context, userId uint,
 	}
 
 	user.Password = newPassword
-	err = service.repo.Update(ctx, user)
+	err = service.repo.UpdateColumns(ctx, user, "password")
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventPasswordChangeFailed).Errorf("Failed to update user password: %v", err)
 		return nil, apperror.NewDBUpdateError("Failed to update password")
@@ -163,14 +171,20 @@ func (service *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, 
 		return apperror.NewNotFoundError("User not found")
 	}
 
+	// Only the fields sent are written, so the update cannot undo a concurrent
+	// change to another column (e.g. a password reset).
+	var columns []string
 	if input.Name != nil {
 		user.Name = *input.Name
+		columns = append(columns, "name")
 	}
 	if input.Address != nil {
 		user.Address = input.Address
+		columns = append(columns, "address")
 	}
 	if input.Gender != nil {
 		user.Gender = models.Gender(*input.Gender)
+		columns = append(columns, "gender")
 	}
 
 	if input.Birthday != nil {
@@ -179,9 +193,13 @@ func (service *userServiceImpl) UpdateProfile(ctx context.Context, userID uint, 
 			return err
 		}
 		user.Birthday = birthdayDate
+		columns = append(columns, "birthday")
 	}
 
-	err = service.repo.Update(ctx, user)
+	if len(columns) == 0 {
+		return nil
+	}
+	err = service.repo.UpdateColumns(ctx, user, columns...)
 	if err != nil {
 		logger.WithEvent(ctx, logger.EventProfileUpdateFailed).Errorf("Failed to update user profile: %v", err)
 		return apperror.NewDBUpdateError("Failed to update profile")

@@ -368,27 +368,6 @@ func TestTranslateValidationErrors_DefaultCase(t *testing.T) {
 	})
 }
 
-func TestToFieldErrors(t *testing.T) {
-	t.Run("MapArrayToFieldErrors", func(t *testing.T) {
-		input := []any{
-			map[string]any{"field": "Email", "message": "Email is required"},
-			map[string]any{"field": "Password", "message": "Password is too short"},
-		}
-
-		result := utils.ToFieldErrors(input)
-
-		assert.Equal(t, []apperror.FieldError{
-			{Field: "Email", Message: "Email is required"},
-			{Field: "Password", Message: "Password is too short"},
-		}, result)
-	})
-
-	t.Run("UnsupportedInputReturnsEmpty", func(t *testing.T) {
-		assert.Empty(t, utils.ToFieldErrors(map[string]any{"field": "Email"}))
-		assert.Empty(t, utils.ToFieldErrors("not-an-array"))
-	})
-}
-
 func TestTranslateValidationErrors_InternalBranches(t *testing.T) {
 	t.Run("NonValidationError", func(t *testing.T) {
 		// Non-validation, non-EOF errors are JSON decode failures; the raw

@@ -3,6 +3,7 @@ package middlewares_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -201,5 +202,44 @@ func TestGetRequestID(t *testing.T) {
 
 		// Assert
 		assert.Empty(t, actualID)
+	})
+}
+
+func TestRequestIDMiddleware_ReplacesUnsafeClientIDs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for name, clientID := range map[string]string{
+		"too long":              strings.Repeat("a", 129),
+		"newline (log forging)": "abc\nlevel=error msg=forged",
+		"spaces and quotes":     `id" injected`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			router := gin.New()
+			router.Use(middlewares.RequestIDMiddleware())
+			var captured string
+			router.GET("/test", func(c *gin.Context) { captured = middlewares.GetRequestID(c) })
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set(middlewares.RequestIDHeader, clientID)
+			router.ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.NotEqual(t, clientID, captured)
+			_, err := uuid.Parse(captured)
+			assert.NoError(t, err, "a new UUID is generated instead")
+		})
+	}
+
+	t.Run("A UUID Or Similar Safe ID Is Kept", func(t *testing.T) {
+		router := gin.New()
+		router.Use(middlewares.RequestIDMiddleware())
+		var captured string
+		router.GET("/test", func(c *gin.Context) { captured = middlewares.GetRequestID(c) })
+		id := "Root=1-67891233-abcdef012345678912345678_v2.x"
+
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Header.Set(middlewares.RequestIDHeader, id)
+		router.ServeHTTP(httptest.NewRecorder(), req)
+
+		assert.Equal(t, id, captured)
 	})
 }

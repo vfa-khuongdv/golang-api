@@ -29,8 +29,7 @@ func TestUpdateProfile(t *testing.T) {
 
 	t.Run("UpdateProfile - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		userID := uint(1)
 		requestBody := map[string]any{
@@ -66,7 +65,6 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - Validation Error", func(t *testing.T) {
@@ -179,8 +177,7 @@ func TestUpdateProfile(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				mailerService := new(mocks.MockMailerService)
-				handler := handlers.NewUserHandler(userService, mailerService)
+				handler := handlers.NewUserHandler(userService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -204,19 +201,17 @@ func TestUpdateProfile(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
-				assert.Equal(t, tt.expectedFields, utils.ToFieldErrors(actualBody["fields"]))
+				assert.Equal(t, tt.expectedFields, toFieldErrors(actualBody["fields"]))
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				mailerService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("UpdateProfile - Invalid UserID ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -240,13 +235,11 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("UpdateProfile - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		userID := uint(1)
 		requestBody := map[string]any{
@@ -288,13 +281,11 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error Update User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		userID := uint(1)
 		requestBody := map[string]any{
@@ -336,7 +327,6 @@ func TestUpdateProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 }
@@ -346,8 +336,7 @@ func TestGetProfile(t *testing.T) {
 
 	t.Run("Success get profile from database", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		user := &models.User{
 			ID:        1,
@@ -386,14 +375,12 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error Invalid User ID", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
 
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -415,17 +402,15 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
 		userId := uint(1)
 
 		userService.On("GetProfile", mock.Anything, userId).Return(&models.User{}, apperror.NewNotFoundError("User not found"))
 
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/api/v1/profile", nil)
@@ -447,7 +432,6 @@ func TestGetProfile(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 }
 
@@ -459,8 +443,7 @@ func TestChangePassword(t *testing.T) {
 
 	t.Run("ChangePassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		user := &models.User{
 			ID:        1,
@@ -500,7 +483,6 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Validation Error", func(t *testing.T) {
@@ -609,8 +591,7 @@ func TestChangePassword(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				mailerService := new(mocks.MockMailerService)
-				handler := handlers.NewUserHandler(userService, mailerService)
+				handler := handlers.NewUserHandler(userService)
 
 				// Create http request and context
 				w := httptest.NewRecorder()
@@ -632,19 +613,17 @@ func TestChangePassword(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
-				assert.Equal(t, expectedBody["fields"], utils.ToFieldErrors(actualBody["fields"]))
+				assert.Equal(t, expectedBody["fields"], toFieldErrors(actualBody["fields"]))
 
 				// Assert mock expectations
 				userService.AssertExpectations(t)
-				mailerService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("ChangePassword - NotFound User", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -678,13 +657,11 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"old_password":     "wrongpassword",
@@ -719,13 +696,11 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - New Password and Confirm Password Mismatch", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -763,8 +738,7 @@ func TestChangePassword(t *testing.T) {
 
 	t.Run("ChangePassword - Failed To Update", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -798,13 +772,11 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - User Not found from ctx", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		// Create a test context
 		w := httptest.NewRecorder()
@@ -821,13 +793,11 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Old Password equal to New Password", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -861,13 +831,11 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ChangePassword - Hash Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"old_password":     "12345678",
@@ -901,7 +869,6 @@ func TestChangePassword(t *testing.T) {
 
 		// Assert mock expectations
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 }
@@ -913,8 +880,7 @@ func TestResetPassword(t *testing.T) {
 
 	t.Run("ResetPassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"token":        "token",
@@ -939,13 +905,11 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Not found user by token", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
@@ -979,13 +943,11 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Token Expired", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"token":        "invalid-token",
@@ -1017,13 +979,11 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ResetPassword - Error Hashing Password Failed", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"token":        "token",
@@ -1056,13 +1016,11 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Error failed to UpdateUser", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"token":        "token",
@@ -1098,7 +1056,6 @@ func TestResetPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("Validation Error", func(t *testing.T) {
@@ -1178,8 +1135,7 @@ func TestResetPassword(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				mailerService := new(mocks.MockMailerService)
-				handler := handlers.NewUserHandler(userService, mailerService)
+				handler := handlers.NewUserHandler(userService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -1196,11 +1152,10 @@ func TestResetPassword(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, tt.expectedCode, actualBody["code"])
 				assert.Equal(t, tt.expectedMsg, actualBody["message"])
-				assert.Equal(t, tt.expectedField, utils.ToFieldErrors(actualBody["fields"]))
+				assert.Equal(t, tt.expectedField, toFieldErrors(actualBody["fields"]))
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				mailerService.AssertExpectations(t)
 			})
 		}
 	})
@@ -1215,8 +1170,7 @@ func TestForgotPassword(t *testing.T) {
 
 	t.Run("ForgotPassword - Success", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"email": "test@example.com",
@@ -1243,7 +1197,6 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Validation Error", func(t *testing.T) {
@@ -1286,8 +1239,7 @@ func TestForgotPassword(t *testing.T) {
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				userService := new(mocks.MockUserService)
-				mailerService := new(mocks.MockMailerService)
-				handler := handlers.NewUserHandler(userService, mailerService)
+				handler := handlers.NewUserHandler(userService)
 
 				// Create a test context
 				w := httptest.NewRecorder()
@@ -1308,19 +1260,17 @@ func TestForgotPassword(t *testing.T) {
 				assert.Equal(t, http.StatusBadRequest, w.Code)
 				assert.Equal(t, expectedBody["code"], actualBody["code"])
 				assert.Equal(t, expectedBody["message"], actualBody["message"])
-				assert.Equal(t, tc.expectedFields, utils.ToFieldErrors(actualBody["fields"]))
+				assert.Equal(t, tc.expectedFields, toFieldErrors(actualBody["fields"]))
 
 				// Assert mocks
 				userService.AssertExpectations(t)
-				mailerService.AssertExpectations(t)
 			})
 		}
 	})
 
 	t.Run("ForgotPassword - User Not Found", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"email": "notfound@example.com",
@@ -1351,13 +1301,11 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Update User Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"email": "test@example.com",
@@ -1388,13 +1336,11 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - JSON Parse Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		// Create a test context with invalid JSON
 		w := httptest.NewRecorder()
@@ -1412,13 +1358,11 @@ func TestForgotPassword(t *testing.T) {
 
 		// Assert mocks
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 
 	t.Run("ForgotPassword - Service Error", func(t *testing.T) {
 		userService := new(mocks.MockUserService)
-		mailerService := new(mocks.MockMailerService)
-		handler := handlers.NewUserHandler(userService, mailerService)
+		handler := handlers.NewUserHandler(userService)
 
 		requestBody := map[string]any{
 			"email": "test@example.com",
@@ -1440,6 +1384,5 @@ func TestForgotPassword(t *testing.T) {
 		assert.Equal(t, "send mail failed", actualBody["message"])
 
 		userService.AssertExpectations(t)
-		mailerService.AssertExpectations(t)
 	})
 }

@@ -9,6 +9,7 @@ const (
 	ErrForbidden       = 1004 // Forbidden access
 	ErrConflict        = 1005 // Conflict error
 	ErrTooManyRequests = 1006 // Too many requests
+	ErrPayloadTooLarge = 1007 // Request body is too large
 
 	// Database errors
 	ErrDBConnection = 2000 // Failed to connect to DB
@@ -23,7 +24,6 @@ const (
 	ErrPasswordHashFailed = 3003 // Failed to hash password
 	ErrPasswordMismatch   = 3004 // Password mismatch
 	ErrPasswordUnchanged  = 3005 // Old and new password are the same
-	ErrAccountLocked      = 3006 // Account is temporarily locked
 
 	// Common
 	ErrParseError       = 4000 // Parsing or field error
