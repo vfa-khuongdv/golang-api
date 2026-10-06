@@ -320,3 +320,41 @@ func TestLoadAllowsPlaceholderSecretsOutsideProd(t *testing.T) {
 
 	assert.NoError(t, err)
 }
+
+func TestLoadRejectsPlaceholderSecretsWhenStageUnset(t *testing.T) {
+	// The default "dev" stage is only for logging and Swagger; it must not
+	// enable the public example secrets, or a prod deploy that forgot
+	// STAGE=prod would sign tokens with a key anyone can read.
+	for _, key := range []string{"JWT_KEY", "SETTINGS_ENCRYPTION_KEY"} {
+		t.Run(key, func(t *testing.T) {
+			setRequiredEnv(t)
+			t.Setenv("STAGE", "")
+			require.NoError(t, os.Unsetenv("STAGE"))
+			t.Setenv(key, "change-me-to-a-secret-at-least-32-chars-long!!")
+
+			_, err := configs.Load()
+
+			assert.ErrorContains(t, err, key)
+		})
+	}
+}
+
+func TestLoadRejectsPlaceholderSecretsInUnknownStage(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("STAGE", "staging")
+	t.Setenv("JWT_KEY", "change-me-to-a-secret-at-least-32-chars-long!!")
+
+	_, err := configs.Load()
+
+	assert.ErrorContains(t, err, "JWT_KEY")
+}
+
+func TestLoadAllowsNonPlaceholderSecretsWhenStageUnset(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("STAGE", "")
+	require.NoError(t, os.Unsetenv("STAGE"))
+
+	_, err := configs.Load()
+
+	assert.NoError(t, err)
+}
