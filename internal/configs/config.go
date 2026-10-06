@@ -60,11 +60,19 @@ func Load() (*Config, error) {
 		trustedProxies = "0.0.0.0/0"
 	}
 
+	// The "dev" default is only for logging and Swagger; stageSet records
+	// whether STAGE was configured, so the public example secrets can require
+	// an explicitly non-production stage.
+	stage, stageSet := os.LookupEnv("STAGE")
+	if !stageSet {
+		stage = "dev"
+	}
+
 	cfg := &Config{
 		Server: ServerConfig{
 			Port:                  GetEnv("PORT", "3000"),
 			GinMode:               GetEnv("GIN_MODE", "release"),
-			Stage:                 GetEnv("STAGE", "dev"),
+			Stage:                 stage,
 			TrustedProxies:        splitList(trustedProxies),
 			TrustedProxiesDefault: !trustedProxiesSet,
 		},
@@ -95,7 +103,7 @@ func Load() (*Config, error) {
 		},
 	}
 
-	if err := cfg.validate(); err != nil {
+	if err := cfg.validate(stageSet); err != nil {
 		return nil, err
 	}
 
@@ -105,7 +113,17 @@ func Load() (*Config, error) {
 // placeholderSecretPrefix starts every example secret in .env.example.
 const placeholderSecretPrefix = "change-me"
 
-func (c *Config) validate() error {
+// placeholderStages are the stages allowed to keep the example secrets from
+// .env.example. Any other stage — including an unset STAGE, whose "dev"
+// default only applies to logging and Swagger — refuses them, so a deployment
+// that forgot to configure its stage cannot sign tokens with a public key.
+var placeholderStages = map[string]bool{
+	"dev":   true,
+	"local": true,
+	"ci":    true,
+}
+
+func (c *Config) validate(stageSet bool) error {
 	var missing []string
 
 	if c.Server.Port == "" {
@@ -135,9 +153,11 @@ func (c *Config) validate() error {
 		if len(secret) < utils.MinSecretKeyLength {
 			return fmt.Errorf("%s must be at least %d characters", name, utils.MinSecretKeyLength)
 		}
-		// The .env.example values are public, so a prod deploy copied from it
-		// would sign tokens anyone can forge.
-		if c.Server.Stage == "prod" && strings.HasPrefix(strings.ToLower(secret), placeholderSecretPrefix) {
+		// The .env.example values are public, so a deploy copied from it would
+		// sign tokens anyone can forge. They are accepted only when STAGE is
+		// explicitly set to a known non-production stage.
+		if strings.HasPrefix(strings.ToLower(secret), placeholderSecretPrefix) &&
+			!(stageSet && placeholderStages[strings.ToLower(c.Server.Stage)]) {
 			return fmt.Errorf("%s still has the placeholder value from .env.example; set a random secret", name)
 		}
 	}
