@@ -157,7 +157,7 @@ func (c *Config) validate(stageSet bool) error {
 		// sign tokens anyone can forge. They are accepted only when STAGE is
 		// explicitly set to a known non-production stage.
 		if strings.HasPrefix(strings.ToLower(secret), placeholderSecretPrefix) &&
-			!(stageSet && placeholderStages[strings.ToLower(c.Server.Stage)]) {
+			(!stageSet || !placeholderStages[strings.ToLower(c.Server.Stage)]) {
 			return fmt.Errorf("%s still has the placeholder value from .env.example; set a random secret", name)
 		}
 	}
