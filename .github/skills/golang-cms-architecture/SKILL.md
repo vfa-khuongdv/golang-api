@@ -9,7 +9,7 @@ metadata:
 
 # Golang CMS Architecture & Development Guide
 
-Go 1.27+, Gin, GORM, MySQL 8 (SQLite in-memory for tests), testify. Commands, setup, env vars and the endpoint list are in `README.md` and the `Makefile`; do not duplicate them here.
+Go 1.27+, Gin, GORM, MySQL 8.4 (SQLite in-memory for tests), testify. Commands, setup, env vars and the endpoint list are in `README.md` and the `Makefile`; do not duplicate them here.
 
 ## Structure
 
