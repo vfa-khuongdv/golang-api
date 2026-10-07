@@ -133,7 +133,7 @@ docker-compose up -d
 
 This will:
 
-- Start a MySQL 8.0 container on port 3306 (data is stored in `mysql/db/data`).
+- Start a MySQL 8.4 container on port 3306 (data is stored in `mysql/db/data`).
 - Start a phpMyAdmin container on port 8080 for database management.
 - Start a Mailpit container that catches outgoing mail (SMTP on 1026, web UI on 8026).
 

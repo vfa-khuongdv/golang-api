@@ -10,7 +10,7 @@
 
 Go 1.27+ CMS REST API with JWT auth (access + refresh tokens), password reset by email, and clean architecture.
 - **Framework:** Gin + GORM
-- **Database:** MySQL 8.0+ (SQLite in-memory for tests)
+- **Database:** MySQL 8.4+ (SQLite in-memory for tests)
 - **Migrations:** SQL files in `internal/database/migrations` (golang-migrate)
 - **Testing:** Testify with mocks
 
